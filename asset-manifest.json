@@ -1,19 +1,19 @@
 {
   "files": {
-    "main.css": "/Outvying-hrms/static/css/main.bc27ced8.css",
-    "main.js": "/Outvying-hrms/static/js/main.9b5deddc.js",
+    "main.css": "/Outvying-hrms/static/css/main.5e833302.css",
+    "main.js": "/Outvying-hrms/static/js/main.ccb5ca72.js",
     "static/js/239.7678b824.chunk.js": "/Outvying-hrms/static/js/239.7678b824.chunk.js",
     "static/js/213.c77d47e0.chunk.js": "/Outvying-hrms/static/js/213.c77d47e0.chunk.js",
     "static/js/455.59b62e31.chunk.js": "/Outvying-hrms/static/js/455.59b62e31.chunk.js",
     "index.html": "/Outvying-hrms/index.html",
-    "main.bc27ced8.css.map": "/Outvying-hrms/static/css/main.bc27ced8.css.map",
-    "main.9b5deddc.js.map": "/Outvying-hrms/static/js/main.9b5deddc.js.map",
+    "main.5e833302.css.map": "/Outvying-hrms/static/css/main.5e833302.css.map",
+    "main.ccb5ca72.js.map": "/Outvying-hrms/static/js/main.ccb5ca72.js.map",
     "239.7678b824.chunk.js.map": "/Outvying-hrms/static/js/239.7678b824.chunk.js.map",
     "213.c77d47e0.chunk.js.map": "/Outvying-hrms/static/js/213.c77d47e0.chunk.js.map",
     "455.59b62e31.chunk.js.map": "/Outvying-hrms/static/js/455.59b62e31.chunk.js.map"
   },
   "entrypoints": [
-    "static/css/main.bc27ced8.css",
-    "static/js/main.9b5deddc.js"
+    "static/css/main.5e833302.css",
+    "static/js/main.ccb5ca72.js"
   ]
 }
