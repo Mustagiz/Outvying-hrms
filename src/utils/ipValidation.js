@@ -51,11 +51,18 @@ export const logIPAccess = (employeeId, employeeName, action, ipAddress, status,
 
 export const getCurrentIP = async () => {
   try {
-    const response = await fetch('https://api.ipify.org?format=json');
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 1000);
+
+    const response = await fetch('https://api.ipify.org?format=json', {
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+
     const data = await response.json();
     return data.ip;
   } catch (error) {
-    return '127.0.0.1'; // Fallback for local testing
+    return '127.0.0.1';
   }
 };
 

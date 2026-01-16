@@ -67,20 +67,21 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const login = async (email, password) => {
-    const savedUsers = JSON.parse(localStorage.getItem('users') || '[]');
+    const savedUsers = getFromLocalStorage('users', users);
     const user = savedUsers.find(u => (u.email === email || u.userId === email) && u.password === password);
     if (user) {
-      const ip = await getCurrentIP();
-      const validation = validateIP(ip);
-      setCurrentIP(ip);
-      setIpValidation(validation);
-      
-      logIPAccess(user.id, user.name, 'Login', ip, validation.allowed ? 'Allowed' : 'Blocked', validation.location);
-      
-      if (!validation.allowed) {
-        return { success: false, message: validation.message, ipBlocked: true };
+      try {
+        const ip = await getCurrentIP();
+        const validation = validateIP(ip);
+        setCurrentIP(ip);
+        setIpValidation(validation);
+        logIPAccess(user.id, user.name, 'Login', ip, validation.allowed ? 'Allowed' : 'Blocked', validation.location);
+        if (!validation.allowed) {
+          return { success: false, message: validation.message, ipBlocked: true };
+        }
+      } catch (error) {
+        console.log('IP validation skipped');
       }
-      
       const { password, ...userWithoutPassword } = user;
       setCurrentUser(userWithoutPassword);
       setToLocalStorage('currentUser', userWithoutPassword);
@@ -114,9 +115,9 @@ export const AuthProvider = ({ children }) => {
     const today = new Date().toISOString().split('T')[0];
     const now = new Date();
     const clockInTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-    
+
     const existingRecord = attendance.find(a => a.employeeId === employeeId && a.date === today);
-    
+
     if (existingRecord && existingRecord.clockIn) {
       return { success: false, message: 'Already clocked in today' };
     }
@@ -132,7 +133,7 @@ export const AuthProvider = ({ children }) => {
       overtime: 0
     };
 
-    const updatedAttendance = existingRecord 
+    const updatedAttendance = existingRecord
       ? attendance.map(a => a.id === existingRecord.id ? { ...a, ...newRecord } : a)
       : [...attendance, newRecord];
 
@@ -150,9 +151,9 @@ export const AuthProvider = ({ children }) => {
     const today = new Date().toISOString().split('T')[0];
     const now = new Date();
     const clockOutTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-    
+
     const record = attendance.find(a => a.employeeId === employeeId && a.date === today);
-    
+
     if (!record || !record.clockIn) {
       return { success: false, message: 'Please clock in first' };
     }
@@ -163,8 +164,8 @@ export const AuthProvider = ({ children }) => {
 
     const result = calculateAttendanceStatus(record.clockIn, clockOutTime, today);
 
-    const updatedAttendance = attendance.map(a => 
-      a.id === record.id 
+    const updatedAttendance = attendance.map(a =>
+      a.id === record.id
         ? { ...a, clockOut: clockOutTime, workHours: result.workHours, status: result.status, workingDays: result.workingDays, ruleApplied: result.ruleApplied, overtime: result.workHours > 9 ? (result.workHours - 9).toFixed(2) : 0 }
         : a
     );
@@ -234,13 +235,13 @@ export const AuthProvider = ({ children }) => {
     const updatedUsers = allUsers.map(u => u.id === userId ? { ...u, ...profileData } : u);
     setAllUsers(updatedUsers);
     setToLocalStorage('users', updatedUsers);
-    
+
     if (currentUser.id === userId) {
       const updatedCurrentUser = { ...currentUser, ...profileData };
       setCurrentUser(updatedCurrentUser);
       setToLocalStorage('currentUser', updatedCurrentUser);
     }
-    
+
     return { success: true, message: 'Profile updated successfully' };
   };
 
@@ -272,7 +273,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const updateAnnouncement = (id, updates) => {
-    const updatedAnnouncements = announcements.map(a => 
+    const updatedAnnouncements = announcements.map(a =>
       a.id === id ? { ...a, ...updates } : a
     );
     setAnnouncements(updatedAnnouncements);

@@ -25,7 +25,7 @@ const Login = () => {
     }
 
     const result = await login(email, password);
-    
+
     if (result.success) {
       navigate('/dashboard');
     } else {
@@ -35,7 +35,7 @@ const Login = () => {
         setError(result.message);
       }
     }
-    
+
     setLoading(false);
   };
 
@@ -118,6 +118,23 @@ const Login = () => {
                 </div>
               ))}
             </div>
+          </div>
+
+          <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700 text-center">
+            <Button
+              variant="outline"
+              className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-900/20 border-red-200 dark:border-red-900"
+              onClick={() => {
+                if (window.confirm('This will clear all application data and reset to defaults. Are you sure?')) {
+                  localStorage.clear();
+                  window.location.reload();
+                }
+              }}
+              type="button"
+            >
+              Reset Application Data
+            </Button>
+            <p className="text-xs text-gray-500 dark:text-gray-500 mt-2">Use this if you are unable to login</p>
           </div>
         </div>
 
