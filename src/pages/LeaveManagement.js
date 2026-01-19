@@ -32,7 +32,7 @@ const LeaveManagement = () => {
     const { name, value } = e.target;
     setFormData(prev => {
       const updated = { ...prev, [name]: value };
-      
+
       if (name === 'startDate' || name === 'endDate') {
         if (updated.startDate && updated.endDate) {
           const start = new Date(updated.startDate);
@@ -41,14 +41,14 @@ const LeaveManagement = () => {
           updated.days = days > 0 ? days : 1;
         }
       }
-      
+
       return updated;
     });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    const result = applyLeave(formData);
+    const result = await applyLeave(formData);
     setAlert({ type: result.success ? 'success' : 'error', message: result.message });
     if (result.success) {
       setShowModal(false);

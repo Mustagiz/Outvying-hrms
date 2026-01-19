@@ -13,18 +13,18 @@ const Attendance = () => {
   const [selectedStatus, setSelectedStatus] = useState('all');
 
   const today = new Date().toISOString().split('T')[0];
-  const todayAttendance = attendance.find(a => 
+  const todayAttendance = attendance.find(a =>
     a.employeeId === currentUser.id && a.date === today
   );
 
-  const handleClockIn = () => {
-    const result = clockIn(currentUser.id);
+  const handleClockIn = async () => {
+    const result = await clockIn(currentUser.id);
     setAlert({ type: result.success ? 'success' : 'error', message: result.message });
     setTimeout(() => setAlert(null), 3000);
   };
 
-  const handleClockOut = () => {
-    const result = clockOut(currentUser.id);
+  const handleClockOut = async () => {
+    const result = await clockOut(currentUser.id);
     setAlert({ type: result.success ? 'success' : 'error', message: result.message });
     setTimeout(() => setAlert(null), 3000);
   };
@@ -34,11 +34,11 @@ const Attendance = () => {
       const date = new Date(a.date);
       const matchesMonth = date.getMonth() === selectedMonth;
       const matchesYear = date.getFullYear() === selectedYear;
-      const matchesEmployee = currentUser.role === 'employee' 
+      const matchesEmployee = currentUser.role === 'employee'
         ? a.employeeId === currentUser.id
         : selectedEmployee === 'all' ? true : a.employeeId === parseInt(selectedEmployee);
       const matchesStatus = selectedStatus === 'all' ? true : a.status === selectedStatus;
-      
+
       return matchesMonth && matchesYear && matchesEmployee && matchesStatus;
     });
 
@@ -59,8 +59,8 @@ const Attendance = () => {
 
   const columns = [
     { header: 'Date', accessor: 'date', render: (row) => formatDate(row.date) },
-    ...(currentUser.role !== 'employee' ? [{ 
-      header: 'Employee', 
+    ...(currentUser.role !== 'employee' ? [{
+      header: 'Employee',
       accessor: 'employeeId',
       render: (row) => allUsers.find(u => u.id === row.employeeId)?.name || 'Unknown'
     }] : []),
@@ -68,8 +68,8 @@ const Attendance = () => {
     { header: 'Clock Out', accessor: 'clockOut', render: (row) => row.clockOut || 'N/A' },
     { header: 'Work Hours', accessor: 'workHours', render: (row) => `${row.workHours || 0}h` },
     { header: 'Overtime', accessor: 'overtime', render: (row) => `${row.overtime || 0}h` },
-    { 
-      header: 'Status', 
+    {
+      header: 'Status',
       accessor: 'status',
       render: (row) => (
         <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(row.status)}`}>
@@ -136,8 +136,8 @@ const Attendance = () => {
                   </p>
                 </div>
               </div>
-              <Button 
-                onClick={handleClockOut} 
+              <Button
+                onClick={handleClockOut}
                 disabled={!todayAttendance?.clockIn || todayAttendance?.clockOut}
                 variant="secondary"
               >
@@ -218,7 +218,7 @@ const Attendance = () => {
               </>
             )}
           </div>
-          <Button 
+          <Button
             onClick={() => exportToCSV(filteredAttendance, 'attendance_report')}
             variant="secondary"
           >
