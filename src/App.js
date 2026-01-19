@@ -31,6 +31,7 @@ import UserManagement from './pages/UserManagement';
 import IPRestrictions from './pages/IPRestrictions';
 import IPAccessLogs from './pages/IPAccessLogs';
 import Profile from './pages/Profile';
+import Roster from './pages/Roster';
 import { Spinner } from './components/UI';
 
 const PrivateRoute = ({ children }) => {
@@ -246,6 +247,16 @@ const AppRoutes = () => {
           <PrivateRoute>
             <Layout>
               <BulletinBoard />
+            </Layout>
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/roster"
+        element={
+          <PrivateRoute>
+            <Layout>
+              <Roster />
             </Layout>
           </PrivateRoute>
         }

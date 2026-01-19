@@ -23,6 +23,7 @@ export const AuthProvider = ({ children }) => {
   const [allDocuments, setAllDocuments] = useState([]);
   const [allBankAccounts, setAllBankAccounts] = useState([]);
   const [announcements, setAnnouncements] = useState([]);
+  const [rosters, setRosters] = useState([]);
   const [theme, setTheme] = useState('light');
   const [loading, setLoading] = useState(true);
   const [currentIP, setCurrentIP] = useState('127.0.0.1');
@@ -42,6 +43,7 @@ export const AuthProvider = ({ children }) => {
       { id: 3, type: 'Important', title: 'New Leave Policy Update', message: 'Updated leave policy is now active. Please review the changes in Leave Policy section.', date: '2024-01-13', author: 'Admin', pinned: false, icon: 'AlertCircle', color: 'red' },
       { id: 4, type: 'Achievement', title: 'Team Achievement Award', message: 'Congratulations to Engineering team for completing the project ahead of schedule!', date: '2024-01-12', author: 'Management', pinned: false, icon: 'Trophy', color: 'yellow' }
     ]);
+    const savedRosters = getFromLocalStorage('rosters', []);
     const savedTheme = getFromLocalStorage('theme', 'light');
 
     setCurrentUser(savedUser);
@@ -52,6 +54,7 @@ export const AuthProvider = ({ children }) => {
     setAllDocuments(savedDocuments);
     setAllBankAccounts(savedBankAccounts);
     setAnnouncements(savedAnnouncements);
+    setRosters(savedRosters);
     setTheme(savedTheme);
     setLoading(false);
 
@@ -137,8 +140,21 @@ export const AuthProvider = ({ children }) => {
       ? attendance.map(a => a.id === existingRecord.id ? { ...a, ...newRecord } : a)
       : [...attendance, newRecord];
 
-    setAttendance(updatedAttendance);
-    setToLocalStorage('attendance', updatedAttendance);
+    // Auto-calculate status if we have a roster
+    const todayRoster = rosters.find(r => r.employeeId === employeeId && r.date === today);
+    if (todayRoster) {
+      const result = calculateAttendanceStatus(clockInTime, null, today, todayRoster);
+      const recordWithStatus = { ...newRecord, status: result.status, ruleApplied: result.ruleApplied };
+      const finalAttendance = existingRecord
+        ? attendance.map(a => a.id === existingRecord.id ? { ...a, ...recordWithStatus } : a)
+        : [...attendance, recordWithStatus];
+      setAttendance(finalAttendance);
+      setToLocalStorage('attendance', finalAttendance);
+    } else {
+      setAttendance(updatedAttendance);
+      setToLocalStorage('attendance', updatedAttendance);
+    }
+
     return { success: true, message: 'Clocked in successfully', time: clockInTime };
   };
 
@@ -162,7 +178,8 @@ export const AuthProvider = ({ children }) => {
       return { success: false, message: 'Already clocked out today' };
     }
 
-    const result = calculateAttendanceStatus(record.clockIn, clockOutTime, today);
+    const todayRoster = rosters.find(r => r.employeeId === employeeId && r.date === today);
+    const result = calculateAttendanceStatus(record.clockIn, clockOutTime, today, todayRoster);
 
     const updatedAttendance = attendance.map(a =>
       a.id === record.id
@@ -310,6 +327,25 @@ export const AuthProvider = ({ children }) => {
     return { success: true };
   };
 
+  const assignRoster = (rosterData) => {
+    const newRoster = {
+      id: `R${Date.now()}`,
+      ...rosterData,
+      assignedAt: new Date().toISOString()
+    };
+    const updatedRosters = [...rosters, newRoster];
+    setRosters(updatedRosters);
+    setToLocalStorage('rosters', updatedRosters);
+    return { success: true, message: 'Roster assigned successfully' };
+  };
+
+  const deleteRoster = (id) => {
+    const updatedRosters = rosters.filter(r => r.id !== id);
+    setRosters(updatedRosters);
+    setToLocalStorage('rosters', updatedRosters);
+    return { success: true, message: 'Roster deleted successfully' };
+  };
+
   const value = {
     currentUser,
     allUsers: allUsers.filter(u => {
@@ -322,6 +358,7 @@ export const AuthProvider = ({ children }) => {
     documents: allDocuments,
     bankAccounts: allBankAccounts,
     announcements,
+    rosters,
     theme,
     loading,
     currentIP,
@@ -342,7 +379,9 @@ export const AuthProvider = ({ children }) => {
     deleteAnnouncement,
     addUser,
     deleteUser,
-    updateUser
+    updateUser,
+    assignRoster,
+    deleteRoster
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

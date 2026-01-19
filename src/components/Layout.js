@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { 
-  Home, Users, Calendar, FileText, UserPlus, UserMinus, 
-  Briefcase, DollarSign, CheckSquare, BarChart2, Settings, 
-  LogOut, Menu, X, Sun, Moon, BookOpen, Fingerprint, Megaphone, UserCog, Wallet, CreditCard, Building, Shield 
+import {
+  Home, Users, Calendar, FileText, UserPlus, UserMinus,
+  Briefcase, DollarSign, CheckSquare, BarChart2, Settings,
+  LogOut, Menu, X, Sun, Moon, BookOpen, Fingerprint, Megaphone, UserCog, Wallet, CreditCard, Building, Shield
 } from 'lucide-react';
 
 const Layout = ({ children }) => {
@@ -27,6 +27,7 @@ const Layout = ({ children }) => {
       { path: '/documents', icon: Briefcase, label: 'Documents' },
       { path: '/leave', icon: FileText, label: 'Leave Management' },
       { path: '/profile', icon: Users, label: 'My Profile' },
+      { path: '/roster', icon: Calendar, label: 'Roster' },
       { path: '/payslips', icon: DollarSign, label: 'Payslips' },
       { path: '/attendance-regularization', icon: CheckSquare, label: 'Regularization' }
     ],
@@ -43,6 +44,7 @@ const Layout = ({ children }) => {
       { path: '/profile', icon: Users, label: 'My Profile' },
       { path: '/onboarding', icon: UserPlus, label: 'Onboarding' },
       { path: '/payslips', icon: DollarSign, label: 'Payslips' },
+      { path: '/roster', icon: Calendar, label: 'Roster' },
       { path: '/attendance-regularization', icon: CheckSquare, label: 'Regularization' },
       { path: '/reports', icon: BarChart2, label: 'Reports' }
     ],
@@ -71,6 +73,7 @@ const Layout = ({ children }) => {
       { path: '/attendance-regularization', icon: CheckSquare, label: 'Regularization' },
       { path: '/reporting-hierarchy', icon: Users, label: 'Reporting Hierarchy' },
       { path: '/reports', icon: BarChart2, label: 'Reports' },
+      { path: '/roster', icon: Calendar, label: 'Roster' },
       { path: '/salary-slip-template', icon: FileText, label: 'Salary Slip Template' },
       { path: '/settings', icon: Settings, label: 'Settings' },
       { path: '/user-management', icon: UserCog, label: 'User Management' }
@@ -83,16 +86,15 @@ const Layout = ({ children }) => {
     <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
       {/* Mobile Overlay */}
       {sidebarOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
       {/* Sidebar */}
-      <aside className={`${
-        sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-      } lg:translate-x-0 fixed lg:static inset-y-0 left-0 z-50 w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 transition-transform duration-300 flex flex-col`}>
+      <aside className={`${sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        } lg:translate-x-0 fixed lg:static inset-y-0 left-0 z-50 w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 transition-transform duration-300 flex flex-col`}>
         <div className="p-4 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between">
             <h1 className="text-xl font-bold text-primary-600">Outvying HRMS</h1>
@@ -115,11 +117,10 @@ const Layout = ({ children }) => {
                   <Link
                     to={item.path}
                     onClick={() => setSidebarOpen(false)}
-                    className={`flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors ${
-                      isActive
+                    className={`flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors ${isActive
                         ? 'bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400'
                         : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-                    }`}
+                      }`}
                   >
                     <Icon size={20} />
                     <span>{item.label}</span>

@@ -1,6 +1,6 @@
 // Biometric attendance calculation utilities
 
-export const calculateAttendanceStatus = (clockIn, clockOut, date = null) => {
+export const calculateAttendanceStatus = (clockIn, clockOut, date = null, roster = null) => {
   if (!clockIn || !clockOut) {
     return { status: 'Absent', workHours: 0, workingDays: 0 };
   }
@@ -38,8 +38,15 @@ export const calculateAttendanceStatus = (clockIn, clockOut, date = null) => {
     workingDays = 0;
   }
 
-  // Check if late
-  if (status === 'Present' && inHour >= 9 && inMin > 15) {
+  // Check if late based on roster or default
+  const shiftStartTime = roster?.startTime || '09:00';
+  const [shiftHour, shiftMin] = shiftStartTime.split(':').map(Number);
+  const shiftStartInMinutes = shiftHour * 60 + shiftMin;
+  const clockInInMinutes = inHour * 60 + inMin;
+
+  const gracePeriod = roster?.gracePeriod || defaultRule.gracePeriodMins;
+
+  if (status === 'Present' && clockInInMinutes > (shiftStartInMinutes + gracePeriod)) {
     status = 'Late';
   }
 
@@ -47,7 +54,7 @@ export const calculateAttendanceStatus = (clockIn, clockOut, date = null) => {
     status,
     workHours: workHours.toFixed(2),
     workingDays,
-    ruleApplied: defaultRule.name || 'Standard Office'
+    ruleApplied: roster ? `Roster: ${roster.shiftName}` : (defaultRule.name || 'Standard Office')
   };
 };
 
@@ -66,9 +73,9 @@ export const getFirstInLastOut = (punches) => {
 export const calculateMonthlyWorkingDays = (attendance, employeeId, month, year) => {
   const monthAttendance = attendance.filter(a => {
     const date = new Date(a.date);
-    return a.employeeId === employeeId && 
-           date.getMonth() === month && 
-           date.getFullYear() === year;
+    return a.employeeId === employeeId &&
+      date.getMonth() === month &&
+      date.getFullYear() === year;
   });
 
   let totalWorkingDays = 0;
@@ -83,12 +90,14 @@ export const calculateMonthlyWorkingDays = (attendance, employeeId, month, year)
 export const syncBiometricData = () => {
   // Simulated biometric sync - in production, this would call actual biometric API
   const mockBiometricData = [
-    { employeeId: 1, date: new Date().toISOString().split('T')[0], punches: [
-      { time: '09:05', type: 'IN' },
-      { time: '13:00', type: 'OUT' },
-      { time: '14:00', type: 'IN' },
-      { time: '18:15', type: 'OUT' }
-    ]}
+    {
+      employeeId: 1, date: new Date().toISOString().split('T')[0], punches: [
+        { time: '09:05', type: 'IN' },
+        { time: '13:00', type: 'OUT' },
+        { time: '14:00', type: 'IN' },
+        { time: '18:15', type: 'OUT' }
+      ]
+    }
   ];
 
   return mockBiometricData;
@@ -97,10 +106,12 @@ export const syncBiometricData = () => {
 export const processBiometricSync = () => {
   const biometricData = syncBiometricData();
   const attendance = JSON.parse(localStorage.getItem('attendance') || '[]');
+  const rosters = JSON.parse(localStorage.getItem('rosters') || '[]');
 
   biometricData.forEach(data => {
     const { firstIn, lastOut } = getFirstInLastOut(data.punches);
-    const result = calculateAttendanceStatus(firstIn, lastOut, data.date);
+    const todayRoster = rosters.find(r => r.employeeId === data.employeeId && r.date === data.date);
+    const result = calculateAttendanceStatus(firstIn, lastOut, data.date, todayRoster);
 
     const existingIndex = attendance.findIndex(
       a => a.employeeId === data.employeeId && a.date === data.date
