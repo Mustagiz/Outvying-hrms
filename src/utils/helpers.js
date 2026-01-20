@@ -31,8 +31,8 @@ export const calculateWorkHours = (clockIn, clockOut) => {
 };
 
 export const getMonthName = (monthIndex) => {
-  const months = ['January', 'February', 'March', 'April', 'May', 'June', 
-                  'July', 'August', 'September', 'October', 'November', 'December'];
+  const months = ['January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'];
   return months[monthIndex];
 };
 
@@ -54,13 +54,13 @@ export const getStatusColor = (status) => {
 
 export const exportToCSV = (data, filename) => {
   if (!data || data.length === 0) return;
-  
+
   const headers = Object.keys(data[0]);
   const csvContent = [
     headers.join(','),
     ...data.map(row => headers.map(header => JSON.stringify(row[header] || '')).join(','))
   ].join('\n');
-  
+
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
@@ -70,7 +70,7 @@ export const exportToCSV = (data, filename) => {
 
 export const filterData = (data, searchTerm, fields) => {
   if (!searchTerm) return data;
-  
+
   return data.filter(item =>
     fields.some(field =>
       String(item[field]).toLowerCase().includes(searchTerm.toLowerCase())
@@ -103,4 +103,14 @@ export const validateEmail = (email) => {
 export const validatePhone = (phone) => {
   const re = /^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,9}$/;
   return re.test(phone);
+};
+
+export const getYearOptions = (startYear = 2022, futureYears = 5) => {
+  const currentYear = new Date().getFullYear();
+  const endYear = currentYear + futureYears;
+  const years = [];
+  for (let year = startYear; year <= endYear; year++) {
+    years.push({ value: year, label: year.toString() });
+  }
+  return years;
 };

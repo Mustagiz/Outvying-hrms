@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Card, Button, Select } from '../components/UI';
-import { exportToCSV } from '../utils/helpers';
+import { exportToCSV, getYearOptions } from '../utils/helpers';
 import { BarChart3, Download, TrendingUp, Users } from 'lucide-react';
 
 const Reports = () => {
@@ -56,15 +56,15 @@ const Reports = () => {
 
       const empAttendance = attendance.filter(a => {
         const date = new Date(a.date);
-        return a.employeeId === emp.id && 
-               date.getMonth() === selectedMonth && 
-               date.getFullYear() === selectedYear;
+        return a.employeeId === emp.id &&
+          date.getMonth() === selectedMonth &&
+          date.getFullYear() === selectedYear;
       });
 
-      byDepartment[emp.department].present += empAttendance.filter(a => 
+      byDepartment[emp.department].present += empAttendance.filter(a =>
         a.status === 'Present' || a.status === 'Late'
       ).length;
-      byDepartment[emp.department].absent += empAttendance.filter(a => 
+      byDepartment[emp.department].absent += empAttendance.filter(a =>
         a.status === 'Absent'
       ).length;
     });
@@ -79,7 +79,7 @@ const Reports = () => {
     { value: 9, label: 'October' }, { value: 10, label: 'November' }, { value: 11, label: 'December' }
   ];
 
-  const yearOptions = [2022, 2023, 2024, 2025].map(y => ({ value: y, label: y.toString() }));
+  const yearOptions = getYearOptions();
 
   const exportAttendanceReport = () => {
     const data = attendance.filter(a => {
@@ -207,7 +207,7 @@ const Reports = () => {
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600 dark:text-gray-400">Attendance %</span>
                   <span className="font-semibold text-primary-600">
-                    {data.present + data.absent > 0 
+                    {data.present + data.absent > 0
                       ? ((data.present / (data.present + data.absent)) * 100).toFixed(1)
                       : 0}%
                   </span>

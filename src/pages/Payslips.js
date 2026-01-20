@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { Card, Button, Select, Table, Modal } from '../components/UI';
 import { Download, FileText, Calendar, DollarSign, Eye, EyeOff, Settings } from 'lucide-react';
 import jsPDF from 'jspdf';
+import { getYearOptions } from '../utils/helpers';
 
 const Payslips = () => {
   const { currentUser, attendance, allUsers } = useAuth();
@@ -409,7 +410,7 @@ const Payslips = () => {
     { value: 9, label: 'October' }, { value: 10, label: 'November' }, { value: 11, label: 'December' }
   ];
 
-  const yearOptions = [2022, 2023, 2024, 2025].map(y => ({ value: y, label: y.toString() }));
+  const yearOptions = getYearOptions();
 
   const employeeOptions = currentUser.role === 'employee'
     ? [{ value: currentUser.id, label: currentUser.name }]

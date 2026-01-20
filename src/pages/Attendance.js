@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Card, Button, Table, Alert, Select } from '../components/UI';
 import { Clock, Calendar } from 'lucide-react';
-import { formatDate, getStatusColor, exportToCSV } from '../utils/helpers';
+import { formatDate, getStatusColor, exportToCSV, getYearOptions } from '../utils/helpers';
 
 const Attendance = () => {
   const { currentUser, attendance, clockIn, clockOut, allUsers } = useAuth();
@@ -87,7 +87,7 @@ const Attendance = () => {
     { value: 9, label: 'October' }, { value: 10, label: 'November' }, { value: 11, label: 'December' }
   ];
 
-  const yearOptions = [2022, 2023, 2024, 2025].map(y => ({ value: y, label: y.toString() }));
+  const yearOptions = getYearOptions();
 
   const employeeOptions = [
     { value: 'all', label: 'All Employees' },

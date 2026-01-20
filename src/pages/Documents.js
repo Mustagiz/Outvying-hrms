@@ -13,6 +13,7 @@ const Documents = () => {
     type: 'Resume',
     expiryDate: ''
   });
+  const [selectedFile, setSelectedFile] = useState(null);
 
   const documentTypes = [
     'Resume',
@@ -26,7 +27,7 @@ const Documents = () => {
   ];
 
   const myDocuments = useMemo(() => {
-    return documents.filter(d => 
+    return documents.filter(d =>
       currentUser.role === 'employee' ? d.employeeId === currentUser.id : true
     );
   }, [documents, currentUser]);
@@ -36,15 +37,58 @@ const Documents = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  const handleFileChange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      setSelectedFile(e.target.files[0]);
+    }
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
-    const result = uploadDocument(currentUser.id, formData);
-    setAlert({ type: result.success ? 'success' : 'error', message: result.message });
-    if (result.success) {
-      setShowModal(false);
-      setFormData({ name: '', type: 'Resume', expiryDate: '' });
+    if (!selectedFile) {
+      setAlert({ type: 'error', message: 'Please select a file to upload' });
+      return;
     }
-    setTimeout(() => setAlert(null), 3000);
+
+    if (selectedFile.size > 500 * 1024) { // 500KB limit
+      setAlert({ type: 'error', message: 'File size exceeds 500KB limit. Please choose a smaller file.' });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const fileUrl = event.target.result;
+      const result = uploadDocument(currentUser.id, {
+        ...formData,
+        fileName: selectedFile.name,
+        fileType: selectedFile.type,
+        fileSize: (selectedFile.size / 1024).toFixed(2) + ' KB',
+        fileUrl: fileUrl
+      });
+
+      setAlert({ type: result.success ? 'success' : 'error', message: result.message });
+      if (result.success) {
+        setShowModal(false);
+        setFormData({ name: '', type: 'Resume', expiryDate: '' });
+        setSelectedFile(null);
+      }
+      setTimeout(() => setAlert(null), 3000);
+    };
+
+    reader.readAsDataURL(selectedFile);
+  };
+
+  const handleDownload = (doc) => {
+    if (doc.fileUrl) {
+      const link = document.createElement('a');
+      link.href = doc.fileUrl;
+      link.download = doc.fileName || doc.name;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } else {
+      alert(`This is a mock document. (Simulated Download: ${doc.name})`);
+    }
   };
 
   const columns = [
@@ -53,8 +97,8 @@ const Documents = () => {
       accessor: 'employeeId',
       render: (row) => allUsers.find(u => u.id === row.employeeId)?.name || 'Unknown'
     }] : []),
-    { 
-      header: 'Document Name', 
+    {
+      header: 'Document Name',
       accessor: 'name',
       render: (row) => (
         <div className="flex items-center space-x-2">
@@ -65,8 +109,8 @@ const Documents = () => {
     },
     { header: 'Type', accessor: 'type' },
     { header: 'Upload Date', accessor: 'uploadDate', render: (row) => formatDate(row.uploadDate) },
-    { 
-      header: 'Expiry Date', 
+    {
+      header: 'Expiry Date',
       accessor: 'expiryDate',
       render: (row) => row.expiryDate ? formatDate(row.expiryDate) : 'N/A'
     },
@@ -83,7 +127,11 @@ const Documents = () => {
       header: 'Actions',
       render: (row) => (
         <div className="flex space-x-2">
-          <button className="text-primary-600 hover:text-primary-700">
+          <button
+            onClick={() => handleDownload(row)}
+            className="text-primary-600 hover:text-primary-700"
+            title="Download"
+          >
             <Download size={16} />
           </button>
         </div>
@@ -170,15 +218,32 @@ const Documents = () => {
 
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Upload File
+              Upload File <span className="text-red-500">*</span>
             </label>
-            <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-6 text-center">
-              <Upload className="mx-auto text-gray-400 mb-2" size={32} />
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                Click to upload or drag and drop
-              </p>
-              <p className="text-xs text-gray-500 mt-1">PDF, DOC, DOCX, JPG, PNG (Max 10MB)</p>
-              <input type="file" className="hidden" />
+            <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-6 text-center relative group hover:border-primary-500 transition-colors">
+              <input
+                type="file"
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                onChange={handleFileChange}
+                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                required
+              />
+              <div className="pointer-events-none">
+                <Upload className="mx-auto text-gray-400 mb-2 group-hover:text-primary-500" size={32} />
+                {selectedFile ? (
+                  <div className="text-primary-600 font-medium">
+                    <p>{selectedFile.name}</p>
+                    <p className="text-xs text-gray-500 mt-1">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      Click to upload or drag and drop
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">PDF, DOC, JPG, PNG (Max 500KB)</p>
+                  </>
+                )}
+              </div>
             </div>
           </div>
 
