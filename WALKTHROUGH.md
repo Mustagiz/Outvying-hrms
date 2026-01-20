@@ -250,8 +250,19 @@ To verify the fix, please follow these steps:
 2.  Go to **Leave Management** -> **Apply Leave**.
 3.  Verify that only **LWP** (and other non-restricted types) appear in the dropdown.
 4.  Mark 15 days of attendance for that employee (manually in DB or via clock-in logic).
-5.  Re-check the dropdown; verify that **PL** and **CL** now appear (if balance > 0).
+5.  Re-check the dropdown; verify that **PL** and **CL** now appear (if balance > 0).### Manual Leave Allocation (Admin)
+- **Files**: `src/pages/LeaveManagement.js`, `src/context/AuthContext.js`
+- **Change**: 
+    - Created `manualLeaveAllocations` collection in Firestore.
+    - Added "Manage Balances" tab in Leave Management for Admins.
+    - Admins can now add or deduct Paid/Casual leave balances manually for any employee.
+    - Balances are recalculated in real-time to include these adjustments.
+- **Reason**: Allows HR/Admin to handle special cases, carry-forwards, or manual adjustments without affecting attendance history.
 
-
-
-
+#### Verification
+1.  Login as **Admin**.
+2.  Go to **Leave Management** -> **Manage Balances** tab.
+3.  Click **Allocate** next to an employee.
+4.  Enter the amount (e.g., `5` for 5 days) and a reason.
+5.  Verify that the employee's balance increases immediately.
+6.  Try a negative number (e.g., `-2`) to deduct leaves.
