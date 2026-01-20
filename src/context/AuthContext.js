@@ -6,7 +6,9 @@ import {
   signOut,
   onAuthStateChanged,
   getAuth,
-  createUserWithEmailAndPassword
+  createUserWithEmailAndPassword,
+  updatePassword,
+  updateEmail
 } from 'firebase/auth';
 import {
   collection,
@@ -605,6 +607,68 @@ export const AuthProvider = ({ children }) => {
     } catch (e) { return { success: false, message: 'Update failed' }; }
   };
 
+  // ADMIN - RESET PASSWORD (Requires signing in as user temporarily or using a secondary app)
+  // WARNING: Resetting password for ANOTHER user without Cloud Functions usually requires their credentials.
+  // HOWEVER, we can use the secondary app to "Login" as them if we know their OLD credentials, 
+  // OR just instruct the admin to use the "Forgot Password" flow effectively.
+  // FOR THIS APP: We will implement a "Force Update" using the secondary app pattern if old password is provided,
+  // OR we inform the user to use Firebase Console.
+  // BETTER CLIENT-SIDE APPROACH: Use `sendPasswordResetEmail`.
+  const resetPassword = async (email) => {
+    try {
+      const { sendPasswordResetEmail } = await import('firebase/auth');
+      await sendPasswordResetEmail(auth, email);
+      return { success: true, message: 'Password reset link sent to ' + email };
+    } catch (e) {
+      console.error("Reset Error:", e);
+      return { success: false, message: 'Reset failed: ' + e.message };
+    }
+  };
+
+  // For direct password override (if admin provides temporary password):
+  const forceUpdatePassword = async (email, oldPassword, newPassword) => {
+    let secondaryApp = null;
+    try {
+      secondaryApp = initializeApp(firebaseConfig, "PasswordResetApp");
+      const secondaryAuth = getAuth(secondaryApp);
+      const userCredential = await signInWithEmailAndPassword(secondaryAuth, email, oldPassword);
+      await updatePassword(userCredential.user, newPassword);
+
+      await signOut(secondaryAuth);
+      await deleteApp(secondaryApp);
+      return { success: true, message: 'Password updated successfully' };
+    } catch (e) {
+      if (secondaryApp) await deleteApp(secondaryApp);
+      return { success: false, message: 'Update failed: ' + e.message };
+    }
+  };
+
+  const updateUserId = async (currentEmail, currentPassword, newEmail) => {
+    let secondaryApp = null;
+    try {
+      secondaryApp = initializeApp(firebaseConfig, "EmailUpdateApp");
+      const secondaryAuth = getAuth(secondaryApp);
+      const userCredential = await signInWithEmailAndPassword(secondaryAuth, currentEmail, currentPassword);
+
+      // 1. Update in Auth
+      await updateEmail(userCredential.user, newEmail);
+      const uid = userCredential.user.uid;
+
+      // 2. Update in Firestore
+      await updateDoc(doc(db, 'users', uid), {
+        email: newEmail,
+        userId: newEmail // Sync userId field if used
+      });
+
+      await signOut(secondaryAuth);
+      await deleteApp(secondaryApp);
+      return { success: true, message: 'User ID / Email updated successfully' };
+    } catch (e) {
+      if (secondaryApp) await deleteApp(secondaryApp);
+      return { success: false, message: 'Update failed: ' + e.message };
+    }
+  };
+
   const deleteUser = async (userId) => {
     try {
       await deleteDoc(doc(db, 'users', userId));
@@ -679,6 +743,9 @@ export const AuthProvider = ({ children }) => {
     addUser,
     updateUser,
     updateUserProfile: updateUser,
+    resetPassword,
+    forceUpdatePassword,
+    updateUserId,
     deleteUser,
     assignRoster,
     deleteRoster,
