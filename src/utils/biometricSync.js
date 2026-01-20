@@ -1,7 +1,7 @@
 // Biometric attendance calculation utilities
 
 export const calculateAttendanceStatus = (clockIn, clockOut, date = null, roster = null) => {
-  if (!clockIn || !clockOut) {
+  if (!clockIn) {
     return { status: 'Absent', workHours: 0, workingDays: 0 };
   }
 
@@ -13,46 +13,48 @@ export const calculateAttendanceStatus = (clockIn, clockOut, date = null, roster
     gracePeriodMins: 15
   };
 
-  // Calculate work hours
   const [inHour, inMin] = clockIn.split(':').map(Number);
-  const [outHour, outMin] = clockOut.split(':').map(Number);
-  const workHours = outHour - inHour + (outMin - inMin) / 60;
+  const clockInInMinutes = inHour * 60 + inMin;
 
-  // Apply grace period
-  const graceHours = defaultRule.gracePeriodMins / 60;
-  const adjustedHours = workHours + graceHours;
-
-  // Determine status
-  let status, workingDays;
-  if (adjustedHours >= defaultRule.fullDayHours) {
-    status = 'Present';
-    workingDays = 1.0;
-  } else if (adjustedHours >= defaultRule.halfDayHours) {
-    status = 'Half Day';
-    workingDays = 0.5;
-  } else if (adjustedHours >= defaultRule.minPresentHours) {
-    status = 'Half Day';
-    workingDays = 0.5;
-  } else {
-    status = 'Absent';
-    workingDays = 0;
-  }
-
-  // Check if late based on roster or default
   const shiftStartTime = roster?.startTime || '09:00';
   const [shiftHour, shiftMin] = shiftStartTime.split(':').map(Number);
   const shiftStartInMinutes = shiftHour * 60 + shiftMin;
-  const clockInInMinutes = inHour * 60 + inMin;
-
   const gracePeriod = roster?.gracePeriod || defaultRule.gracePeriodMins;
 
-  if (status === 'Present' && clockInInMinutes > (shiftStartInMinutes + gracePeriod)) {
-    status = 'Late';
+  // Initial status based on clockIn time
+  let status = clockInInMinutes > (shiftStartInMinutes + gracePeriod) ? 'Late' : 'Present';
+  let workingDays = 0; // Only count days after clockOut
+  let workHours = 0;
+
+  if (clockOut) {
+    const [outHour, outMin] = clockOut.split(':').map(Number);
+    workHours = outHour - inHour + (outMin - inMin) / 60;
+
+    // Final status and working days calculation
+    const graceHours = defaultRule.gracePeriodMins / 60;
+    const adjustedHours = workHours + graceHours;
+
+    if (adjustedHours >= defaultRule.fullDayHours) {
+      workingDays = 1.0;
+    } else if (adjustedHours >= defaultRule.halfDayHours) {
+      status = 'Half Day';
+      workingDays = 0.5;
+    } else if (adjustedHours >= defaultRule.minPresentHours) {
+      status = 'Half Day';
+      workingDays = 0.5;
+    } else {
+      status = 'Absent';
+      workingDays = 0;
+    }
+
+    if (status === 'Present' && clockInInMinutes > (shiftStartInMinutes + gracePeriod)) {
+      status = 'Late';
+    }
   }
 
   return {
     status,
-    workHours: workHours.toFixed(2),
+    workHours: typeof workHours === 'number' ? Math.round(workHours * 100) / 100 : 0,
     workingDays,
     ruleApplied: roster ? `Roster: ${roster.shiftName}` : (defaultRule.name || 'Standard Office')
   };

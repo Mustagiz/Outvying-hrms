@@ -212,9 +212,10 @@ export const AuthProvider = ({ children }) => {
     if (loading || allUsers.length === 0) return;
 
     const updatedBalances = allUsers.map(user => {
-      // 1. Calculate Accrued Paid Leave (PL)
+      // 1. Calculate Accrued Leaves (PL and CL)
       let accruedPL = 0;
-      const userAttendance = attendance.filter(a => a.employeeId === user.uid || a.employeeId === user.id); // Handle both ID types
+      let accruedCL = 0;
+      const userAttendance = attendance.filter(a => String(a.employeeId) === String(user.uid) || String(a.employeeId) === String(user.id));
 
       const attendanceByMonth = {};
       userAttendance.forEach(a => {
@@ -228,7 +229,8 @@ export const AuthProvider = ({ children }) => {
 
       Object.values(attendanceByMonth).forEach(daysPresent => {
         if (daysPresent >= 15) {
-          accruedPL += 1.5;
+          accruedPL += 1.0;
+          accruedCL += 0.5;
         }
       });
 
@@ -258,7 +260,11 @@ export const AuthProvider = ({ children }) => {
           used: usedPL,
           available: Math.max(0, accruedPL - usedPL)
         },
-        casualLeave: { total: 6, used: usedCL, available: 6 - usedCL },
+        casualLeave: {
+          total: accruedCL,
+          used: usedCL,
+          available: Math.max(0, accruedCL - usedCL)
+        },
         lwp: { total: 0, used: usedLWP, available: 0 },
         upl: { total: 0, used: 0, available: 0 }
       };
@@ -361,11 +367,13 @@ export const AuthProvider = ({ children }) => {
     }
 
     try {
+      console.log("Attempting Clock In for:", employeeId, "at:", clockInTime, "Doc ID:", docId);
       await setDoc(docRef, newRecord);
+      console.log("Clock In Success");
       return { success: true, message: 'Clocked in successfully', time: clockInTime };
     } catch (error) {
-      console.error("ClockIn Error", error);
-      return { success: false, message: 'Failed to clock in: ' + error.message };
+      console.error("ClockIn Error:", error);
+      return { success: false, message: 'Failed to clock in: ' + (error.code || error.message) };
     }
   };
 
@@ -399,12 +407,14 @@ export const AuthProvider = ({ children }) => {
 
       const docId = `${employeeId}_${today}`;
       const docRef = doc(db, 'attendance', docId);
+      console.log("Attempting Clock Out for:", employeeId, "updates:", updates);
       await updateDoc(docRef, updates);
+      console.log("Clock Out Success");
       return { success: true, message: 'Clocked out successfully', time: clockOutTime };
 
     } catch (error) {
-      console.error("ClockOut Error", error);
-      return { success: false, message: 'Failed to clock out' };
+      console.error("ClockOut Error:", error);
+      return { success: false, message: 'Failed to clock out: ' + (error.code || error.message) };
     }
   };
 
