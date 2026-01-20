@@ -14,14 +14,36 @@ const BankAccount = () => {
 
   const myBankAccount = useMemo(() => {
     const empId = currentUser.role === 'employee' ? String(currentUser.id) : String(selectedEmployee);
-    return bankAccounts.find(b => String(b.employeeId) === String(empId)) || {
+    console.log("BankAccount Debug - Current User Role:", currentUser.role);
+    console.log("BankAccount Debug - Targeted EmpId:", empId);
+    console.log("BankAccount Debug - Total Bank Accounts:", bankAccounts.length);
+
+    if (!empId || empId === 'null') return {
       accountNumber: '',
       bankName: '',
       ifscCode: '',
       accountType: 'Savings',
       branch: ''
     };
-  }, [bankAccounts, currentUser, selectedEmployee]);
+
+    const emp = allUsers.find(u => String(u.id) === String(empId) || String(u.uid) === String(empId));
+
+    // Try matching by UID first, then by numeric employeeId
+    const found = bankAccounts.find(b =>
+      String(b.id) === String(empId) ||
+      (emp && b.employeeId && String(b.employeeId) === String(emp.employeeId)) ||
+      (emp && String(b.id) === String(emp.employeeId))
+    );
+
+    console.log("BankAccount Debug - Found Account:", found);
+    return found || {
+      accountNumber: '',
+      bankName: '',
+      ifscCode: '',
+      accountType: 'Savings',
+      branch: ''
+    };
+  }, [bankAccounts, currentUser, selectedEmployee, allUsers]);
 
   useEffect(() => {
     setFormData(myBankAccount);
@@ -55,7 +77,12 @@ const BankAccount = () => {
 
     const headers = ['Employee ID', 'Employee Name', 'Department', 'Bank Name', 'Account Number', 'IFSC Code', 'Account Type', 'Branch'];
     const rows = filteredEmployees.map(emp => {
-      const bankAcc = bankAccounts.find(b => String(b.employeeId) === String(emp.id)) || {};
+      // Try matching by UID first, then by numeric employeeId
+      const bankAcc = bankAccounts.find(b =>
+        String(b.id) === String(emp.id) ||
+        (emp.employeeId && b.employeeId && String(b.employeeId) === String(emp.employeeId)) ||
+        String(b.id) === String(emp.employeeId)
+      ) || {};
       return [
         emp.employeeId || '',
         emp.name || '',
@@ -158,6 +185,7 @@ const BankAccount = () => {
               >
                 <option value="">Select an employee</option>
                 {allUsers.filter(u => {
+                  console.log("BankAccount Debug - Filtering User:", u.name, "Role:", u.role);
                   if (u.role !== 'employee' && u.role !== 'hr') return false;
                   if (searchTerm && !u.name.toLowerCase().includes(searchTerm.toLowerCase()) && !u.employeeId.toLowerCase().includes(searchTerm.toLowerCase())) return false;
                   if (departmentFilter !== 'all' && u.department !== departmentFilter) return false;

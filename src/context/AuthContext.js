@@ -198,8 +198,11 @@ export const AuthProvider = ({ children }) => {
 
     // Subscribe to Bank Accounts (Separate collection)
     const unsubBank = onSnapshot(collection(db, 'bankAccounts'), (snapshot) => {
-      const bankData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), employeeId: doc.id })); // Assuming doc ID is employeeId
+      const bankData = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+      console.log("AuthContext Debug - Bank Snapshot received. Count:", bankData.length);
       setAllBankAccounts(bankData);
+    }, (error) => {
+      console.error("AuthContext Debug - Bank Subscription Error:", error);
     });
 
     // Subscribe to Leave Types
