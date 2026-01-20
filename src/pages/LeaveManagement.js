@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { Card, Button, Table, Modal, Input, Select, Alert, Badge, Pagination } from '../components/UI';
 // import { leaveTypes } from '../data/mockData';
 import { formatDate, getStatusColor } from '../utils/helpers';
-import { User, CheckCircle, XCircle } from 'lucide-react';
+import { User, CheckCircle, XCircle, Search } from 'lucide-react';
 
 const LeaveManagement = () => {
   const { currentUser, leaves, leaveBalances, applyLeave, updateLeaveStatus, allLeaveTypes, attendance, allocateLeave, allUsers } = useAuth();
@@ -103,6 +103,7 @@ const LeaveManagement = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [adminCurrentPage, setAdminCurrentPage] = useState(1);
   const [balanceCurrentPage, setBalanceCurrentPage] = useState(1);
+  const [balanceSearchTerm, setBalanceSearchTerm] = useState('');
   const itemsPerPage = 10;
 
   const paginatedLeaves = useMemo(() => {
@@ -115,25 +116,38 @@ const LeaveManagement = () => {
     return allApplications.slice(startIndex, startIndex + itemsPerPage);
   }, [allApplications, adminCurrentPage]);
 
-  // Admin: Sorted Balances (A-Z by Name)
-  const sortedBalances = useMemo(() => {
-    return [...leaveBalances].sort((a, b) => {
+  // Admin: Filtered and Sorted Balances
+  const filteredBalances = useMemo(() => {
+    let filtered = [...leaveBalances];
+
+    if (balanceSearchTerm) {
+      const term = balanceSearchTerm.toLowerCase();
+      filtered = filtered.filter(lb => {
+        const emp = allUsers.find(u => String(u.id) === String(lb.employeeId) || String(u.uid) === String(lb.employeeId));
+        return (
+          emp?.name?.toLowerCase().includes(term) ||
+          emp?.employeeId?.toLowerCase().includes(term)
+        );
+      });
+    }
+
+    return filtered.sort((a, b) => {
       const userA = allUsers.find(u => String(u.id) === String(a.employeeId) || String(u.uid) === String(a.employeeId));
       const userB = allUsers.find(u => String(u.id) === String(b.employeeId) || String(u.uid) === String(b.employeeId));
       const nameA = userA?.name?.toLowerCase() || '';
       const nameB = userB?.name?.toLowerCase() || '';
       return nameA.localeCompare(nameB);
     });
-  }, [leaveBalances, allUsers]);
+  }, [leaveBalances, allUsers, balanceSearchTerm]);
 
   const paginatedBalances = useMemo(() => {
     const startIndex = (balanceCurrentPage - 1) * itemsPerPage;
-    return sortedBalances.slice(startIndex, startIndex + itemsPerPage);
-  }, [sortedBalances, balanceCurrentPage]);
+    return filteredBalances.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredBalances, balanceCurrentPage]);
 
   const totalPages = Math.ceil(myLeaves.length / itemsPerPage);
   const totalAdminPages = Math.ceil(allApplications.length / itemsPerPage);
-  const totalBalancePages = Math.ceil(sortedBalances.length / itemsPerPage);
+  const totalBalancePages = Math.ceil(filteredBalances.length / itemsPerPage);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -413,6 +427,19 @@ const LeaveManagement = () => {
 
       {activeTab === 'manageBalances' ? (
         <Card title="Manage Employee Leave Balances">
+          <div className="mb-4 relative max-w-md">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+            <input
+              type="text"
+              placeholder="Search employee by name or ID..."
+              value={balanceSearchTerm}
+              onChange={(e) => {
+                setBalanceSearchTerm(e.target.value);
+                setBalanceCurrentPage(1);
+              }}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 outline-none transition-all"
+            />
+          </div>
           <Table columns={balanceColumns} data={paginatedBalances} />
           {totalBalancePages > 1 && (
             <div className="mt-4 flex justify-center">
