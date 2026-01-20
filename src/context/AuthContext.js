@@ -62,6 +62,7 @@ export const AuthProvider = ({ children }) => {
   });
   const [announcements, setAnnouncements] = useState([]);
   const [rosters, setRosters] = useState([]);
+  const [manualLeaveAllocations, setManualLeaveAllocations] = useState([]);
 
   // Local State
   const [theme, setTheme] = useState('light');
@@ -218,6 +219,12 @@ export const AuthProvider = ({ children }) => {
       }
     });
 
+    // Subscribe to Manual Leave Allocations
+    const unsubManualLeaves = onSnapshot(collection(db, 'manualLeaveAllocations'), (snapshot) => {
+      const manualData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setManualLeaveAllocations(manualData);
+    });
+
     // Cleanup subscriptions on unmount or logout
     return () => {
       unsubUsers();
@@ -229,6 +236,7 @@ export const AuthProvider = ({ children }) => {
       unsubBank();
       unsubLeaveTypes();
       unsubPolicy();
+      unsubManualLeaves();
     };
 
   }, [currentUser]);
@@ -262,7 +270,14 @@ export const AuthProvider = ({ children }) => {
         }
       });
 
-      // 2. Calculate Used Leaves
+      // 2. Add Manual Allocations
+      const userManuals = manualLeaveAllocations.filter(m => String(m.employeeId) === String(user.uid) || String(m.employeeId) === String(user.id));
+      userManuals.forEach(m => {
+        if (m.type === 'Paid Leave') accruedPL += parseFloat(m.amount);
+        else if (m.type === 'Casual Leave') accruedCL += parseFloat(m.amount);
+      });
+
+      // 3. Calculate Used Leaves
       const userLeaves = leaves.filter(l => (l.employeeId === user.uid || l.employeeId === user.id) && l.status === 'Approved');
       let usedPL = 0;
       let usedCL = 0;
@@ -299,7 +314,7 @@ export const AuthProvider = ({ children }) => {
     });
 
     setAllLeaveBalances(updatedBalances);
-  }, [attendance, leaves, allUsers, loading]);
+  }, [attendance, leaves, allUsers, manualLeaveAllocations, loading]);
 
 
   // --- 4. Actions (CRUD) using Firebase ---
@@ -494,6 +509,25 @@ export const AuthProvider = ({ children }) => {
       return { success: true, message: `Leave ${status.toLowerCase()} successfully` };
     } catch (error) {
       return { success: false, message: 'Update failed' };
+    }
+  };
+
+  // ALLOCATE LEAVE (Admin only)
+  const allocateLeave = async (employeeId, type, amount, reason) => {
+    try {
+      await addDoc(collection(db, 'manualLeaveAllocations'), {
+        employeeId,
+        type,
+        amount: parseFloat(amount),
+        reason,
+        allocatedBy: currentUser.name || currentUser.email,
+        date: new Date().toISOString().split('T')[0],
+        createdAt: serverTimestamp()
+      });
+      return { success: true, message: 'Leave allocated successfully' };
+    } catch (error) {
+      console.error("AllocateLeave Error", error);
+      return { success: false, message: 'Failed to allocate leave' };
     }
   };
 
@@ -844,6 +878,8 @@ export const AuthProvider = ({ children }) => {
     assignRoster,
     deleteRoster,
     updateRoster,
+    allocateLeave,
+    manualLeaveAllocations,
     updateLeavePolicy,
     addLeaveType,
     deleteLeaveType,

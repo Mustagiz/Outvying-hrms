@@ -6,8 +6,15 @@ import { formatDate, getStatusColor } from '../utils/helpers';
 import { User, CheckCircle, XCircle } from 'lucide-react';
 
 const LeaveManagement = () => {
-  const { currentUser, leaves, leaveBalances, applyLeave, updateLeaveStatus, allLeaveTypes, attendance } = useAuth();
+  const { currentUser, leaves, leaveBalances, applyLeave, updateLeaveStatus, allLeaveTypes, attendance, allocateLeave, allUsers } = useAuth();
   const [showModal, setShowModal] = useState(false);
+  const [showAllocateModal, setShowAllocateModal] = useState(false);
+  const [allocationData, setAllocationData] = useState({
+    employeeId: '',
+    type: 'Paid Leave',
+    amount: '',
+    reason: ''
+  });
   const [alert, setAlert] = useState(null);
 
   // Define myLeaveBalance early to avoid ReferenceError
@@ -151,6 +158,26 @@ const LeaveManagement = () => {
     setTimeout(() => setAlert(null), 3000);
   };
 
+  const handleAllocateLeave = async (e) => {
+    e.preventDefault();
+    if (!allocationData.employeeId || !allocationData.amount) {
+      setAlert({ type: 'error', message: 'Please select an employee and enter an amount' });
+      return;
+    }
+    const result = await allocateLeave(
+      allocationData.employeeId,
+      allocationData.type,
+      allocationData.amount,
+      allocationData.reason
+    );
+    setAlert({ type: result.success ? 'success' : 'error', message: result.message });
+    if (result.success) {
+      setShowAllocateModal(false);
+      setAllocationData({ employeeId: '', type: 'Paid Leave', amount: '', reason: '' });
+    }
+    setTimeout(() => setAlert(null), 3000);
+  };
+
   const columns = [
     { header: 'Leave Type', accessor: 'leaveType' },
     { header: 'Start Date', accessor: 'startDate', render: (row) => formatDate(row.startDate) },
@@ -241,6 +268,31 @@ const LeaveManagement = () => {
     }
   ];
 
+  const balanceColumns = [
+    {
+      header: 'Employee', render: (row) => {
+        const emp = allUsers.find(u => String(u.id) === String(row.employeeId) || String(u.uid) === String(row.employeeId));
+        return emp?.name || 'Unknown';
+      }
+    },
+    { header: 'Paid Leave Available', render: (row) => row.paidLeave.available },
+    { header: 'Casual Leave Available', render: (row) => row.casualLeave.available },
+    {
+      header: 'Actions',
+      render: (row) => (
+        <Button
+          onClick={() => {
+            setAllocationData(prev => ({ ...prev, employeeId: row.employeeId }));
+            setShowAllocateModal(true);
+          }}
+          className="text-xs py-1 px-2"
+        >
+          Allocate
+        </Button>
+      )
+    }
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -273,6 +325,15 @@ const LeaveManagement = () => {
               }`}
           >
             All Applications
+          </button>
+          <button
+            onClick={() => setActiveTab('manageBalances')}
+            className={`pb-2 px-2 text-sm font-medium transition-colors border-b-2 ${activeTab === 'manageBalances'
+              ? 'border-primary-600 text-primary-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+          >
+            Manage Balances
           </button>
         </div>
       )}
@@ -332,7 +393,11 @@ const LeaveManagement = () => {
         )}
       </div>
 
-      {activeTab === 'myLeaves' ? (
+      {activeTab === 'manageBalances' ? (
+        <Card title="Manage Employee Leave Balances">
+          <Table columns={balanceColumns} data={leaveBalances} />
+        </Card>
+      ) : activeTab === 'myLeaves' ? (
         <Card title="My Leave History">
           <Table columns={columns} data={paginatedLeaves} />
           {totalPages > 1 && (
@@ -430,6 +495,50 @@ const LeaveManagement = () => {
               Cancel
             </Button>
             <Button type="submit">Apply</Button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal isOpen={showAllocateModal} onClose={() => setShowAllocateModal(false)} title="Allocate Leave Manually">
+        <form onSubmit={handleAllocateLeave} className="space-y-4">
+          <Select
+            label="Employee"
+            value={allocationData.employeeId}
+            onChange={(e) => setAllocationData(prev => ({ ...prev, employeeId: e.target.value }))}
+            options={allUsers.map(u => ({ value: String(u.uid || u.id), label: `${u.name} (${u.employeeId})` }))}
+            required
+          />
+          <Select
+            label="Leave Type"
+            value={allocationData.type}
+            onChange={(e) => setAllocationData(prev => ({ ...prev, type: e.target.value }))}
+            options={[
+              { value: 'Paid Leave', label: 'Paid Leave' },
+              { value: 'Casual Leave', label: 'Casual Leave' }
+            ]}
+            required
+          />
+          <Input
+            label="Amount (Days)"
+            type="number"
+            step="0.5"
+            value={allocationData.amount}
+            onChange={(e) => setAllocationData(prev => ({ ...prev, amount: e.target.value }))}
+            placeholder="e.g. 1.0 or -1.0 to deduct"
+            required
+          />
+          <Input
+            label="Reason/Note"
+            value={allocationData.reason}
+            onChange={(e) => setAllocationData(prev => ({ ...prev, reason: e.target.value }))}
+            placeholder="Reason for manual adjustment..."
+            required
+          />
+          <div className="flex justify-end space-x-3 pt-4">
+            <Button type="button" variant="secondary" onClick={() => setShowAllocateModal(false)}>
+              Cancel
+            </Button>
+            <Button type="submit">Allocate</Button>
           </div>
         </form>
       </Modal>
