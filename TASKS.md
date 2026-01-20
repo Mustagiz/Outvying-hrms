@@ -10,6 +10,7 @@
 - [x] Sync Leave Policy/Types between Admin and Employee panels
 - [x] Enable users to change their own password in Profile page
 - [x] Fix Bulk Employee Onboarding (App collisions & data mapping)
+- [x] Add search filter to Manage Employee Leave Balances
 - [x] Sort Employee Leave Balances and selection dropdown (A to Z)
 - [x] Implement pagination for manual leave balances table (10 per page)
 - [x] Give option to Admin to allocate Paid/Casual leaves manually

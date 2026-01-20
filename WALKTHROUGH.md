@@ -266,3 +266,17 @@ To verify the fix, please follow these steps:
 4.  Enter the amount (e.g., `5` for 5 days) and a reason.
 5.  Verify that the employee's balance increases immediately.
 6.  Try a negative number (e.g., `-2`) to deduct leaves.
+
+### Search Filter (Real-time)
+- **Files**: `src/pages/LeaveManagement.js`
+- **Change**: 
+    - Added a search bar to the "Manage Employee Leave Balances" tab.
+    - Implemented live filtering logic that matches by employee name or ID.
+- **Reason**: Allows administrators to quickly locate specific employees in large organizations without manually browsing pages.
+
+#### Verification
+1.  Go to **Leave Management** -> **Manage Balances**.
+2.  Type an employee name (or part of it) in the search box.
+3.  Verify the list filters instantly.
+4.  Try searching by **Employee ID** (e.g., `EMP001`).
+5.  Clear the search and verify the full sorted list returns.
