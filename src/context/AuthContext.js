@@ -94,9 +94,9 @@ export const AuthProvider = ({ children }) => {
             setCurrentUser({
               ...userData,
               uid: user.uid,
+              id: user.uid, // Always use UID as the primary ID for database consistency
               email: user.email,
-              // Polyfill 'id' for compatibility with components using .id instead of .uid
-              id: userData.id || user.uid
+              legacyId: userData.id // Preserve legacy ID if needed
             });
           } else {
             // Fallback: If user exists in Auth but not in Firestore (should not happen in prod)
@@ -149,7 +149,7 @@ export const AuthProvider = ({ children }) => {
 
     // Subscribe to ALL Users (Needed for Employee Directory, Admin views, etc.)
     const unsubUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
-      const usersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const usersData = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id, uid: doc.id }));
       setAllUsers(usersData);
     });
 
