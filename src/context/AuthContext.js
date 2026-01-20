@@ -674,6 +674,7 @@ export const AuthProvider = ({ children }) => {
     deleteAnnouncement,
     addUser,
     updateUser,
+    updateUserProfile: updateUser,
     deleteUser,
     assignRoster,
     deleteRoster,

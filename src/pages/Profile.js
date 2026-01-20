@@ -20,11 +20,13 @@ const Profile = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    const result = updateUserProfile(currentUser.id, formData);
+    const result = await updateUserProfile(currentUser.id, formData);
     setAlert({ type: result.success ? 'success' : 'error', message: result.message });
-    setIsEditing(false);
+    if (result.success) {
+      setIsEditing(false);
+    }
     setTimeout(() => setAlert(null), 3000);
   };
 
@@ -51,7 +53,7 @@ const Profile = () => {
               </h2>
               <p className="text-gray-600 dark:text-gray-400 mb-2">{currentUser.designation}</p>
               <p className="text-sm text-gray-500 dark:text-gray-500">{currentUser.employeeId}</p>
-              
+
               <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
                 <div className="space-y-3 text-left">
                   <div className="flex items-center space-x-3">
