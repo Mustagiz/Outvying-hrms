@@ -9,12 +9,12 @@ const Attendance = () => {
   const [alert, setAlert] = useState(null);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  const [selectedEmployee, setSelectedEmployee] = useState(currentUser.role === 'employee' ? currentUser.id : 'all');
+  const [selectedEmployee, setSelectedEmployee] = useState(currentUser.role === 'employee' ? String(currentUser.id) : 'all');
   const [selectedStatus, setSelectedStatus] = useState('all');
 
   const today = new Date().toISOString().split('T')[0];
   const todayAttendance = attendance.find(a =>
-    a.employeeId === currentUser.id && a.date === today
+    String(a.employeeId) === String(currentUser.id) && a.date === today
   );
 
   const handleClockIn = async () => {
@@ -35,8 +35,8 @@ const Attendance = () => {
       const matchesMonth = date.getMonth() === selectedMonth;
       const matchesYear = date.getFullYear() === selectedYear;
       const matchesEmployee = currentUser.role === 'employee'
-        ? a.employeeId === currentUser.id
-        : selectedEmployee === 'all' ? true : a.employeeId === parseInt(selectedEmployee);
+        ? String(a.employeeId) === String(currentUser.id)
+        : selectedEmployee === 'all' ? true : String(a.employeeId) === String(selectedEmployee);
       const matchesStatus = selectedStatus === 'all' ? true : a.status === selectedStatus;
 
       return matchesMonth && matchesYear && matchesEmployee && matchesStatus;
@@ -62,7 +62,7 @@ const Attendance = () => {
     ...(currentUser.role !== 'employee' ? [{
       header: 'Employee',
       accessor: 'employeeId',
-      render: (row) => allUsers.find(u => u.id === row.employeeId)?.name || 'Unknown'
+      render: (row) => allUsers.find(u => String(u.id) === String(row.employeeId))?.name || 'Unknown'
     }] : []),
     { header: 'Clock In', accessor: 'clockIn', render: (row) => row.clockIn || 'N/A' },
     { header: 'Clock Out', accessor: 'clockOut', render: (row) => row.clockOut || 'N/A' },
@@ -91,7 +91,7 @@ const Attendance = () => {
 
   const employeeOptions = [
     { value: 'all', label: 'All Employees' },
-    ...allUsers.filter(u => u.role === 'employee').map(u => ({ value: u.id, label: u.name }))
+    ...allUsers.filter(u => u.role === 'employee').map(u => ({ value: String(u.id), label: u.name }))
   ];
 
   const statusOptions = [

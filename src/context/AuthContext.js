@@ -333,7 +333,7 @@ export const AuthProvider = ({ children }) => {
     const clockInTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 
     // Check if already clocked in (locally checked from state for speed, firebase rule will reject typically but good UX here)
-    const existingRecord = attendance.find(a => a.employeeId === employeeId && a.date === today);
+    const existingRecord = attendance.find(a => String(a.employeeId) === String(employeeId) && a.date === today);
     if (existingRecord && existingRecord.clockIn) {
       return { success: false, message: 'Already clocked in today' };
     }
@@ -372,7 +372,7 @@ export const AuthProvider = ({ children }) => {
     const now = new Date();
     const clockOutTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 
-    const record = attendance.find(a => a.employeeId === employeeId && a.date === today);
+    const record = attendance.find(a => String(a.employeeId) === String(employeeId) && a.date === today);
 
     if (!record || !record.clockIn) {
       return { success: false, message: 'Please clock in first' };
@@ -382,7 +382,7 @@ export const AuthProvider = ({ children }) => {
     }
 
     try {
-      const todayRoster = rosters.find(r => r.employeeId === employeeId && r.date === today);
+      const todayRoster = rosters.find(r => String(r.employeeId) === String(employeeId) && r.date === today);
       const result = calculateAttendanceStatus(record.clockIn, clockOutTime, today, todayRoster);
 
       const updates = {
