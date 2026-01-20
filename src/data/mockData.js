@@ -104,17 +104,15 @@ export const users = [
 ];
 
 export const leaveTypes = [
-  { id: 1, name: 'Sick Leave', code: 'SL', maxDays: 12 },
-  { id: 2, name: 'Casual Leave', code: 'CL', maxDays: 10 },
-  { id: 3, name: 'Annual Leave', code: 'AL', maxDays: 20 },
-  { id: 4, name: 'Maternity Leave', code: 'ML', maxDays: 180 }
+  { id: 1, name: 'Paid Leave', code: 'PL', maxDays: 12 },
+  { id: 2, name: 'Casual Leave', code: 'CL', maxDays: 6 }
 ];
 
 export const generateAttendanceData = () => {
   const attendance = [];
   const today = new Date();
   const sixMonthsAgo = new Date(today.getFullYear(), today.getMonth() - 6, 1);
-  
+
   users.forEach(user => {
     for (let d = new Date(sixMonthsAgo); d <= today; d.setDate(d.getDate() + 1)) {
       const dayOfWeek = d.getDay();
@@ -122,7 +120,7 @@ export const generateAttendanceData = () => {
         const isPresent = Math.random() > 0.1;
         const clockIn = isPresent ? `09:${String(Math.floor(Math.random() * 60)).padStart(2, '0')}` : null;
         const clockOut = isPresent ? `18:${String(Math.floor(Math.random() * 60)).padStart(2, '0')}` : null;
-        
+
         attendance.push({
           id: `${user.id}-${d.toISOString().split('T')[0]}`,
           employeeId: user.id,
@@ -136,20 +134,20 @@ export const generateAttendanceData = () => {
       }
     }
   });
-  
+
   return attendance;
 };
 
 export const generateLeaveData = () => {
   const leaves = [];
   const statuses = ['Pending', 'Approved', 'Rejected'];
-  
+
   users.forEach((user, idx) => {
     for (let i = 0; i < 5; i++) {
       const startDate = new Date(2024, Math.floor(Math.random() * 12), Math.floor(Math.random() * 28) + 1);
       const endDate = new Date(startDate);
       endDate.setDate(endDate.getDate() + Math.floor(Math.random() * 5) + 1);
-      
+
       leaves.push({
         id: `L${idx}${i}${Date.now()}`,
         employeeId: user.id,
@@ -165,16 +163,16 @@ export const generateLeaveData = () => {
       });
     }
   });
-  
+
   return leaves;
 };
 
 export const leaveBalances = users.map(user => ({
   employeeId: user.id,
-  sickLeave: { total: 12, used: Math.floor(Math.random() * 5), available: 12 - Math.floor(Math.random() * 5) },
-  casualLeave: { total: 10, used: Math.floor(Math.random() * 4), available: 10 - Math.floor(Math.random() * 4) },
-  annualLeave: { total: 20, used: Math.floor(Math.random() * 10), available: 20 - Math.floor(Math.random() * 10) },
-  maternityLeave: { total: 180, used: 0, available: 180 }
+  paidLeave: { total: 12, used: Math.floor(Math.random() * 5), available: 12 - Math.floor(Math.random() * 5) },
+  casualLeave: { total: 6, used: Math.floor(Math.random() * 3), available: 6 - Math.floor(Math.random() * 3) },
+  lwp: { total: 0, used: Math.floor(Math.random() * 3), available: 0 },
+  upl: { total: 0, used: Math.floor(Math.random() * 2), available: 0 }
 }));
 
 export const documents = [

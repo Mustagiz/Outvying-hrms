@@ -13,7 +13,7 @@ const LeaveManagement = () => {
     return saved ? JSON.parse(saved) : leaveTypes;
   });
   const [formData, setFormData] = useState({
-    leaveType: leaveTypes[0]?.name || 'Sick Leave',
+    leaveType: leaveTypes[0]?.name || 'Paid Leave',
     startDate: '',
     endDate: '',
     reason: '',
@@ -52,7 +52,7 @@ const LeaveManagement = () => {
     setAlert({ type: result.success ? 'success' : 'error', message: result.message });
     if (result.success) {
       setShowModal(false);
-      setFormData({ leaveType: 'Sick Leave', startDate: '', endDate: '', reason: '', days: 1 });
+      setFormData({ leaveType: 'Paid Leave', startDate: '', endDate: '', reason: '', days: 1 });
     }
     setTimeout(() => setAlert(null), 3000);
   };
@@ -113,15 +113,15 @@ const LeaveManagement = () => {
       {currentUser.role === 'employee' && myLeaveBalance && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           <Card>
-            <h3 className="text-sm text-gray-600 dark:text-gray-400 mb-2">Sick Leave</h3>
+            <h3 className="text-sm text-gray-600 dark:text-gray-400 mb-2">Paid Leave</h3>
             <div className="flex justify-between items-end">
               <div>
-                <p className="text-2xl font-bold text-gray-800 dark:text-white">{myLeaveBalance.sickLeave.available}</p>
+                <p className="text-2xl font-bold text-gray-800 dark:text-white">{myLeaveBalance.paidLeave?.available ?? 0}</p>
                 <p className="text-xs text-gray-500">Available</p>
               </div>
               <div className="text-right">
-                <p className="text-sm text-gray-600 dark:text-gray-400">{myLeaveBalance.sickLeave.used} used</p>
-                <p className="text-xs text-gray-500">of {myLeaveBalance.sickLeave.total}</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">{myLeaveBalance.paidLeave?.used ?? 0} used</p>
+                <p className="text-xs text-gray-500">of {myLeaveBalance.paidLeave?.total ?? 12}</p>
               </div>
             </div>
           </Card>
@@ -130,40 +130,32 @@ const LeaveManagement = () => {
             <h3 className="text-sm text-gray-600 dark:text-gray-400 mb-2">Casual Leave</h3>
             <div className="flex justify-between items-end">
               <div>
-                <p className="text-2xl font-bold text-gray-800 dark:text-white">{myLeaveBalance.casualLeave.available}</p>
+                <p className="text-2xl font-bold text-gray-800 dark:text-white">{myLeaveBalance.casualLeave?.available ?? 0}</p>
                 <p className="text-xs text-gray-500">Available</p>
               </div>
               <div className="text-right">
-                <p className="text-sm text-gray-600 dark:text-gray-400">{myLeaveBalance.casualLeave.used} used</p>
-                <p className="text-xs text-gray-500">of {myLeaveBalance.casualLeave.total}</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">{myLeaveBalance.casualLeave?.used ?? 0} used</p>
+                <p className="text-xs text-gray-500">of {myLeaveBalance.casualLeave?.total ?? 6}</p>
               </div>
             </div>
           </Card>
 
           <Card>
-            <h3 className="text-sm text-gray-600 dark:text-gray-400 mb-2">Annual Leave</h3>
+            <h3 className="text-sm text-gray-600 dark:text-gray-400 mb-2">Leave Without Pay (LWP)</h3>
             <div className="flex justify-between items-end">
               <div>
-                <p className="text-2xl font-bold text-gray-800 dark:text-white">{myLeaveBalance.annualLeave.available}</p>
-                <p className="text-xs text-gray-500">Available</p>
-              </div>
-              <div className="text-right">
-                <p className="text-sm text-gray-600 dark:text-gray-400">{myLeaveBalance.annualLeave.used} used</p>
-                <p className="text-xs text-gray-500">of {myLeaveBalance.annualLeave.total}</p>
+                <p className="text-2xl font-bold text-red-600">{myLeaveBalance.lwp?.used ?? 0}</p>
+                <p className="text-xs text-gray-500">Days Taken</p>
               </div>
             </div>
           </Card>
 
           <Card>
-            <h3 className="text-sm text-gray-600 dark:text-gray-400 mb-2">Maternity Leave</h3>
+            <h3 className="text-sm text-gray-600 dark:text-gray-400 mb-2">Unplanned Leave (UPL)</h3>
             <div className="flex justify-between items-end">
               <div>
-                <p className="text-2xl font-bold text-gray-800 dark:text-white">{myLeaveBalance.maternityLeave.available}</p>
-                <p className="text-xs text-gray-500">Available</p>
-              </div>
-              <div className="text-right">
-                <p className="text-sm text-gray-600 dark:text-gray-400">{myLeaveBalance.maternityLeave.used} used</p>
-                <p className="text-xs text-gray-500">of {myLeaveBalance.maternityLeave.total}</p>
+                <p className="text-2xl font-bold text-yellow-600">{myLeaveBalance.upl?.used ?? 0}</p>
+                <p className="text-xs text-gray-500">Days Taken</p>
               </div>
             </div>
           </Card>
