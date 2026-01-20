@@ -537,7 +537,10 @@ export const AuthProvider = ({ children }) => {
         createdAt: serverTimestamp()
       });
       return { success: true, message: 'User profile created (Auth separate)' };
-    } catch (e) { return { success: false, message: 'Error adding user' }; }
+    } catch (e) {
+      console.error("Error adding user:", e);
+      return { success: false, message: 'Error adding user: ' + e.message };
+    }
   };
 
   const updateUser = async (userId, updates) => {
