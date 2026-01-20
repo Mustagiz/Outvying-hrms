@@ -168,6 +168,19 @@ const Roster = () => {
         }] : [])
     ];
 
+    const groupedRosters = useMemo(() => {
+        if (currentUser.role === 'employee') return {};
+
+        const groups = {};
+        sortedRosters.forEach(roster => {
+            if (!groups[roster.employeeName]) {
+                groups[roster.employeeName] = [];
+            }
+            groups[roster.employeeName].push(roster);
+        });
+        return groups;
+    }, [sortedRosters, currentUser]);
+
     return (
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -208,9 +221,25 @@ const Roster = () => {
             {alert && <Alert type={alert.type} message={alert.message} onClose={() => setAlert(null)} />}
 
             {view === 'list' ? (
-                <Card title={currentUser.role === 'employee' ? 'My Assigned Shifts' : 'All Roster Assignments'}>
-                    <Table columns={columns} data={sortedRosters} />
-                </Card>
+                <>
+                    {currentUser.role === 'employee' ? (
+                        <Card title="My Assigned Shifts">
+                            <Table columns={columns} data={sortedRosters} />
+                        </Card>
+                    ) : (
+                        <div className="space-y-6">
+                            {/* If grouped, we sort keys (names) for consistency */}
+                            {Object.keys(groupedRosters).sort().map(employeeName => (
+                                <Card key={employeeName} title={employeeName}>
+                                    <Table columns={columns} data={groupedRosters[employeeName]} />
+                                </Card>
+                            ))}
+                            {Object.keys(groupedRosters).length === 0 && (
+                                <p className="text-center text-gray-500 py-4">No rosters assigned yet.</p>
+                            )}
+                        </div>
+                    )}
+                </>
             ) : (
                 <div className="space-y-4">
                     <div className="flex items-center justify-between bg-white dark:bg-gray-800 p-4 rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
