@@ -7,14 +7,14 @@ const BankAccount = () => {
   const { currentUser, bankAccounts, updateBankAccount, allUsers } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [alert, setAlert] = useState(null);
-  const [selectedEmployee, setSelectedEmployee] = useState(currentUser.role === 'employee' ? currentUser.id : null);
+  const [selectedEmployee, setSelectedEmployee] = useState(currentUser.role === 'employee' ? String(currentUser.id) : null);
   const [searchTerm, setSearchTerm] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('all');
 
   const myBankAccount = useMemo(() => {
-    const empId = currentUser.role === 'employee' ? currentUser.id : selectedEmployee;
-    return bankAccounts.find(b => b.employeeId === empId) || {
+    const empId = currentUser.role === 'employee' ? String(currentUser.id) : String(selectedEmployee);
+    return bankAccounts.find(b => String(b.employeeId) === String(empId)) || {
       accountNumber: '',
       bankName: '',
       ifscCode: '',
@@ -34,12 +34,14 @@ const BankAccount = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    const empId = currentUser.role === 'employee' ? currentUser.id : selectedEmployee;
-    const result = updateBankAccount(empId, formData);
+    const empId = currentUser.role === 'employee' ? String(currentUser.id) : String(selectedEmployee);
+    const result = await updateBankAccount(empId, formData);
     setAlert({ type: result.success ? 'success' : 'error', message: result.message });
-    setIsEditing(false);
+    if (result.success) {
+      setIsEditing(false);
+    }
     setTimeout(() => setAlert(null), 3000);
   };
 
@@ -53,7 +55,7 @@ const BankAccount = () => {
 
     const headers = ['Employee ID', 'Employee Name', 'Department', 'Bank Name', 'Account Number', 'IFSC Code', 'Account Type', 'Branch'];
     const rows = filteredEmployees.map(emp => {
-      const bankAcc = bankAccounts.find(b => b.employeeId === emp.id) || {};
+      const bankAcc = bankAccounts.find(b => String(b.employeeId) === String(emp.id)) || {};
       return [
         emp.employeeId || '',
         emp.name || '',
@@ -149,7 +151,7 @@ const BankAccount = () => {
               <select
                 value={selectedEmployee || ''}
                 onChange={(e) => {
-                  setSelectedEmployee(parseInt(e.target.value));
+                  setSelectedEmployee(e.target.value);
                   setIsEditing(false);
                 }}
                 className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
