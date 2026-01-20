@@ -52,7 +52,7 @@ const Onboarding = () => {
     });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const employeeData = {
       ...formData,
@@ -61,7 +61,10 @@ const Onboarding = () => {
       designation: formData.designation === 'Other' ? formData.customDesignation : formData.designation,
       address: `${formData.addressLine1}, ${formData.city}, ${formData.state}, ${formData.country} - ${formData.zipCode}`
     };
-    const result = addEmployee(employeeData);
+
+    // Fix: Await the async result
+    const result = await addEmployee(employeeData);
+
     setAlert({ type: result.success ? 'success' : 'error', message: result.message });
     if (result.success) {
       setShowForm(false);
@@ -123,11 +126,65 @@ const Onboarding = () => {
     window.URL.revokeObjectURL(url);
   };
 
-  const handleBulkUpload = (e) => {
+  const handleBulkUpload = async (e) => {
     const file = e.target.files[0];
-    if (file) {
-      alert('Bulk upload functionality will process the CSV file');
-    }
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const text = event.target.result;
+      const lines = text.split('\n');
+      const headers = lines[0].split(',').map(h => h.trim());
+
+      const successCount = 0;
+      const errors = [];
+
+      // Basic CSV parsing (assuming no commas in fields for simplicity, or use a lib like papa-parse for robustness if allowed later)
+      // Skipping header row
+      for (let i = 1; i < lines.length; i++) {
+        if (!lines[i].trim()) continue;
+
+        const values = lines[i].split(',').map(v => v.trim());
+        const employeeData = {};
+
+        headers.forEach((header, index) => {
+          if (values[index]) employeeData[header] = values[index];
+        });
+
+        // specific required fields check or defaults
+        if (!employeeData.email || !employeeData.firstName) {
+          errors.push(`Row ${i + 1}: Missing email or first name`);
+          continue;
+        }
+
+        // Auto-generate name if missing
+        if (!employeeData.name) {
+          employeeData.name = `${employeeData.firstName} ${employeeData.lastName || ''}`.trim();
+        }
+
+        // Auto-generate User ID if missing (matching our single-add logic)
+        if (!employeeData.userId && employeeData.email) {
+          employeeData.userId = employeeData.email;
+        }
+
+        // Default role
+        if (!employeeData.role) employeeData.role = 'employee';
+
+        try {
+          await addEmployee(employeeData);
+        } catch (err) {
+          errors.push(`Row ${i + 1} (${employeeData.email}): ${err.message}`);
+        }
+      }
+
+      if (errors.length === 0) {
+        setAlert({ type: 'success', message: 'Bulk upload completed successfully!' });
+        setShowBulkUpload(false);
+      } else {
+        setAlert({ type: 'warning', message: `Upload completed with some errors: ${errors.join('; ')}` });
+      }
+    };
+    reader.readAsText(file);
   };
 
   const completedTasks = tasks.filter(t => t.completed).length;
