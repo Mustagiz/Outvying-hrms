@@ -11,7 +11,7 @@ const Roster = () => {
     const [currentDate, setCurrentDate] = useState(new Date());
     const [alert, setAlert] = useState(null);
     const [formData, setFormData] = useState({
-        employeeId: '',
+        selectedEmployees: [],
         startDate: '',
         endDate: '',
         shiftName: 'Morning Shift',
@@ -54,25 +54,28 @@ const Roster = () => {
         }
     };
 
+    const handleEmployeeToggle = (e) => {
+        const options = Array.from(e.target.selectedOptions, option => parseInt(option.value));
+        setFormData({ ...formData, selectedEmployees: options });
+    };
+
     const handleSubmit = (e) => {
         e.preventDefault();
-        if (!formData.employeeId || !formData.startDate) {
-            setAlert({ type: 'error', message: 'Please select employee and start date' });
+        if (formData.selectedEmployees.length === 0 || !formData.startDate) {
+            setAlert({ type: 'error', message: 'Please select at least one employee and start date' });
             return;
         }
 
-        const employee = allUsers.find(u => u.id === parseInt(formData.employeeId));
         const result = assignRoster({
             ...formData,
-            employeeId: parseInt(formData.employeeId),
-            employeeName: employee?.name || 'Unknown'
+            employeeIds: formData.selectedEmployees
         });
 
         setAlert({ type: result.success ? 'success' : 'error', message: result.message });
         if (result.success) {
             setShowModal(false);
             setFormData({
-                employeeId: '',
+                selectedEmployees: [],
                 startDate: '',
                 endDate: '',
                 shiftName: 'Morning Shift',
@@ -162,8 +165,8 @@ const Roster = () => {
                         <button
                             onClick={() => setView('list')}
                             className={`px-3 py-1.5 rounded-md flex items-center gap-2 text-sm font-medium transition-colors ${view === 'list'
-                                    ? 'bg-primary-100 text-primary-600 dark:bg-primary-900/40 dark:text-primary-400'
-                                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                ? 'bg-primary-100 text-primary-600 dark:bg-primary-900/40 dark:text-primary-400'
+                                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
                                 }`}
                         >
                             <List size={16} /> List
@@ -171,8 +174,8 @@ const Roster = () => {
                         <button
                             onClick={() => setView('calendar')}
                             className={`px-3 py-1.5 rounded-md flex items-center gap-2 text-sm font-medium transition-colors ${view === 'calendar'
-                                    ? 'bg-primary-100 text-primary-600 dark:bg-primary-900/40 dark:text-primary-400'
-                                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                ? 'bg-primary-100 text-primary-600 dark:bg-primary-900/40 dark:text-primary-400'
+                                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
                                 }`}
                         >
                             <CalendarIcon size={16} /> Calendar
@@ -226,8 +229,8 @@ const Roster = () => {
                                     {item && (
                                         <div className="h-full flex flex-col">
                                             <span className={`text-sm font-bold ${new Date(currentDate.getFullYear(), currentDate.getMonth(), item.day).toDateString() === new Date().toDateString()
-                                                    ? 'bg-primary-600 text-white w-7 h-7 flex items-center justify-center rounded-full mb-1'
-                                                    : 'text-gray-700 dark:text-gray-300 mb-1'
+                                                ? 'bg-primary-600 text-white w-7 h-7 flex items-center justify-center rounded-full mb-1'
+                                                : 'text-gray-700 dark:text-gray-300 mb-1'
                                                 }`}>
                                                 {item.day}
                                             </span>
@@ -261,16 +264,23 @@ const Roster = () => {
 
             <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="Assign Roster">
                 <form onSubmit={handleSubmit} className="space-y-4">
-                    <Select
-                        label="Employee"
-                        value={formData.employeeId}
-                        onChange={(e) => setFormData({ ...formData, employeeId: e.target.value })}
-                        options={[
-                            { value: '', label: 'Select Employee' },
-                            ...allUsers.filter(u => u.role === 'employee').map(u => ({ value: u.id, label: u.name }))
-                        ]}
-                        required
-                    />
+                    <div className="mb-4">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            Select Employees (Hold Ctrl to select multiple)
+                        </label>
+                        <select
+                            multiple
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:text-white"
+                            value={formData.selectedEmployees}
+                            onChange={handleEmployeeToggle}
+                            size="5"
+                            required
+                        >
+                            {allUsers.filter(u => u.role === 'employee').map(u => (
+                                <option key={u.id} value={u.id}>{u.name} ({u.employeeId})</option>
+                            ))}
+                        </select>
+                    </div>
 
                     <div className="grid grid-cols-2 gap-4">
                         <Input

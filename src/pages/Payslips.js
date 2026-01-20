@@ -16,26 +16,52 @@ const Payslips = () => {
   const [showPreview, setShowPreview] = useState(false);
   const [previewData, setPreviewData] = useState(null);
 
-  const baseSalary = 50000; // Base monthly salary
-  const taxRate = 0.1; // 10% tax
-  const pfRate = 0.12; // 12% PF
+  const [customDeduction, setCustomDeduction] = useState(0);
+  const [deductionReason, setDeductionReason] = useState('LOP (Loss of Pay)');
 
-  const isPayslipReleased = (month, year) => {
-    return releasedPayslips.some(p => p.month === month && p.year === year);
+  const deductionReasons = [
+    'LOP (Loss of Pay)', 'Income Tax / TDS', 'Professional Tax', 'Provident Fund',
+    'Advance Recovery', 'Loan EMI', 'Other'
+  ];
+
+  const template = useMemo(() => {
+    const saved = localStorage.getItem('salarySlipTemplate');
+    return saved ? JSON.parse(saved) : {
+      visibility: { grossPay: true, deductions: true, netPay: true }
+    };
+  }, []);
+
+  const isPayslipReleased = (month, year, employeeId) => {
+    return releasedPayslips.some(p => p.month === month && p.year === year && (p.employeeId === employeeId || p.allReleased));
   };
 
   const releasePayslip = () => {
-    const newRelease = { month: selectedMonth, year: selectedYear, releasedOn: new Date().toISOString() };
+    const empId = currentUser.role === 'employee' ? currentUser.id : selectedEmployee;
+    const newRelease = {
+      month: selectedMonth,
+      year: selectedYear,
+      employeeId: empId,
+      customDeduction,
+      deductionReason,
+      releasedOn: new Date().toISOString()
+    };
     const updated = [...releasedPayslips, newRelease];
     setReleasedPayslips(updated);
     localStorage.setItem('releasedPayslips', JSON.stringify(updated));
+    alert('Payslip released successfully');
   };
 
   const releaseAllPayslips = () => {
-    const newRelease = { month: selectedMonth, year: selectedYear, releasedOn: new Date().toISOString() };
+    const newRelease = {
+      month: selectedMonth,
+      year: selectedYear,
+      allReleased: true,
+      releasedOn: new Date().toISOString()
+    };
     const updated = [...releasedPayslips, newRelease];
     setReleasedPayslips(updated);
     localStorage.setItem('releasedPayslips', JSON.stringify(updated));
+    alert('All payslips released successfully');
   };
 
   const canViewPayslip = (month, year) => {
@@ -45,35 +71,33 @@ const Payslips = () => {
 
   const calculatePayslip = (employeeId, month, year) => {
     const employee = allUsers.find(u => u.id === employeeId);
+    const releaseInfo = releasedPayslips.find(p =>
+      p.month === month && p.year === year && (p.employeeId === employeeId || p.allReleased)
+    );
+
     const daysInMonth = new Date(year, month + 1, 0).getDate();
-    
-    // Calculate working days (excluding Saturdays and Sundays)
+    // ... rest of working days logic ...
     let workingDaysInMonth = 0;
     for (let day = 1; day <= daysInMonth; day++) {
       const date = new Date(year, month, day);
-      const dayOfWeek = date.getDay();
-      if (dayOfWeek !== 0 && dayOfWeek !== 6) { // 0 = Sunday, 6 = Saturday
-        workingDaysInMonth++;
-      }
+      if (date.getDay() !== 0 && date.getDay() !== 6) workingDaysInMonth++;
     }
-    
-    const dailyRate = baseSalary / workingDaysInMonth;
+
+    const empBaseSalary = employee?.ctc ? (employee.ctc / 12) : 50000;
+    const dailyRate = empBaseSalary / workingDaysInMonth;
 
     const monthAttendance = attendance.filter(a => {
       const date = new Date(a.date);
-      return a.employeeId === employeeId && 
-             date.getMonth() === month && 
-             date.getFullYear() === year;
+      return a.employeeId === employeeId && date.getMonth() === month && date.getFullYear() === year;
     });
 
-    const workingDays = monthAttendance.filter(a => 
-      a.status === 'Present' || a.status === 'Late'
-    ).length;
+    const workingDays = monthAttendance.filter(a => a.status === 'Present' || a.status === 'Late').length;
 
     const grossPay = dailyRate * workingDays;
-    const tax = grossPay * taxRate;
-    const pf = grossPay * pfRate;
-    const totalDeductions = tax + pf;
+    const tax = grossPay * 0.1;
+    const pf = grossPay * 0.12;
+    const extraDeduction = releaseInfo?.customDeduction || (employeeId === selectedEmployee ? customDeduction : 0);
+    const totalDeductions = tax + pf + parseFloat(extraDeduction || 0);
     const netPay = grossPay - totalDeductions;
 
     return {
@@ -84,13 +108,15 @@ const Payslips = () => {
       workingDaysInMonth,
       workingDays,
       dailyRate: dailyRate.toFixed(2),
-      baseSalary,
+      baseSalary: empBaseSalary,
       grossPay: grossPay.toFixed(2),
       tax: tax.toFixed(2),
       pf: pf.toFixed(2),
+      customDeduction: parseFloat(extraDeduction || 0).toFixed(2),
+      deductionReason: releaseInfo?.deductionReason || (employeeId === selectedEmployee ? deductionReason : ''),
       totalDeductions: totalDeductions.toFixed(2),
       netPay: netPay.toFixed(2),
-      released: isPayslipReleased(month, year)
+      released: !!releaseInfo
     };
   };
 
@@ -106,78 +132,78 @@ const Payslips = () => {
     }
 
     const template = JSON.parse(localStorage.getItem('salarySlipTemplate') || '{}');
-    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
-                        'July', 'August', 'September', 'October', 'November', 'December'];
-    
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'];
+
     const doc = new jsPDF();
-    
+
     // Company Header
     doc.setFontSize(16);
     doc.setFont(undefined, 'bold');
     doc.setTextColor(0, 0, 0);
     doc.text('Outvying Media Solution Pvt Ltd.', 105, 15, { align: 'center' });
-    
+
     doc.setFontSize(8);
     doc.setFont(undefined, 'normal');
     doc.text('A-106, 1st floor, Town Square, New Airport Road, Viman Nagar, Pune, Maharashtra 411014', 105, 20, { align: 'center' });
     doc.text('Email: hr@outvying.com | Website: www.Outvying.com', 105, 25, { align: 'center' });
-    
+
     // Payslip Title
     doc.setFillColor(220, 220, 220);
     doc.rect(15, 30, 180, 8, 'F');
     doc.setFontSize(11);
     doc.setFont(undefined, 'bold');
     doc.text(`Payslip For The Month Of ${monthNames[payslipData.month]}-${payslipData.year}`, 105, 35, { align: 'center' });
-    
+
     // Employee Details Section
     doc.setFontSize(9);
     doc.setFont(undefined, 'normal');
     let yPos = 45;
-    
+
     // Left Column
     doc.setFont(undefined, 'bold');
     doc.text('Employee ID', 20, yPos);
     doc.setFont(undefined, 'normal');
     doc.text(payslipData.employee.employeeId, 60, yPos);
-    
+
     doc.setFont(undefined, 'bold');
     doc.text('Employee Name', 110, yPos);
     doc.setFont(undefined, 'normal');
     doc.text(payslipData.employee.name, 150, yPos);
-    
+
     yPos += 6;
     doc.setFont(undefined, 'bold');
     doc.text('Designation', 20, yPos);
     doc.setFont(undefined, 'normal');
     doc.text(payslipData.employee.designation, 60, yPos);
-    
+
     doc.setFont(undefined, 'bold');
     doc.text('Business Unit', 110, yPos);
     doc.setFont(undefined, 'normal');
     doc.text(payslipData.employee.department, 150, yPos);
-    
+
     yPos += 6;
     doc.setFont(undefined, 'bold');
     doc.text('Date Of Joining', 20, yPos);
     doc.setFont(undefined, 'normal');
     doc.text(payslipData.employee.dateOfJoining || 'N/A', 60, yPos);
-    
+
     doc.setFont(undefined, 'bold');
     doc.text('Location', 110, yPos);
     doc.setFont(undefined, 'normal');
     doc.text('Pune', 150, yPos);
-    
+
     yPos += 6;
     doc.setFont(undefined, 'bold');
     doc.text('Bank Name', 20, yPos);
     doc.setFont(undefined, 'normal');
     doc.text(payslipData.employee.bankName || 'Federal Bank', 60, yPos);
-    
+
     doc.setFont(undefined, 'bold');
     doc.text('Bank Account No.', 110, yPos);
     doc.setFont(undefined, 'normal');
     doc.text(payslipData.employee.bankAccount || 'XXXXXXXXXXXX', 150, yPos);
-    
+
     yPos += 6;
     doc.setFont(undefined, 'bold');
     doc.text('IFSC Code', 20, yPos);
@@ -188,49 +214,49 @@ const Payslips = () => {
     doc.text('PF No.', 20, yPos);
     doc.setFont(undefined, 'normal');
     doc.text('-', 60, yPos);
-    
+
     doc.setFont(undefined, 'bold');
     doc.text('UAN No.', 110, yPos);
     doc.setFont(undefined, 'normal');
     doc.text('-', 150, yPos);
-    
+
     yPos += 6;
     doc.setFont(undefined, 'bold');
     doc.text('ESI No.', 20, yPos);
     doc.setFont(undefined, 'normal');
     doc.text('-', 60, yPos);
-    
+
     doc.setFont(undefined, 'bold');
     doc.text('PAN Number', 110, yPos);
     doc.setFont(undefined, 'normal');
     doc.text(payslipData.employee.panNumber || 'FTZPBXXXXN', 150, yPos);
-    
+
     yPos += 6;
     doc.setFont(undefined, 'bold');
     doc.text('Days In Month', 20, yPos);
     doc.setFont(undefined, 'normal');
     doc.text(payslipData.daysInMonth.toString(), 60, yPos);
-    
+
     doc.setFont(undefined, 'bold');
     doc.text('Effective Work Days', 110, yPos);
     doc.setFont(undefined, 'normal');
     doc.text(payslipData.workingDays.toString(), 150, yPos);
-    
+
     yPos += 10;
-    
+
     // Earnings and Deductions Table
     doc.setDrawColor(0, 0, 0);
     doc.setLineWidth(0.5);
     doc.line(15, yPos, 195, yPos);
-    
+
     yPos += 6;
     doc.setFont(undefined, 'bold');
     doc.text('EARNINGS', 30, yPos);
     doc.text('DEDUCTIONS', 130, yPos);
-    
+
     yPos += 2;
     doc.line(15, yPos, 195, yPos);
-    
+
     yPos += 6;
     doc.setFontSize(8);
     doc.text('Description', 20, yPos);
@@ -239,13 +265,13 @@ const Payslips = () => {
     doc.text('Actual', 100, yPos, { align: 'right' });
     doc.text('Description', 110, yPos);
     doc.text('Amount', 185, yPos, { align: 'right' });
-    
+
     yPos += 2;
     doc.line(15, yPos, 195, yPos);
-    
+
     yPos += 5;
     doc.setFont(undefined, 'normal');
-    
+
     // Earnings
     const earnings = [
       ['Basic Salary (BS)', payslipData.baseSalary, '0.00', payslipData.grossPay],
@@ -255,52 +281,62 @@ const Payslips = () => {
       ['Shift Allowance', '0.00', '0.00', '0.00'],
       ['Attendence Allowence', '0.00', '0.00', '0.00']
     ];
-    
+
     const deductions = [
       ['Professional TAX', '200.00'],
       ['ESI', '0.00'],
       ['PF', payslipData.pf]
     ];
-    
+
+    if (parseFloat(payslipData.customDeduction) > 0) {
+      deductions.push([payslipData.deductionReason || 'Other Deduction', payslipData.customDeduction]);
+    }
+
     earnings.forEach((item, idx) => {
       doc.text(item[0], 20, yPos);
       doc.text(item[1].toString(), 70, yPos, { align: 'right' });
       doc.text(item[2], 85, yPos, { align: 'right' });
       doc.text(item[3].toString(), 100, yPos, { align: 'right' });
-      
+
       if (deductions[idx]) {
         doc.text(deductions[idx][0], 110, yPos);
         doc.text(deductions[idx][1], 185, yPos, { align: 'right' });
       }
       yPos += 5;
     });
-    
+
     yPos += 2;
     doc.line(15, yPos, 195, yPos);
-    
+
     yPos += 6;
     doc.setFont(undefined, 'bold');
     doc.text('Total Earnings', 20, yPos);
-    doc.text(payslipData.grossPay, 100, yPos, { align: 'right' });
+    if (template.visibility?.grossPay !== false) {
+      doc.text(payslipData.grossPay, 100, yPos, { align: 'right' });
+    }
     doc.text('Total Deduction', 110, yPos);
-    doc.text(payslipData.totalDeductions, 185, yPos, { align: 'right' });
-    
+    if (template.visibility?.deductions !== false) {
+      doc.text(payslipData.totalDeductions, 185, yPos, { align: 'right' });
+    }
+
     yPos += 2;
     doc.line(15, yPos, 195, yPos);
-    
+
     yPos += 8;
-    doc.setFontSize(10);
-    doc.text('Net Pay for the month (Total Earnings - Total Dedutions):', 20, yPos);
-    doc.text('₹' + payslipData.netPay, 185, yPos, { align: 'right' });
-    
+    if (template.visibility?.netPay !== false) {
+      doc.setFontSize(10);
+      doc.text('Net Pay for the month (Total Earnings - Total Dedutions):', 20, yPos);
+      doc.text('₹' + payslipData.netPay, 185, yPos, { align: 'right' });
+    }
+
     yPos += 2;
     doc.line(15, yPos, 195, yPos);
-    
+
     // Footer
     doc.setFontSize(8);
     doc.setFont(undefined, 'italic');
     doc.text('This is a system generated statement and it does not require any signatures', 105, 280, { align: 'center' });
-    
+
     doc.save(`Payslip_${payslipData.employee.employeeId}_${monthNames[payslipData.month]}_${payslipData.year}.pdf`);
   };
 
@@ -324,8 +360,8 @@ const Payslips = () => {
   }, [selectedEmployee, selectedMonth, selectedYear, currentUser, releasedPayslips, statusFilter]);
 
   const columns = [
-    { 
-      header: 'Month', 
+    {
+      header: 'Month',
       render: (row) => {
         const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
         return `${monthNames[row.month]} ${row.year}`;
@@ -338,9 +374,8 @@ const Payslips = () => {
     {
       header: 'Status',
       render: (row) => (
-        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-          row.released ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-        }`}>
+        <span className={`px-2 py-1 rounded-full text-xs font-medium ${row.released ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+          }`}>
           {row.released ? 'Released' : 'Pending'}
         </span>
       )
@@ -369,7 +404,7 @@ const Payslips = () => {
 
   const yearOptions = [2022, 2023, 2024, 2025].map(y => ({ value: y, label: y.toString() }));
 
-  const employeeOptions = currentUser.role === 'employee' 
+  const employeeOptions = currentUser.role === 'employee'
     ? [{ value: currentUser.id, label: currentUser.name }]
     : allUsers.filter(u => u.role === 'employee' || u.role === 'hr').map(u => ({ value: u.id, label: `${u.name} (${u.employeeId})` }));
 
@@ -388,35 +423,41 @@ const Payslips = () => {
           </div>
         </Card>
 
-        <Card>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Gross Pay</p>
-              <p className="text-3xl font-bold text-green-600">₹{currentPayslip.grossPay}</p>
+        {template.visibility?.grossPay !== false && (
+          <Card>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Gross Pay</p>
+                <p className="text-3xl font-bold text-green-600">₹{currentPayslip.grossPay}</p>
+              </div>
+              <DollarSign className="text-green-600" size={32} />
             </div>
-            <DollarSign className="text-green-600" size={32} />
-          </div>
-        </Card>
+          </Card>
+        )}
 
-        <Card>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Deductions</p>
-              <p className="text-3xl font-bold text-red-600">₹{currentPayslip.totalDeductions}</p>
+        {template.visibility?.deductions !== false && (
+          <Card>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Deductions</p>
+                <p className="text-3xl font-bold text-red-600">₹{currentPayslip.totalDeductions}</p>
+              </div>
+              <DollarSign className="text-red-600" size={32} />
             </div>
-            <DollarSign className="text-red-600" size={32} />
-          </div>
-        </Card>
+          </Card>
+        )}
 
-        <Card>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Net Pay</p>
-              <p className="text-3xl font-bold text-blue-600">₹{currentPayslip.netPay}</p>
+        {template.visibility?.netPay !== false && (
+          <Card>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Net Pay</p>
+                <p className="text-3xl font-bold text-blue-600">₹{currentPayslip.netPay}</p>
+              </div>
+              <DollarSign className="text-blue-600" size={32} />
             </div>
-            <DollarSign className="text-blue-600" size={32} />
-          </div>
-        </Card>
+          </Card>
+        )}
       </div>
 
       <Card title="Current Month Payslip" className="mb-6">
@@ -463,6 +504,36 @@ const Payslips = () => {
             <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
               <p className="text-sm text-gray-600 dark:text-gray-400">Daily Rate</p>
               <p className="text-xl font-bold text-gray-800 dark:text-white">₹{currentPayslip.dailyRate}</p>
+            </div>
+          </div>
+        )}
+
+        {currentUser.role === 'admin' && !currentPayslip.released && (
+          <div className="mb-4 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600">
+            <h3 className="text-sm font-semibold text-gray-800 dark:text-white mb-3">Add Deductions / Adjustments</h3>
+            <div className="flex gap-4 items-end">
+              <div className="flex-1">
+                <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Deduction Reason</label>
+                <select
+                  value={deductionReason}
+                  onChange={(e) => setDeductionReason(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-sm"
+                >
+                  {deductionReasons.map(r => (
+                    <option key={r} value={r}>{r}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex-1">
+                <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Amount (₹)</label>
+                <input
+                  type="number"
+                  value={customDeduction}
+                  onChange={(e) => setCustomDeduction(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-sm"
+                  min="0"
+                />
+              </div>
             </div>
           </div>
         )}

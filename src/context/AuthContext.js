@@ -328,33 +328,43 @@ export const AuthProvider = ({ children }) => {
   };
 
   const assignRoster = (rosterData) => {
-    const { startDate, endDate, ...rest } = rosterData;
+    const { employeeIds, startDate, endDate, ...rest } = rosterData;
     let newEntries = [];
 
-    if (startDate && endDate) {
-      const start = new Date(startDate);
-      const end = new Date(endDate);
+    employeeIds.forEach(empId => {
+      const employee = allUsers.find(u => u.id === empId);
+      const employeeName = employee?.name || 'Unknown';
 
-      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      if (startDate && endDate) {
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+
+        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+          newEntries.push({
+            id: `R${Date.now()}-${empId}-${d.getTime()}`,
+            ...rest,
+            employeeId: empId,
+            employeeName,
+            date: d.toISOString().split('T')[0],
+            assignedAt: new Date().toISOString()
+          });
+        }
+      } else {
         newEntries.push({
-          id: `R${Date.now()}-${d.getTime()}`,
+          id: `R${Date.now()}-${empId}`,
           ...rest,
-          date: d.toISOString().split('T')[0],
+          employeeId: empId,
+          employeeName,
+          date: rosterData.date,
           assignedAt: new Date().toISOString()
         });
       }
-    } else {
-      newEntries.push({
-        id: `R${Date.now()}`,
-        ...rosterData,
-        assignedAt: new Date().toISOString()
-      });
-    }
+    });
 
     const updatedRosters = [...rosters, ...newEntries];
     setRosters(updatedRosters);
     setToLocalStorage('rosters', updatedRosters);
-    return { success: true, message: `Roster assigned successfully (${newEntries.length} days)` };
+    return { success: true, message: `Roster assigned successfully for ${employeeIds.length} employees` };
   };
 
   const deleteRoster = (id) => {

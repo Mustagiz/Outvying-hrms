@@ -10,9 +10,15 @@ const SalarySlipTemplate = () => {
       earnings: ['basic', 'hra', 'medical', 'transport', 'shift', 'attendance'],
       deductions: ['pf', 'ptax', 'tds'],
       summary: { workingDays: true, grossSalary: true, totalDeductions: true, netPay: true },
+      visibility: { grossPay: true, deductions: true, netPay: true },
       footer: { signature: true, bankDetails: true, terms: true }
     };
   });
+
+  const deductionReasons = [
+    'LOP (Loss of Pay)', 'Income Tax / TDS', 'Professional Tax', 'Provident Fund',
+    'Advance Recovery', 'Loan EMI', 'Other'
+  ];
 
   const [showPreview, setShowPreview] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -20,7 +26,7 @@ const SalarySlipTemplate = () => {
   const [newComponent, setNewComponent] = useState('');
 
   const availableEarnings = [
-    'basic', 'hra', 'medical', 'transport', 'shift', 'attendance', 
+    'basic', 'hra', 'medical', 'transport', 'shift', 'attendance',
     'bonus', 'overtime', 'special_allowance', 'conveyance'
   ];
 
@@ -51,6 +57,10 @@ const SalarySlipTemplate = () => {
 
   const toggleFooter = (key) => {
     setTemplate({ ...template, footer: { ...template.footer, [key]: !template.footer[key] } });
+  };
+
+  const toggleVisibility = (key) => {
+    setTemplate({ ...template, visibility: { ...template.visibility, [key]: !template.visibility[key] } });
   };
 
   const removeComponent = (type, component) => {
@@ -110,19 +120,40 @@ const SalarySlipTemplate = () => {
           </div>
         </Card>
 
-        <Card title="Summary Section">
-          <div className="space-y-2">
-            {Object.keys(template.summary).map(key => (
-              <label key={key} className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={template.summary[key]}
-                  onChange={() => toggleSummary(key)}
-                  className="w-4 h-4"
-                />
-                <span className="text-gray-700 dark:text-gray-300 capitalize">{key.replace(/([A-Z])/g, ' $1')}</span>
-              </label>
-            ))}
+        <Card title="Summary/Visibility Section">
+          <div className="space-y-4">
+            <div>
+              <p className="text-xs font-bold text-gray-500 mb-2 uppercase tracking-wider">Show in Summary</p>
+              <div className="space-y-2">
+                {Object.keys(template.summary).map(key => (
+                  <label key={key} className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={template.summary[key]}
+                      onChange={() => toggleSummary(key)}
+                      className="w-4 h-4 cursor-pointer"
+                    />
+                    <span className="text-gray-700 dark:text-gray-300 capitalize">{key.replace(/([A-Z])/g, ' $1')}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className="border-t pt-4">
+              <p className="text-xs font-bold text-gray-500 mb-2 uppercase tracking-wider">Global Visibility Controls</p>
+              <div className="space-y-2">
+                {Object.keys(template.visibility || { grossPay: true, deductions: true, netPay: true }).map(key => (
+                  <label key={key} className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={template.visibility ? template.visibility[key] : true}
+                      onChange={() => toggleVisibility(key)}
+                      className="w-4 h-4 cursor-pointer"
+                    />
+                    <span className="text-gray-700 dark:text-gray-300 capitalize">{key.replace(/([A-Z])/g, ' $1')}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
           </div>
         </Card>
 
