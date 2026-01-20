@@ -6,23 +6,61 @@ import { formatDate, getStatusColor } from '../utils/helpers';
 import { User, CheckCircle, XCircle } from 'lucide-react';
 
 const LeaveManagement = () => {
-  const { currentUser, leaves, leaveBalances, applyLeave, updateLeaveStatus, allLeaveTypes } = useAuth();
+  const { currentUser, leaves, leaveBalances, applyLeave, updateLeaveStatus, allLeaveTypes, attendance } = useAuth();
   const [showModal, setShowModal] = useState(false);
   const [alert, setAlert] = useState(null);
+
+  // Calculate working days to check eligibility (15 days requirement for PL/CL)
+  const workingDaysCount = useMemo(() => {
+    return attendance.filter(a =>
+      (String(a.employeeId) === String(currentUser.id) || String(a.employeeId) === String(currentUser.uid)) &&
+      ['Present', 'Late', 'Half Day'].includes(a.status)
+    ).length;
+  }, [attendance, currentUser]);
+
+  const isEligibleForPaidLeaves = workingDaysCount >= 15;
+
+  // Filter Leave Types + Always Include LWP
+  const filteredLeaveTypes = useMemo(() => {
+    let types = allLeaveTypes.filter(type => {
+      const name = type.name.toLowerCase();
+      const isPL = name.includes('paid') || name.includes('pl');
+      const isCL = name.includes('casual') || name.includes('cl');
+      const isLWP = name.includes('lwp') || name.includes('without pay');
+
+      if (isPL) {
+        return isEligibleForPaidLeaves && (myLeaveBalance?.paidLeave?.available > 0);
+      }
+      if (isCL) {
+        return isEligibleForPaidLeaves && (myLeaveBalance?.casualLeave?.available > 0);
+      }
+      if (isLWP) return true;
+      return true; // Other types (like Sick Leave) are generally available
+    });
+
+    // Ensure LWP is there even if not in DB
+    const hasLWP = types.some(t => t.name.toLowerCase().includes('lwp') || t.name.toLowerCase().includes('without pay'));
+    if (!hasLWP) {
+      types = [{ id: 'lwp-default', name: 'Leave Without Pay (LWP)' }, ...types];
+    }
+
+    return types;
+  }, [allLeaveTypes, isEligibleForPaidLeaves, myLeaveBalance]);
+
   const [formData, setFormData] = useState({
-    leaveType: '', // Start empty, will be set by useEffect or default
+    leaveType: '',
     startDate: '',
     endDate: '',
     reason: '',
     days: 1
   });
 
-  // Default leave type when types load
+  // Default leave type when types load or modal opens
   useEffect(() => {
-    if (allLeaveTypes.length > 0 && !formData.leaveType) {
-      setFormData(prev => ({ ...prev, leaveType: allLeaveTypes[0].name }));
+    if (filteredLeaveTypes.length > 0 && (!formData.leaveType || !filteredLeaveTypes.find(t => t.name === formData.leaveType))) {
+      setFormData(prev => ({ ...prev, leaveType: filteredLeaveTypes[0].name }));
     }
-  }, [allLeaveTypes]);
+  }, [filteredLeaveTypes]);
 
   // Tab State
   const [activeTab, setActiveTab] = useState('myLeaves'); // 'myLeaves' | 'allApplications'
@@ -346,7 +384,7 @@ const LeaveManagement = () => {
             name="leaveType"
             value={formData.leaveType}
             onChange={handleInputChange}
-            options={allLeaveTypes.map(type => ({ value: type.name, label: type.name }))}
+            options={filteredLeaveTypes.map(type => ({ value: type.name, label: type.name }))}
             required
           />
           <div className="grid grid-cols-2 gap-4">

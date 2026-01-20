@@ -456,6 +456,21 @@ export const AuthProvider = ({ children }) => {
   // APPLY LEAVE
   const applyLeave = async (leaveData) => {
     try {
+      // Eligibility check
+      const name = (leaveData.leaveType || '').toLowerCase();
+      const isPaidOrCasual = name.includes('paid') || name.includes('casual') || name.includes('pl') || name.includes('cl');
+
+      if (isPaidOrCasual) {
+        const presentDays = attendance.filter(a =>
+          (String(a.employeeId) === String(currentUser.uid)) &&
+          ['Present', 'Late', 'Half Day'].includes(a.status)
+        ).length;
+
+        if (presentDays < 15) {
+          return { success: false, message: `Eligibility failed: You have only completed ${presentDays} working days. 15 days required for Paid/Casual leave.` };
+        }
+      }
+
       const newLeave = {
         employeeId: currentUser.uid, // Ensure we use UID
         employeeName: currentUser.name || currentUser.email,
