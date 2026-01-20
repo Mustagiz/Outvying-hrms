@@ -220,6 +220,18 @@ To verify the fix, please follow these steps:
 4.  Enter your current password and a new 6+ character password.
 5.  Click **Update Password**; verify the success message.
 
+### Forgot Password Flow
+- **Files**: `src/pages/Login.js`, `src/context/AuthContext.js`
+- **Change**: Added a "Forgot Password?" link that utilizes Firebase's `sendPasswordResetEmail`.
+- **Reason**: Allows users to recover their accounts independently if they lose their credentials.
+
+#### Verification
+1.  On the **Login** screen, enter your email.
+2.  Click **Forgot Password?**.
+3.  Check for a "Password reset email sent!" success message.
+4.  Verify the email receipt in your inbox.
+
+
 
 
 
