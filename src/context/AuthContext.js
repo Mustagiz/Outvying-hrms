@@ -1,8 +1,29 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { users, generateAttendanceData, generateLeaveData, leaveBalances, documents, bankAccounts } from '../data/mockData';
-import { getFromLocalStorage, setToLocalStorage } from '../utils/helpers';
+import { auth, db } from '../config/firebase';
+import {
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged
+} from 'firebase/auth';
+import {
+  collection,
+  onSnapshot,
+  query,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  doc,
+  where,
+  getDoc,
+  setDoc,
+  serverTimestamp
+} from 'firebase/firestore';
 import { getCurrentIP, validateIP, logIPAccess, checkModuleAccess } from '../utils/ipValidation';
 import { calculateAttendanceStatus } from '../utils/biometricSync';
+
+// --- Default Data for Seeding (Optional) ---
+// You can remove this import if you don't plan to auto-seed
+import { leaveBalances as mockLeaveBalances } from '../data/mockData';
 
 const AuthContext = createContext();
 
@@ -15,7 +36,11 @@ export const useAuth = () => {
 };
 
 export const AuthProvider = ({ children }) => {
+  // --- Global State ---
   const [currentUser, setCurrentUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  // Data Collections
   const [allUsers, setAllUsers] = useState([]);
   const [attendance, setAttendance] = useState([]);
   const [leaves, setLeaves] = useState([]);
@@ -24,62 +49,142 @@ export const AuthProvider = ({ children }) => {
   const [allBankAccounts, setAllBankAccounts] = useState([]);
   const [announcements, setAnnouncements] = useState([]);
   const [rosters, setRosters] = useState([]);
+
+  // Local State
   const [theme, setTheme] = useState('light');
-  const [loading, setLoading] = useState(true);
   const [currentIP, setCurrentIP] = useState('127.0.0.1');
   const [ipValidation, setIpValidation] = useState({ allowed: true, location: 'Unrestricted' });
 
+  // --- 1. Initialization & Auth Listener ---
   useEffect(() => {
-    const savedUser = getFromLocalStorage('currentUser');
-    const savedUsers = getFromLocalStorage('users', users);
-    const savedAttendance = getFromLocalStorage('attendance', generateAttendanceData());
-    const savedLeaves = getFromLocalStorage('leaves', generateLeaveData());
-    const savedLeaveBalances = getFromLocalStorage('leaveBalances', leaveBalances);
-    const savedDocuments = getFromLocalStorage('documents', documents);
-    const savedBankAccounts = getFromLocalStorage('bankAccounts', bankAccounts);
-    const savedAnnouncements = getFromLocalStorage('announcements', [
-      { id: 1, type: 'New Joiner', title: 'Welcome Mike Johnson!', message: 'Please welcome Mike Johnson who joined as Frontend Developer in Engineering team.', date: '2024-01-15', author: 'HR Team', pinned: true, icon: 'Users', color: 'blue' },
-      { id: 2, type: 'Holiday', title: 'Upcoming Holiday - Diwali', message: 'Office will be closed on November 12th for Diwali celebration. Enjoy the festival!', date: '2024-01-14', author: 'Admin', pinned: true, icon: 'Gift', color: 'purple' },
-      { id: 3, type: 'Important', title: 'New Leave Policy Update', message: 'Updated leave policy is now active. Please review the changes in Leave Policy section.', date: '2024-01-13', author: 'Admin', pinned: false, icon: 'AlertCircle', color: 'red' },
-      { id: 4, type: 'Achievement', title: 'Team Achievement Award', message: 'Congratulations to Engineering team for completing the project ahead of schedule!', date: '2024-01-12', author: 'Management', pinned: false, icon: 'Trophy', color: 'yellow' }
-    ]);
-    const savedRosters = getFromLocalStorage('rosters', []);
-    const savedTheme = getFromLocalStorage('theme', 'light');
-
-    setCurrentUser(savedUser);
-    setAllUsers(savedUsers);
-    setAttendance(savedAttendance);
-    setLeaves(savedLeaves);
-    setAllLeaveBalances(savedLeaveBalances);
-    setAllDocuments(savedDocuments);
-    setAllBankAccounts(savedBankAccounts);
-    setAnnouncements(savedAnnouncements);
-    setRosters(savedRosters);
+    // Theme Handler
+    const savedTheme = localStorage.getItem('theme') || 'light';
     setTheme(savedTheme);
-    setLoading(false);
+    if (savedTheme === 'dark') document.documentElement.classList.add('dark');
 
-    if (savedTheme === 'dark') {
-      document.documentElement.classList.add('dark');
-    }
-
+    // IP Check
     getCurrentIP().then(ip => {
       setCurrentIP(ip);
       const validation = validateIP(ip);
       setIpValidation(validation);
     });
+
+    // Firebase Auth Listener
+    const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        // Fetch User Details from Firestore 'users' collection
+        try {
+          // We use onSnapshot here to keep user profile updated (e.g. role change)
+          const userRef = doc(db, 'users', user.uid);
+          const userSnap = await getDoc(userRef);
+
+          if (userSnap.exists()) {
+            const userData = userSnap.data();
+            // Merge Auth info with Firestore info
+            setCurrentUser({ ...userData, uid: user.uid, email: user.email });
+          } else {
+            // Fallback: If user exists in Auth but not in Firestore (should not happen in prod)
+            // For simplified setup, we might create a basic profile here or just error out.
+            // Keeping it clean: use Auth info
+            setCurrentUser({ uid: user.uid, email: user.email, name: user.email ? user.email.split('@')[0] : 'User', role: 'employee' });
+          }
+        } catch (error) {
+          console.error("Error fetching user profile:", error);
+          // Fallback
+          setCurrentUser({ uid: user.uid, email: user.email, role: 'employee' });
+        }
+      } else {
+        setCurrentUser(null);
+      }
+      setLoading(false);
+    });
+
+    return () => unsubscribeAuth();
   }, []);
 
+  // --- 2. Real-time Data Subscriptions ---
+  // Subscribes to collections when a user is logged in
+  useEffect(() => {
+    if (!currentUser) {
+      // Clear state on logout
+      setAllUsers([]);
+      setAttendance([]);
+      setLeaves([]);
+      setRosters([]);
+      setAllLeaveBalances([]);
+      setAnnouncements([]);
+      setAllDocuments([]);
+      return;
+    }
+
+    // Subscribe to ALL Users (Needed for Employee Directory, Admin views, etc.)
+    const unsubUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
+      const usersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setAllUsers(usersData);
+    });
+
+    // Subscribe to Attendance
+    // Optimization: In a huge app, filter by date or assume role-based query.
+    // For now, load all to match previous Context API behavior.
+    const unsubAttendance = onSnapshot(collection(db, 'attendance'), (snapshot) => {
+      const attData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setAttendance(attData);
+    });
+
+    // Subscribe to Leaves
+    const unsubLeaves = onSnapshot(collection(db, 'leaves'), (snapshot) => {
+      const leaveData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setLeaves(leaveData);
+    });
+
+    // Subscribe to Rosters
+    const unsubRosters = onSnapshot(collection(db, 'rosters'), (snapshot) => {
+      const rosterData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setRosters(rosterData);
+    });
+
+    // Subscribe to Announcements
+    const unsubAnnouncements = onSnapshot(collection(db, 'announcements'), (snapshot) => {
+      const annData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      // Sort announcements by date desc locally or via query if we added 'orderBy'
+      setAnnouncements(annData.sort((a, b) => new Date(b.date) - new Date(a.date)));
+    });
+
+    // Subscribe to Documents
+    const unsubDocuments = onSnapshot(collection(db, 'documents'), (snapshot) => {
+      const docData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setAllDocuments(docData);
+    });
+
+    // Subscribe to Bank Accounts (Separate collection)
+    const unsubBank = onSnapshot(collection(db, 'bankAccounts'), (snapshot) => {
+      const bankData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), employeeId: doc.id })); // Assuming doc ID is employeeId
+      setAllBankAccounts(bankData);
+    });
+
+    // Cleanup subscriptions on unmount or logout
+    return () => {
+      unsubUsers();
+      unsubAttendance();
+      unsubLeaves();
+      unsubRosters();
+      unsubAnnouncements();
+      unsubDocuments();
+      unsubBank();
+    };
+
+  }, [currentUser]);
 
 
-  // Recalculate Leave Balances based on Attendance and Used Leaves
+  // --- 3. Dynamic Leave Balance Calculation ---
+  // Mimicking the logic from the previous AuthContext
   useEffect(() => {
     if (loading || allUsers.length === 0) return;
 
     const updatedBalances = allUsers.map(user => {
-      // 1. Calculate Accrued Paid Leave (PL) based on Attendance
-      // Rule: 1.5 PL for every month with >= 15 working days
+      // 1. Calculate Accrued Paid Leave (PL)
       let accruedPL = 0;
-      const userAttendance = attendance.filter(a => a.employeeId === user.id);
+      const userAttendance = attendance.filter(a => a.employeeId === user.uid || a.employeeId === user.id); // Handle both ID types
 
       const attendanceByMonth = {};
       userAttendance.forEach(a => {
@@ -98,87 +203,87 @@ export const AuthProvider = ({ children }) => {
       });
 
       // 2. Calculate Used Leaves
-      const userLeaves = leaves.filter(l => l.employeeId === user.id && l.status === 'Approved');
+      const userLeaves = leaves.filter(l => (l.employeeId === user.uid || l.employeeId === user.id) && l.status === 'Approved');
       let usedPL = 0;
       let usedCL = 0;
       let usedLWP = 0;
-      let usedUPL = 0; // Assuming UPL logic is manual for now
+      let usedUPL = 0;
 
       userLeaves.forEach(l => {
         if (l.leaveType === 'Paid Leave') usedPL += parseFloat(l.days);
         else if (l.leaveType === 'Casual Leave') usedCL += parseFloat(l.days);
-        else if (l.leaveType === 'Sick Leave') usedPL += parseFloat(l.days); // Fallback if exists
+        else if (l.leaveType === 'Sick Leave') usedPL += parseFloat(l.days);
       });
 
-      // Calculate LWP from attendance (auto-marked)
+      // LWP from attendance
       const attendanceLWP = userAttendance.filter(a => a.status === 'LWP' || a.status === 'Absent').length;
       usedLWP = attendanceLWP;
 
-      // Current Mock Balances (Preserve static CL/UPL rules for now, override PL/LWP)
-      const existingBalance = allLeaveBalances.find(b => b.employeeId === user.id) || {};
-
+      // We maintain a local structure for balances, but we aren't saving this back to Firestore constantly to avoid write-loops.
+      // This state is computed client-side for display.
       return {
-        employeeId: user.id,
+        employeeId: user.id, // or uid
         paidLeave: {
           total: accruedPL,
           used: usedPL,
           available: Math.max(0, accruedPL - usedPL)
         },
-        casualLeave: existingBalance.casualLeave || { total: 6, used: usedCL, available: 6 - usedCL },
+        casualLeave: { total: 6, used: usedCL, available: 6 - usedCL },
         lwp: { total: 0, used: usedLWP, available: 0 },
-        upl: existingBalance.upl || { total: 0, used: 0, available: 0 }
+        upl: { total: 0, used: 0, available: 0 }
       };
     });
 
-    // Only update if changes are detected to avoid infinite loops (simple JSON stringify check)
-    if (JSON.stringify(updatedBalances) !== JSON.stringify(allLeaveBalances)) {
-      setAllLeaveBalances(updatedBalances);
-      setToLocalStorage('leaveBalances', updatedBalances);
-    }
-  }, [attendance, leaves, allUsers, loading]); // Dependencies: updates when any of these change
+    setAllLeaveBalances(updatedBalances);
+  }, [attendance, leaves, allUsers, loading]);
 
-  const updateDocumentStatus = (docId, status) => {
-    const updatedDocs = allDocuments.map(d =>
-      d.id === docId ? { ...d, status } : d
-    );
-    setAllDocuments(updatedDocs);
-    setToLocalStorage('documents', updatedDocs);
-    return { success: true, message: `Document ${status.toLowerCase()} successfully` };
-  };
 
+  // --- 4. Actions (CRUD) using Firebase ---
+
+  // LOGIN
   const login = async (email, password) => {
-    const savedUsers = getFromLocalStorage('users', users);
-    const user = savedUsers.find(u => (u.email === email || u.userId === email) && u.password === password);
-    if (user) {
-      try {
-        const ip = await getCurrentIP();
-        const validation = validateIP(ip);
-        setCurrentIP(ip);
-        setIpValidation(validation);
-        logIPAccess(user.id, user.name, 'Login', ip, validation.allowed ? 'Allowed' : 'Blocked', validation.location);
-        if (!validation.allowed) {
-          return { success: false, message: validation.message, ipBlocked: true };
-        }
-      } catch (error) {
-        console.log('IP validation skipped');
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      // IP Validation Logic
+      const ip = await getCurrentIP();
+      const validation = validateIP(ip);
+      setCurrentIP(ip);
+      setIpValidation(validation);
+
+      // We can log access to Firestore 'audit_logs' if needed
+      // logIPAccess(...) 
+
+      if (!validation.allowed) {
+        await signOut(auth); // Force logout if IP is blocked
+        return { success: false, message: validation.message, ipBlocked: true };
       }
-      const { password, ...userWithoutPassword } = user;
-      setCurrentUser(userWithoutPassword);
-      setToLocalStorage('currentUser', userWithoutPassword);
-      return { success: true, user: userWithoutPassword };
+
+      // Success
+      return { success: true, user: userCredential.user };
+    } catch (error) {
+      console.error("Login error:", error);
+      let message = "Invalid email or password";
+      if (error.code === 'auth/user-not-found') message = "User not found";
+      if (error.code === 'auth/wrong-password') message = "Invalid password";
+      return { success: false, message };
     }
-    return { success: false, message: 'Invalid email or password' };
   };
 
-  const logout = () => {
-    setCurrentUser(null);
-    localStorage.removeItem('currentUser');
+  // LOGOUT
+  const logout = async () => {
+    try {
+      await signOut(auth);
+      setCurrentUser(null);
+    } catch (error) {
+      console.error("Logout error", error);
+    }
   };
 
+  // THEME
   const toggleTheme = () => {
     const newTheme = theme === 'light' ? 'dark' : 'light';
     setTheme(newTheme);
-    setToLocalStorage('theme', newTheme);
+    localStorage.setItem('theme', newTheme);
     if (newTheme === 'dark') {
       document.documentElement.classList.add('dark');
     } else {
@@ -186,61 +291,53 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // CLOCK IN
   const clockIn = async (employeeId) => {
+    // IP Check
     if (checkModuleAccess('attendance') && !ipValidation.allowed) {
-      const ip = await getCurrentIP();
-      logIPAccess(employeeId, currentUser.name, 'Clock In', ip, 'Blocked', 'Unknown');
       return { success: false, message: ipValidation.message };
     }
+
     const today = new Date().toISOString().split('T')[0];
     const now = new Date();
     const clockInTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 
+    // Check if already clocked in (locally checked from state for speed, firebase rule will reject typically but good UX here)
     const existingRecord = attendance.find(a => a.employeeId === employeeId && a.date === today);
-
     if (existingRecord && existingRecord.clockIn) {
       return { success: false, message: 'Already clocked in today' };
     }
 
     const newRecord = {
-      id: `${employeeId}-${today}`,
       employeeId,
       date: today,
       clockIn: clockInTime,
       clockOut: null,
-      status: clockInTime > '09:15' ? 'Late' : 'Present',
+      status: clockInTime > '09:15' ? 'Late' : 'Present', // Basic logic, can be enhanced
       workHours: 0,
-      overtime: 0
+      overtime: 0,
+      createdAt: serverTimestamp()
     };
 
-    const updatedAttendance = existingRecord
-      ? attendance.map(a => a.id === existingRecord.id ? { ...a, ...newRecord } : a)
-      : [...attendance, newRecord];
-
-    // Auto-calculate status if we have a roster
+    // Roster Logic for Status
     const todayRoster = rosters.find(r => r.employeeId === employeeId && r.date === today);
     if (todayRoster) {
       const result = calculateAttendanceStatus(clockInTime, null, today, todayRoster);
-      const recordWithStatus = { ...newRecord, status: result.status, ruleApplied: result.ruleApplied };
-      const finalAttendance = existingRecord
-        ? attendance.map(a => a.id === existingRecord.id ? { ...a, ...recordWithStatus } : a)
-        : [...attendance, recordWithStatus];
-      setAttendance(finalAttendance);
-      setToLocalStorage('attendance', finalAttendance);
-    } else {
-      setAttendance(updatedAttendance);
-      setToLocalStorage('attendance', updatedAttendance);
+      newRecord.status = result.status;
+      newRecord.ruleApplied = result.ruleApplied;
     }
 
-    return { success: true, message: 'Clocked in successfully', time: clockInTime };
+    try {
+      await addDoc(collection(db, 'attendance'), newRecord);
+      return { success: true, message: 'Clocked in successfully', time: clockInTime };
+    } catch (error) {
+      console.error("ClockIn Error", error);
+      return { success: false, message: 'Failed to clock in: ' + error.message };
+    }
   };
 
+  // CLOCK OUT
   const clockOut = async (employeeId) => {
-    if (checkModuleAccess('attendance') && !ipValidation.allowed) {
-      const ip = await getCurrentIP();
-      logIPAccess(employeeId, currentUser.name, 'Clock Out', ip, 'Blocked', 'Unknown');
-      return { success: false, message: ipValidation.message };
-    }
     const today = new Date().toISOString().split('T')[0];
     const now = new Date();
     const clockOutTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
@@ -250,213 +347,210 @@ export const AuthProvider = ({ children }) => {
     if (!record || !record.clockIn) {
       return { success: false, message: 'Please clock in first' };
     }
-
     if (record.clockOut) {
       return { success: false, message: 'Already clocked out today' };
     }
 
-    const todayRoster = rosters.find(r => r.employeeId === employeeId && r.date === today);
-    const result = calculateAttendanceStatus(record.clockIn, clockOutTime, today, todayRoster);
+    try {
+      const todayRoster = rosters.find(r => r.employeeId === employeeId && r.date === today);
+      const result = calculateAttendanceStatus(record.clockIn, clockOutTime, today, todayRoster);
 
-    const updatedAttendance = attendance.map(a =>
-      a.id === record.id
-        ? { ...a, clockOut: clockOutTime, workHours: result.workHours, status: result.status, workingDays: result.workingDays, ruleApplied: result.ruleApplied, overtime: result.workHours > 9 ? (result.workHours - 9).toFixed(2) : 0 }
-        : a
-    );
+      const updates = {
+        clockOut: clockOutTime,
+        workHours: result.workHours,
+        status: result.status,
+        workingDays: result.workingDays,
+        ruleApplied: result.ruleApplied || null,
+        overtime: result.workHours > 9 ? (result.workHours - 9).toFixed(2) : 0
+      };
 
-    setAttendance(updatedAttendance);
-    setToLocalStorage('attendance', updatedAttendance);
-    return { success: true, message: 'Clocked out successfully', time: clockOutTime };
+      const docRef = doc(db, 'attendance', record.id);
+      await updateDoc(docRef, updates);
+      return { success: true, message: 'Clocked out successfully', time: clockOutTime };
+
+    } catch (error) {
+      console.error("ClockOut Error", error);
+      return { success: false, message: 'Failed to clock out' };
+    }
   };
 
+  // APPLY LEAVE
   const applyLeave = async (leaveData) => {
-    if (checkModuleAccess('leaveRequests') && !ipValidation.allowed) {
-      const ip = await getCurrentIP();
-      logIPAccess(currentUser.id, currentUser.name, 'Apply Leave', ip, 'Blocked', 'Unknown');
-      return { success: false, message: ipValidation.message };
+    try {
+      const newLeave = {
+        employeeId: currentUser.uid, // Ensure we use UID
+        employeeName: currentUser.name || currentUser.email,
+        ...leaveData,
+        status: 'Pending',
+        appliedDate: new Date().toISOString().split('T')[0],
+        createdAt: serverTimestamp()
+      };
+      await addDoc(collection(db, 'leaves'), newLeave);
+      return { success: true, message: 'Leave application submitted successfully' };
+    } catch (error) {
+      return { success: false, message: 'Failed to apply leave: ' + error.message };
     }
-    const newLeave = {
-      id: `L${Date.now()}`,
-      employeeId: currentUser.id,
-      employeeName: currentUser.name,
-      ...leaveData,
-      status: 'Pending',
-      appliedDate: new Date().toISOString().split('T')[0]
-    };
-
-    const updatedLeaves = [...leaves, newLeave];
-    setLeaves(updatedLeaves);
-    setToLocalStorage('leaves', updatedLeaves);
-    return { success: true, message: 'Leave application submitted successfully' };
   };
 
-  const updateLeaveStatus = (leaveId, status, approvedBy) => {
-    const updatedLeaves = leaves.map(leave =>
-      leave.id === leaveId ? { ...leave, status, approvedBy } : leave
-    );
-    setLeaves(updatedLeaves);
-    setToLocalStorage('leaves', updatedLeaves);
-    return { success: true, message: `Leave ${status.toLowerCase()} successfully` };
-  };
-
-  const uploadDocument = (employeeId, documentData) => {
-    const newDoc = {
-      id: Date.now(),
-      employeeId,
-      ...documentData,
-      uploadDate: new Date().toISOString().split('T')[0],
-      status: 'Pending'
-    };
-
-    const updatedDocs = [...allDocuments, newDoc];
-    setAllDocuments(updatedDocs);
-    setToLocalStorage('documents', updatedDocs);
-    return { success: true, message: 'Document uploaded successfully' };
-  };
-
-  const updateBankAccount = (employeeId, bankData) => {
-    const existing = allBankAccounts.find(b => b.employeeId === employeeId);
-    const updatedBankAccounts = existing
-      ? allBankAccounts.map(b => b.employeeId === employeeId ? { ...b, ...bankData } : b)
-      : [...allBankAccounts, { employeeId, ...bankData }];
-
-    setAllBankAccounts(updatedBankAccounts);
-    setToLocalStorage('bankAccounts', updatedBankAccounts);
-    return { success: true, message: 'Bank account details updated successfully' };
-  };
-
-  const updateUserProfile = (userId, profileData) => {
-    const updatedUsers = allUsers.map(u => u.id === userId ? { ...u, ...profileData } : u);
-    setAllUsers(updatedUsers);
-    setToLocalStorage('users', updatedUsers);
-
-    if (currentUser.id === userId) {
-      const updatedCurrentUser = { ...currentUser, ...profileData };
-      setCurrentUser(updatedCurrentUser);
-      setToLocalStorage('currentUser', updatedCurrentUser);
+  // UPDATE LEAVE STATUS
+  const updateLeaveStatus = async (leaveId, status, approvedBy) => {
+    try {
+      const docRef = doc(db, 'leaves', leaveId);
+      await updateDoc(docRef, { status, approvedBy });
+      return { success: true, message: `Leave ${status.toLowerCase()} successfully` };
+    } catch (error) {
+      return { success: false, message: 'Update failed' };
     }
-
-    return { success: true, message: 'Profile updated successfully' };
   };
 
-  const addEmployee = (employeeData) => {
-    const newEmployee = {
-      id: allUsers.length + 1,
-      ...employeeData,
-      employeeId: `EMP${String(allUsers.length + 1).padStart(3, '0')}`,
-      dateOfJoining: new Date().toISOString().split('T')[0]
-    };
-
-    const updatedUsers = [...allUsers, newEmployee];
-    setAllUsers(updatedUsers);
-    setToLocalStorage('users', updatedUsers);
-    return { success: true, message: 'Employee added successfully', employee: newEmployee };
-  };
-
-  const addAnnouncement = (announcementData) => {
-    const newAnnouncement = {
-      id: announcements.length + 1,
-      ...announcementData,
-      date: new Date().toISOString().split('T')[0]
-    };
-
-    const updatedAnnouncements = [newAnnouncement, ...announcements];
-    setAnnouncements(updatedAnnouncements);
-    setToLocalStorage('announcements', updatedAnnouncements);
-    return { success: true, message: 'Announcement posted successfully' };
-  };
-
-  const updateAnnouncement = (id, updates) => {
-    const updatedAnnouncements = announcements.map(a =>
-      a.id === id ? { ...a, ...updates } : a
-    );
-    setAnnouncements(updatedAnnouncements);
-    setToLocalStorage('announcements', updatedAnnouncements);
-    return { success: true };
-  };
-
-  const deleteAnnouncement = (id) => {
-    const updatedAnnouncements = announcements.filter(a => a.id !== id);
-    setAnnouncements(updatedAnnouncements);
-    setToLocalStorage('announcements', updatedAnnouncements);
-    return { success: true, message: 'Announcement deleted' };
-  };
-
-  const addUser = (userData) => {
-    const newUser = { ...userData, id: allUsers.length + 1 };
-    const updatedUsers = [...allUsers, newUser];
-    setAllUsers(updatedUsers);
-    setToLocalStorage('users', updatedUsers);
-    return { success: true };
-  };
-
-  const deleteUser = (userId) => {
-    const updatedUsers = allUsers.filter(u => u.id !== userId);
-    setAllUsers(updatedUsers);
-    setToLocalStorage('users', updatedUsers);
-    return { success: true };
-  };
-
-  const updateUser = (userId, updates) => {
-    const updatedUsers = allUsers.map(u => u.id === userId ? { ...u, ...updates } : u);
-    setAllUsers(updatedUsers);
-    setToLocalStorage('users', updatedUsers);
-    return { success: true };
-  };
-
-  const assignRoster = (rosterData) => {
+  // ROSTER - ASSIGN
+  const assignRoster = async (rosterData) => {
     const { employeeIds, startDate, endDate, ...rest } = rosterData;
-    let newEntries = [];
+    // Batch writes recommended for efficiency, but simple loop for now
+    try {
+      const promises = [];
+      employeeIds.forEach(empId => {
+        // We need name for display. Find in allUsers
+        const employee = allUsers.find(u => u.id === empId || u.uid === empId);
+        const employeeName = employee?.name || 'Unknown';
 
-    employeeIds.forEach(empId => {
-      const employee = allUsers.find(u => u.id === empId);
-      const employeeName = employee?.name || 'Unknown';
+        if (startDate && endDate) {
+          const start = new Date(startDate);
+          const end = new Date(endDate);
 
-      if (startDate && endDate) {
-        const start = new Date(startDate);
-        const end = new Date(endDate);
-
-        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-          newEntries.push({
-            id: `R${Date.now()}-${empId}-${d.getTime()}`,
+          for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+            const dateStr = d.toISOString().split('T')[0];
+            promises.push(addDoc(collection(db, 'rosters'), {
+              ...rest,
+              employeeId: empId,
+              employeeName,
+              date: dateStr,
+              assignedAt: serverTimestamp()
+            }));
+          }
+        } else {
+          // Single Date logic if applicable (UI mostly sends ranges)
+          promises.push(addDoc(collection(db, 'rosters'), {
             ...rest,
             employeeId: empId,
             employeeName,
-            date: d.toISOString().split('T')[0],
-            assignedAt: new Date().toISOString()
-          });
+            date: rosterData.date || startDate, // fallback
+            assignedAt: serverTimestamp()
+          }));
         }
-      } else {
-        newEntries.push({
-          id: `R${Date.now()}-${empId}`,
-          ...rest,
-          employeeId: empId,
-          employeeName,
-          date: rosterData.date,
-          assignedAt: new Date().toISOString()
-        });
-      }
-    });
+      });
 
-    const updatedRosters = [...rosters, ...newEntries];
-    setRosters(updatedRosters);
-    setToLocalStorage('rosters', updatedRosters);
-    return { success: true, message: `Roster assigned successfully for ${employeeIds.length} employees` };
+      await Promise.all(promises);
+      return { success: true, message: `Roster assigned successfully` };
+
+    } catch (error) {
+      console.error("Roster Assign Error", error);
+      return { success: false, message: 'Failed to assign roster' };
+    }
   };
 
-  const deleteRoster = (id) => {
-    const updatedRosters = rosters.filter(r => r.id !== id);
-    setRosters(updatedRosters);
-    setToLocalStorage('rosters', updatedRosters);
-    return { success: true, message: 'Roster deleted successfully' };
+  // ROSTER - DELETE
+  const deleteRoster = async (id) => {
+    try {
+      await deleteDoc(doc(db, 'rosters', id));
+      return { success: true, message: 'Roster deleted successfully' };
+    } catch (error) {
+      return { success: false, message: 'Delete failed' };
+    }
   };
+
+  // ROSTER - UPDATE
+  const updateRoster = async (id, updatedData) => {
+    try {
+      await updateDoc(doc(db, 'rosters', id), updatedData);
+      return { success: true, message: 'Roster updated successfully' };
+    } catch (error) {
+      return { success: false, message: 'Update failed' };
+    }
+  };
+
+  // DOCUMENT - UPLOAD (Metadata only - real file storage happens in Component usually, or we can add storage logic here)
+  const uploadDocument = async (employeeId, documentData) => {
+    try {
+      // documentData should contain { name, size, type, data(base64) OR url }
+      await addDoc(collection(db, 'documents'), {
+        employeeId,
+        ...documentData,
+        uploadDate: new Date().toISOString().split('T')[0],
+        status: 'Pending',
+        createdAt: serverTimestamp()
+      });
+      return { success: true, message: 'Document uploaded successfully' };
+    } catch (error) {
+      return { success: false, message: 'Upload failed' };
+    }
+  };
+
+  const updateDocumentStatus = async (docId, status) => {
+    try {
+      await updateDoc(doc(db, 'documents', docId), { status });
+      return { success: true, message: `Document ${status.toLowerCase()} successfully` };
+    } catch (e) { return { success: false, message: 'Error updating document' }; }
+  };
+
+  // BANK ACCOUNT
+  const updateBankAccount = async (employeeId, bankData) => {
+    try {
+      // Use employeeId as Document ID for 1:1 mapping
+      await setDoc(doc(db, 'bankAccounts', employeeId), { ...bankData, updatedAt: serverTimestamp() }, { merge: true });
+      return { success: true, message: 'Bank account updated' };
+    } catch (e) { return { success: false, message: 'Error updating bank details' }; }
+  };
+
+  // ADMIN - CREATE USER (Only creates in Firestore profile, Auth creation usually server-side or secondary app in basic setup)
+  // Note: Client-side `createUserWithEmailAndPassword` logs you in as the NEW user, which logs out the Admin. 
+  // For this simple app, we can use a secondary function or just assume Admin creates manually in Console.
+  // OR: We use the `addUser` purely for Firestore profile if Auth is handled differently.
+  // For now: Simple Firestore Add.
+  const addUser = async (userData) => {
+    try {
+      // We can't set UID easily without Auth. 
+      // Suggestion: Just add to collection, let Auth happen separately or assume this is a 'profile' creation.
+      await addDoc(collection(db, 'users'), {
+        ...userData,
+        createdAt: serverTimestamp()
+      });
+      return { success: true, message: 'User profile created (Auth separate)' };
+    } catch (e) { return { success: false, message: 'Error adding user' }; }
+  };
+
+  const updateUser = async (userId, updates) => {
+    try {
+      await updateDoc(doc(db, 'users', userId), updates);
+      return { success: true, message: 'User updated' };
+    } catch (e) { return { success: false, message: 'Update failed' }; }
+  };
+
+  const deleteUser = async (userId) => {
+    try {
+      await deleteDoc(doc(db, 'users', userId));
+      return { success: true, message: 'User deleted' };
+    } catch (e) { return { success: false, message: 'Delete failed' }; }
+  };
+
+  // ANNOUNCEMENTS
+  const addAnnouncement = async (data) => {
+    try {
+      await addDoc(collection(db, 'announcements'), { ...data, date: new Date().toISOString().split('T')[0] });
+      return { success: true, message: 'Posted' };
+    } catch (e) { return { success: false, message: 'Error' }; }
+  };
+  const deleteAnnouncement = async (id) => {
+    try {
+      await deleteDoc(doc(db, 'announcements', id));
+      return { success: true, message: 'Deleted' };
+    } catch (e) { return { success: false, message: 'Error' }; }
+  };
+
 
   const value = {
     currentUser,
-    allUsers: allUsers.filter(u => {
-      const exitedIds = JSON.parse(localStorage.getItem('exitedEmployeeIds') || '[]');
-      return !exitedIds.includes(u.id);
-    }),
+    allUsers,
     attendance,
     leaves,
     leaveBalances: allLeaveBalances,
@@ -478,17 +572,17 @@ export const AuthProvider = ({ children }) => {
     uploadDocument,
     updateBankAccount,
     updateDocumentStatus,
-    updateUserProfile,
-    addEmployee,
     addAnnouncement,
-    updateAnnouncement,
     deleteAnnouncement,
     addUser,
-    deleteUser,
     updateUser,
+    deleteUser,
     assignRoster,
-    deleteRoster
+    deleteRoster,
+    updateRoster,
+    // Add Employee wrapper
+    addEmployee: addUser
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={value}>{loading ? <div className="h-screen w-full flex items-center justify-center">Loading Firebase...</div> : children}</AuthContext.Provider>;
 };

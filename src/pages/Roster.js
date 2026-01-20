@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Card, Button, Table, Modal, Input, Select, Alert } from '../components/UI';
-import { Calendar as CalendarIcon, Clock, UserPlus, Trash2, ChevronLeft, ChevronRight, List, ChevronDown, User } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, UserPlus, Trash2, ChevronLeft, ChevronRight, List, ChevronDown, User, Edit } from 'lucide-react';
 import { formatDate } from '../utils/helpers';
 
 const EmployeeRosterGroup = ({ employeeName, rosters, columns }) => {
@@ -38,11 +38,20 @@ const EmployeeRosterGroup = ({ employeeName, rosters, columns }) => {
 };
 
 const Roster = () => {
-    const { currentUser, rosters, allUsers, assignRoster, deleteRoster } = useAuth();
+    const { currentUser, rosters, allUsers, assignRoster, deleteRoster, updateRoster } = useAuth();
     const [showModal, setShowModal] = useState(false);
     const [view, setView] = useState('list'); // 'list' or 'calendar'
     const [currentDate, setCurrentDate] = useState(new Date());
     const [alert, setAlert] = useState(null);
+
+    // Day Details Modal State
+    const [showDayModal, setShowDayModal] = useState(false);
+    const [selectedDayRosters, setSelectedDayRosters] = useState([]);
+    const [selectedDayDate, setSelectedDayDate] = useState(null);
+
+    // Edit State
+    const [editingRosterId, setEditingRosterId] = useState(null);
+
     const [formData, setFormData] = useState({
         selectedEmployees: [],
         startDate: '',
@@ -107,30 +116,65 @@ const Roster = () => {
         }
     };
 
+    const handleEdit = (roster) => {
+        setEditingRosterId(roster.id);
+        setFormData({
+            selectedEmployees: [roster.employeeId], // Kept for consistency, though hidden
+            startDate: roster.date,
+            endDate: roster.date,
+            shiftName: roster.shiftName,
+            startTime: roster.startTime,
+            endTime: roster.endTime,
+            gracePeriod: roster.gracePeriod
+        });
+        setShowModal(true);
+    };
+
+    const handleCloseModal = () => {
+        setShowModal(false);
+        setEditingRosterId(null);
+        setFormData({
+            selectedEmployees: [],
+            startDate: '',
+            endDate: '',
+            shiftName: 'Morning Shift',
+            startTime: '09:00',
+            endTime: '18:00',
+            gracePeriod: 15
+        });
+    }
+
     const handleSubmit = (e) => {
         e.preventDefault();
-        if (formData.selectedEmployees.length === 0 || !formData.startDate) {
-            setAlert({ type: 'error', message: 'Please select at least one employee and start date' });
-            return;
-        }
 
-        const result = assignRoster({
-            ...formData,
-            employeeIds: formData.selectedEmployees
-        });
-
-        setAlert({ type: result.success ? 'success' : 'error', message: result.message });
-        if (result.success) {
-            setShowModal(false);
-            setFormData({
-                selectedEmployees: [],
-                startDate: '',
-                endDate: '',
-                shiftName: 'Morning Shift',
-                startTime: '09:00',
-                endTime: '18:00',
-                gracePeriod: 15
+        if (editingRosterId) {
+            // Update Mode
+            const result = updateRoster(editingRosterId, {
+                shiftName: formData.shiftName,
+                startTime: formData.startTime,
+                endTime: formData.endTime,
+                gracePeriod: formData.gracePeriod,
             });
+            setAlert({ type: result.success ? 'success' : 'error', message: result.message });
+            if (result.success) {
+                handleCloseModal();
+            }
+        } else {
+            // Create Mode
+            if (formData.selectedEmployees.length === 0 || !formData.startDate) {
+                setAlert({ type: 'error', message: 'Please select at least one employee and start date' });
+                return;
+            }
+
+            const result = assignRoster({
+                ...formData,
+                employeeIds: formData.selectedEmployees
+            });
+
+            setAlert({ type: result.success ? 'success' : 'error', message: result.message });
+            if (result.success) {
+                handleCloseModal();
+            }
         }
         setTimeout(() => setAlert(null), 3000);
     };
@@ -171,12 +215,22 @@ const Roster = () => {
 
         for (let d = 1; d <= daysInMonth; d++) {
             const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-            const roster = filteredRosters.find(r => r.date === dateStr);
-            days.push({ day: d, roster });
+            // Filter ALL rosters for this date, not just find the first one
+            const dayRosters = filteredRosters.filter(r => r.date === dateStr);
+            days.push({ day: d, rosters: dayRosters, dateStr });
         }
 
         return days;
     }, [currentDate, filteredRosters]);
+
+    const handleDayClick = (dayData) => {
+        if (dayData && dayData.rosters && dayData.rosters.length > 0) {
+            setSelectedDayRosters(dayData.rosters);
+            const dateObj = new Date(dayData.dateStr);
+            setSelectedDayDate(dateObj.toDateString());
+            setShowDayModal(true);
+        }
+    };
 
     const columns = [
         { header: 'Date', accessor: 'date', render: (row) => formatDate(row.date) },
@@ -194,9 +248,14 @@ const Roster = () => {
         ...(currentUser.role !== 'employee' ? [{
             header: 'Actions',
             render: (row) => (
-                <button onClick={() => handleDelete(row.id)} className="text-red-600 hover:text-red-900">
-                    <Trash2 size={18} />
-                </button>
+                <div className="flex items-center gap-2">
+                    <button onClick={() => handleEdit(row)} className="text-blue-600 hover:text-blue-900" title="Edit Roster">
+                        <Edit size={18} />
+                    </button>
+                    <button onClick={() => handleDelete(row.id)} className="text-red-600 hover:text-red-900" title="Delete Roster">
+                        <Trash2 size={18} />
+                    </button>
+                </div>
             )
         }] : [])
     ];
@@ -305,80 +364,85 @@ const Roster = () => {
                         </div>
                         <div className="grid grid-cols-7">
                             {calendarData.map((item, index) => (
-                                <div key={index} className={`min-h-[120px] p-2 border-r border-b border-gray-100 dark:border-gray-700 last:border-r-0 ${!item ? 'bg-gray-50/30 dark:bg-gray-900/10' : ''}`}>
+                                <div
+                                    key={index}
+                                    className={`min-h-[120px] p-1 border-r border-b border-gray-100 dark:border-gray-700 last:border-r-0 transition-colors ${!item ? 'bg-gray-50/30 dark:bg-gray-900/10' : 'hover:bg-gray-50/50 dark:hover:bg-gray-800/50 cursor-pointer'}`}
+                                    onClick={() => handleDayClick(item)}
+                                >
                                     {item && (
                                         <div className="h-full flex flex-col">
-                                            <span className={`text-sm font-bold ${new Date(currentDate.getFullYear(), currentDate.getMonth(), item.day).toDateString() === new Date().toDateString()
+                                            <span className={`text-sm font-bold self-end mr-1 ${new Date(currentDate.getFullYear(), currentDate.getMonth(), item.day).toDateString() === new Date().toDateString()
                                                 ? 'bg-primary-600 text-white w-7 h-7 flex items-center justify-center rounded-full mb-1'
                                                 : 'text-gray-700 dark:text-gray-300 mb-1'
                                                 }`}>
                                                 {item.day}
                                             </span>
-                                            {item.roster && (
-                                                <div className={`p-1.5 rounded-lg border text-[10px] leading-tight flex flex-col gap-1 shadow-sm ${getShiftColor(item.roster.shiftName)}`}>
-                                                    <p className="font-bold truncate">{item.roster.shiftName}</p>
-                                                    <div className="flex items-center gap-1 opacity-90">
-                                                        <Clock size={10} />
-                                                        <span>{item.roster.startTime} - {item.roster.endTime}</span>
+
+                                            <div className="flex flex-col gap-1 mt-1">
+                                                {item.rosters.slice(0, 3).map((roster, idx) => (
+                                                    <div key={idx} className={`px-1.5 py-1 rounded text-[10px] truncate border-l-2 ${getShiftColor(roster.shiftName)} border-l-current bg-opacity-20`}>
+                                                        <span className="font-semibold mr-1">
+                                                            {currentUser.role !== 'employee' ? roster.employeeName?.split(' ')[0] : roster.shiftName}
+                                                        </span>
+                                                        <span className="opacity-75 hidden sm:inline">
+                                                            {roster.startTime}
+                                                        </span>
                                                     </div>
-                                                </div>
-                                            )}
+                                                ))}
+                                                {item.rosters.length > 3 && (
+                                                    <div className="text-[10px] text-center text-gray-500 font-medium bg-gray-100 dark:bg-gray-700 rounded py-0.5">
+                                                        +{item.rosters.length - 3} More
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                     )}
                                 </div>
                             ))}
                         </div>
                     </div>
-
-                    <div className="flex flex-wrap gap-4 p-4 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-                        <p className="text-sm font-bold text-gray-700 dark:text-gray-300 w-full mb-1">Shift Legend:</p>
-                        {shifts.map(s => (
-                            <div key={s.name} className="flex items-center gap-2">
-                                <div className={`w-3 h-3 rounded-full ${s.color.split(' ')[0]}`}></div>
-                                <span className="text-xs font-medium text-gray-600 dark:text-gray-400">{s.name}</span>
-                            </div>
-                        ))}
-                    </div>
                 </div>
             )}
 
-            <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="Assign Roster">
+            <Modal isOpen={showModal} onClose={handleCloseModal} title={editingRosterId ? "Edit Roster" : "Assign Roster"}>
                 <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="mb-4">
-                        <div className="flex justify-between items-center mb-2">
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                Select Employees
-                            </label>
-                            <label className="flex items-center space-x-2 text-sm text-primary-600 cursor-pointer hover:text-primary-700">
-                                <input
-                                    type="checkbox"
-                                    className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                                    onChange={handleSelectAll}
-                                    checked={allUsers.filter(u => u.role === 'employee').length > 0 && formData.selectedEmployees.length === allUsers.filter(u => u.role === 'employee').length}
-                                />
-                                <span>Select All</span>
-                            </label>
-                        </div>
-                        <div className="border border-gray-300 dark:border-gray-600 rounded-lg max-h-48 overflow-y-auto p-2 bg-white dark:bg-gray-700">
-                            {allUsers.filter(u => u.role === 'employee').map(u => (
-                                <label key={u.id} className="flex items-center space-x-3 p-2 hover:bg-gray-50 dark:hover:bg-gray-600 rounded cursor-pointer transition-colors border-b border-gray-100 dark:border-gray-600 last:border-0">
+                    {!editingRosterId && (
+                        <div className="mb-4">
+                            <div className="flex justify-between items-center mb-2">
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    Select Employees
+                                </label>
+                                <label className="flex items-center space-x-2 text-sm text-primary-600 cursor-pointer hover:text-primary-700">
                                     <input
                                         type="checkbox"
-                                        checked={formData.selectedEmployees.includes(u.id)}
-                                        onChange={() => handleEmployeeToggle(u.id)}
-                                        className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                                        className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                                        onChange={handleSelectAll}
+                                        checked={allUsers.filter(u => u.role === 'employee').length > 0 && formData.selectedEmployees.length === allUsers.filter(u => u.role === 'employee').length}
                                     />
-                                    <span className="text-sm text-gray-700 dark:text-gray-200 font-medium">{u.name} <span className="text-xs text-gray-500 dark:text-gray-400 font-normal">({u.employeeId})</span></span>
+                                    <span>Select All</span>
                                 </label>
-                            ))}
-                            {allUsers.filter(u => u.role === 'employee').length === 0 && (
-                                <p className="text-sm text-gray-500 text-center py-2">No employees found</p>
-                            )}
+                            </div>
+                            <div className="border border-gray-300 dark:border-gray-600 rounded-lg max-h-48 overflow-y-auto p-2 bg-white dark:bg-gray-700">
+                                {allUsers.filter(u => u.role === 'employee').map(u => (
+                                    <label key={u.id} className="flex items-center space-x-3 p-2 hover:bg-gray-50 dark:hover:bg-gray-600 rounded cursor-pointer transition-colors border-b border-gray-100 dark:border-gray-600 last:border-0">
+                                        <input
+                                            type="checkbox"
+                                            checked={formData.selectedEmployees.includes(u.id)}
+                                            onChange={() => handleEmployeeToggle(u.id)}
+                                            className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                                        />
+                                        <span className="text-sm text-gray-700 dark:text-gray-200 font-medium">{u.name} <span className="text-xs text-gray-500 dark:text-gray-400 font-normal">({u.employeeId})</span></span>
+                                    </label>
+                                ))}
+                                {allUsers.filter(u => u.role === 'employee').length === 0 && (
+                                    <p className="text-sm text-gray-500 text-center py-2">No employees found</p>
+                                )}
+                            </div>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 text-right">
+                                {formData.selectedEmployees.length} selected
+                            </p>
                         </div>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 text-right">
-                            {formData.selectedEmployees.length} selected
-                        </p>
-                    </div>
+                    )}
 
                     <div className="grid grid-cols-2 gap-4">
                         <Input
@@ -387,6 +451,7 @@ const Roster = () => {
                             value={formData.startDate}
                             onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
                             required
+                            disabled={!!editingRosterId} // Disable date editing for now
                         />
                         <Input
                             label="End Date"
@@ -395,6 +460,7 @@ const Roster = () => {
                             onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
                             required
                             placeholder="Keep same for single day"
+                            disabled={!!editingRosterId}
                         />
                     </div>
 
@@ -431,12 +497,28 @@ const Roster = () => {
                     />
 
                     <div className="flex justify-end space-x-3 pt-4">
-                        <Button type="button" variant="secondary" onClick={() => setShowModal(false)}>
+                        <Button type="button" variant="secondary" onClick={handleCloseModal}>
                             Cancel
                         </Button>
-                        <Button type="submit">Assign Roster</Button>
+                        <Button type="submit">{editingRosterId ? "Update Roster" : "Assign Roster"}</Button>
                     </div>
                 </form>
+            </Modal>
+
+            {/* Modal for viewing details of a specific day */}
+            <Modal isOpen={showDayModal} onClose={() => setShowDayModal(false)} title={`Roster for ${selectedDayDate}`}>
+                <div className="space-y-4">
+                    <div className="max-h-[60vh] overflow-y-auto">
+                        {selectedDayRosters.length > 0 ? (
+                            <Table columns={columns} data={selectedDayRosters} />
+                        ) : (
+                            <p className="text-center text-gray-500 py-6">No shifts scheduled for this day.</p>
+                        )}
+                    </div>
+                    <div className="flex justify-end">
+                        <Button variant="secondary" onClick={() => setShowDayModal(false)}>Close</Button>
+                    </div>
+                </div>
             </Modal>
         </div>
     );
