@@ -10,7 +10,7 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login, seedDatabase, resetPassword } = useAuth();
+  const { login, resetPassword } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -118,26 +118,6 @@ const Login = () => {
             </Button>
           </form>
 
-        </div>
-
-        <p className="text-center text-white text-xs md:text-sm mt-4">
-          © 2024 Outvying HRMS. All rights reserved.
-        </p>
-
-        <div className="mt-8 text-center">
-          <Button
-            onClick={async () => {
-              if (window.confirm('This will create test accounts in Firebase. Continue?')) {
-                setLoading(true);
-                const res = await seedDatabase();
-                alert(res.message);
-                setLoading(false);
-              }
-            }}
-            className="bg-gray-600 hover:bg-gray-700 text-xs py-1 px-3"
-          >
-            Development: Seed Database
-          </Button>
         </div>
 
         <p className="text-center text-white text-xs md:text-sm mt-4">
