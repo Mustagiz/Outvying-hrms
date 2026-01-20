@@ -154,13 +154,13 @@ const LeavePolicy = () => {
           <div className="flex items-start space-x-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
             <div className="w-2 h-2 bg-primary-600 rounded-full mt-2"></div>
             <p className="text-sm text-gray-700 dark:text-gray-300">
-              <strong>Annual Leave Quota:</strong> 18 leaves per year
+              <strong>Annual Leave Quota:</strong> {policy.annualLeaves} leaves per year
             </p>
           </div>
           <div className="flex items-start space-x-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
             <div className="w-2 h-2 bg-primary-600 rounded-full mt-2"></div>
             <p className="text-sm text-gray-700 dark:text-gray-300">
-              <strong>Monthly Accrual:</strong> 1.5 leaves per month after completing 15 working days
+              <strong>Monthly Accrual:</strong> {policy.monthlyAccrual} leaves per month after completing {policy.workingDaysRequired} working days
             </p>
           </div>
           <div className="flex items-start space-x-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
@@ -178,7 +178,7 @@ const LeavePolicy = () => {
           <div className="flex items-start space-x-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
             <div className="w-2 h-2 bg-primary-600 rounded-full mt-2"></div>
             <p className="text-sm text-gray-700 dark:text-gray-300">
-              <strong>Leave Types:</strong> Paid Leave, Casual Leave, Leave without Pay, Unplanned Leave
+              <strong>Leave Types:</strong> {allLeaveTypes.map(t => t.name).join(', ') || 'No custom types defined'}
             </p>
           </div>
         </div>
