@@ -102,6 +102,7 @@ const LeaveManagement = () => {
 
   const [currentPage, setCurrentPage] = useState(1);
   const [adminCurrentPage, setAdminCurrentPage] = useState(1);
+  const [balanceCurrentPage, setBalanceCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
   const paginatedLeaves = useMemo(() => {
@@ -114,8 +115,14 @@ const LeaveManagement = () => {
     return allApplications.slice(startIndex, startIndex + itemsPerPage);
   }, [allApplications, adminCurrentPage]);
 
+  const paginatedBalances = useMemo(() => {
+    const startIndex = (balanceCurrentPage - 1) * itemsPerPage;
+    return leaveBalances.slice(startIndex, startIndex + itemsPerPage);
+  }, [leaveBalances, balanceCurrentPage]);
+
   const totalPages = Math.ceil(myLeaves.length / itemsPerPage);
   const totalAdminPages = Math.ceil(allApplications.length / itemsPerPage);
+  const totalBalancePages = Math.ceil(leaveBalances.length / itemsPerPage);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -395,7 +402,16 @@ const LeaveManagement = () => {
 
       {activeTab === 'manageBalances' ? (
         <Card title="Manage Employee Leave Balances">
-          <Table columns={balanceColumns} data={leaveBalances} />
+          <Table columns={balanceColumns} data={paginatedBalances} />
+          {totalBalancePages > 1 && (
+            <div className="mt-4 flex justify-center">
+              <Pagination
+                currentPage={balanceCurrentPage}
+                totalPages={totalBalancePages}
+                onPageChange={setBalanceCurrentPage}
+              />
+            </div>
+          )}
         </Card>
       ) : activeTab === 'myLeaves' ? (
         <Card title="My Leave History">
