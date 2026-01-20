@@ -11,21 +11,40 @@ const Approvals = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [showImpactModal, setShowImpactModal] = useState(false);
   const [selectedLeave, setSelectedLeave] = useState(null);
+  const [activeTab, setActiveTab] = useState('pending');
   const itemsPerPage = 10;
 
-  const pendingApprovals = useMemo(() => {
-    const filtered = currentUser.role === 'Employee' 
-      ? leaves.filter(l => l.employeeId === currentUser.id)
-      : leaves.filter(l => l.status === 'Pending');
+  const displayedApprovals = useMemo(() => {
+    let filtered = leaves;
+
+    // Employee View: Show only their own leaves
+    if (currentUser.role === 'Employee' || currentUser.role === 'employee') {
+      filtered = leaves.filter(l => l.employeeId === currentUser.id);
+      // For employees, maybe we just show everything mixed or filter by status too? 
+      // Usually employees want to see everything. Keeping existing logic derived from original code:
+      // Original code filtered by user ID for Employee, and by 'Pending' for Admin. 
+      // We will respect tabs for Admin, but maybe just show all for Employee? 
+      // Let's implement tabs for everyone for consistency, or just Admin.
+      // Request was "in admin Pending Approvals...".
+      // Let's stick to Admin having tabs.
+    } else {
+      // Admin/HR View
+      if (activeTab === 'pending') {
+        filtered = leaves.filter(l => l.status === 'Pending');
+      } else {
+        filtered = leaves.filter(l => l.status !== 'Pending');
+      }
+    }
+
     return filtered.sort((a, b) => new Date(b.appliedDate) - new Date(a.appliedDate));
-  }, [leaves, currentUser]);
+  }, [leaves, currentUser, activeTab]);
 
   const paginatedApprovals = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
-    return pendingApprovals.slice(startIndex, startIndex + itemsPerPage);
-  }, [pendingApprovals, currentPage]);
+    return displayedApprovals.slice(startIndex, startIndex + itemsPerPage);
+  }, [displayedApprovals, currentPage]);
 
-  const totalPages = Math.ceil(pendingApprovals.length / itemsPerPage);
+  const totalPages = Math.ceil(displayedApprovals.length / itemsPerPage);
 
   const calculateLeaveImpact = (leave) => {
     if (!leave) return null;
@@ -74,7 +93,7 @@ const Approvals = () => {
   };
 
   const toggleSelection = (id) => {
-    setSelectedItems(prev => 
+    setSelectedItems(prev =>
       prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
     );
   };
@@ -116,19 +135,40 @@ const Approvals = () => {
           <Button onClick={() => showImpactAnalysis(row)} variant="secondary" className="text-xs py-1 px-2">
             <Users size={14} className="inline mr-1" />Analyze
           </Button>
-          <Button onClick={() => handleApproval(row.id, 'Approved')} variant="success" className="text-xs py-1 px-2">
-            <CheckCircle size={14} className="inline mr-1" />Approve
-          </Button>
-          <Button onClick={() => handleApproval(row.id, 'Rejected')} variant="danger" className="text-xs py-1 px-2">
-            <XCircle size={14} className="inline mr-1" />Reject
-          </Button>
+          {(activeTab === 'pending' || activeTab === 'history') && (
+            <>
+              {row.status !== 'Approved' && (
+                <Button onClick={() => handleApproval(row.id, 'Approved')} variant="success" className="text-xs py-1 px-2">
+                  <CheckCircle size={14} className="inline mr-1" />Approve
+                </Button>
+              )}
+              {row.status !== 'Rejected' && (
+                <Button onClick={() => handleApproval(row.id, 'Rejected')} variant="danger" className="text-xs py-1 px-2">
+                  <XCircle size={14} className="inline mr-1" />Reject
+                </Button>
+              )}
+            </>
+          )}
         </div>
       )
     }
   ];
 
+  // Add Status column if in history view
+  if (activeTab === 'history' || currentUser.role === 'Employee') {
+    columns.splice(2, 0, {
+      header: 'Status',
+      accessor: 'status',
+      render: (row) => (
+        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(row.status)}`}>
+          {row.status}
+        </span>
+      )
+    });
+  }
+
   const approvalStats = useMemo(() => {
-    const filtered = currentUser.role === 'Employee' 
+    const filtered = currentUser.role === 'Employee'
       ? leaves.filter(l => l.employeeId === currentUser.id)
       : leaves;
     const total = filtered.length;
@@ -163,7 +203,28 @@ const Approvals = () => {
         </Card>
       </div>
 
-      <Card title={currentUser.role === 'Employee' ? 'My Leave Requests' : 'Pending Approvals'}>
+      <div className="flex space-x-4 mb-4">
+        <button
+          className={`px-4 py-2 rounded-lg font-medium transition-colors ${activeTab === 'pending'
+              ? 'bg-primary-600 text-white'
+              : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+            }`}
+          onClick={() => { setActiveTab('pending'); setCurrentPage(1); }}
+        >
+          Pending Approvals
+        </button>
+        <button
+          className={`px-4 py-2 rounded-lg font-medium transition-colors ${activeTab === 'history'
+              ? 'bg-primary-600 text-white'
+              : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+            }`}
+          onClick={() => { setActiveTab('history'); setCurrentPage(1); }}
+        >
+          Approval History
+        </button>
+      </div>
+
+      <Card title={activeTab === 'pending' ? 'Pending Requests' : 'Processed Requests'}>
         {selectedItems.length > 0 && (
           <div className="mb-4 p-4 bg-primary-50 dark:bg-primary-900/20 rounded-lg flex justify-between items-center">
             <span className="text-sm text-gray-700 dark:text-gray-300">

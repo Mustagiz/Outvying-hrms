@@ -1,12 +1,14 @@
 import React, { useState, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Card, Table, Button, Modal, Input, Select, Alert } from '../components/UI';
+import { Card, Table, Button, Modal, Input, Select, Alert, Pagination } from '../components/UI';
 import { formatDate, getStatusColor } from '../utils/helpers';
-import { FileText, Upload, Download } from 'lucide-react';
+import { FileText, Upload, Download, CheckCircle, XCircle } from 'lucide-react';
 
 const Documents = () => {
-  const { currentUser, documents, uploadDocument, allUsers } = useAuth();
+  const { currentUser, documents, uploadDocument, updateDocumentStatus, allUsers } = useAuth();
   const [showModal, setShowModal] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
   const [alert, setAlert] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
@@ -29,8 +31,21 @@ const Documents = () => {
   const myDocuments = useMemo(() => {
     return documents.filter(d =>
       currentUser.role === 'employee' ? d.employeeId === currentUser.id : true
-    );
+    ).sort((a, b) => new Date(b.uploadDate) - new Date(a.uploadDate));
   }, [documents, currentUser]);
+
+  const paginatedDocuments = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return myDocuments.slice(startIndex, startIndex + itemsPerPage);
+  }, [myDocuments, currentPage]);
+
+  const totalPages = Math.ceil(myDocuments.length / itemsPerPage);
+
+  const handleStatusUpdate = (docId, status) => {
+    const result = updateDocumentStatus(docId, status);
+    setAlert({ type: result.success ? 'success' : 'error', message: result.message });
+    setTimeout(() => setAlert(null), 3000);
+  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -134,6 +149,28 @@ const Documents = () => {
           >
             <Download size={16} />
           </button>
+          {currentUser.role !== 'employee' && (
+            <>
+              {row.status !== 'Approved' && (
+                <button
+                  onClick={() => handleStatusUpdate(row.id, 'Approved')}
+                  className="text-green-600 hover:text-green-700"
+                  title="Approve"
+                >
+                  <CheckCircle size={16} />
+                </button>
+              )}
+              {row.status !== 'Rejected' && (
+                <button
+                  onClick={() => handleStatusUpdate(row.id, 'Rejected')}
+                  className="text-red-600 hover:text-red-700"
+                  title="Reject"
+                >
+                  <XCircle size={16} />
+                </button>
+              )}
+            </>
+          )}
         </div>
       )
     }
@@ -186,7 +223,14 @@ const Documents = () => {
       </div>
 
       <Card title="My Documents">
-        <Table columns={columns} data={myDocuments} />
+        <Table columns={columns} data={paginatedDocuments} />
+        {totalPages > 1 && (
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+          />
+        )}
       </Card>
 
       <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="Upload Document">
