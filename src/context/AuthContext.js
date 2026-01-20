@@ -547,10 +547,14 @@ export const AuthProvider = ({ children }) => {
   // BANK ACCOUNT
   const updateBankAccount = async (employeeId, bankData) => {
     try {
+      console.log("Attempting Bank Update for:", employeeId, "Data:", bankData);
       // Use employeeId as Document ID for 1:1 mapping
       await setDoc(doc(db, 'bankAccounts', employeeId), { ...bankData, updatedAt: serverTimestamp() }, { merge: true });
       return { success: true, message: 'Bank account updated' };
-    } catch (e) { return { success: false, message: 'Error updating bank details' }; }
+    } catch (e) {
+      console.error("Bank Update Error:", e);
+      return { success: false, message: 'Error updating bank details: ' + (e.message || 'Permission denied') };
+    }
   };
 
   // ADMIN - CREATE USER (Only creates in Firestore profile, Auth creation usually server-side or secondary app in basic setup)
