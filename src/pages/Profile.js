@@ -4,7 +4,7 @@ import { Card, Button, Input, Alert } from '../components/UI';
 import { User, Mail, Phone, MapPin, Briefcase, Calendar } from 'lucide-react';
 
 const Profile = () => {
-  const { currentUser, updateUserProfile } = useAuth();
+  const { currentUser, updateUserProfile, changePassword } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [alert, setAlert] = useState(null);
   const [formData, setFormData] = useState({
@@ -15,9 +15,20 @@ const Profile = () => {
     bloodGroup: currentUser.bloodGroup
   });
 
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handlePasswordInputChange = (e) => {
+    const { name, value } = e.target;
+    setPasswordData(prev => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e) => {
@@ -26,6 +37,25 @@ const Profile = () => {
     setAlert({ type: result.success ? 'success' : 'error', message: result.message });
     if (result.success) {
       setIsEditing(false);
+    }
+    setTimeout(() => setAlert(null), 3000);
+  };
+
+  const handlePasswordSubmit = async (e) => {
+    e.preventDefault();
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      setAlert({ type: 'error', message: 'New passwords do not match' });
+      return;
+    }
+    if (passwordData.newPassword.length < 6) {
+      setAlert({ type: 'error', message: 'Password must be at least 6 characters' });
+      return;
+    }
+
+    const result = await changePassword(passwordData.currentPassword, passwordData.newPassword);
+    setAlert({ type: result.success ? 'success' : 'error', message: result.message });
+    if (result.success) {
+      setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
     }
     setTimeout(() => setAlert(null), 3000);
   };
@@ -228,6 +258,40 @@ const Profile = () => {
                 </div>
               </div>
             )}
+          </Card>
+
+          <Card title="Security" className="mt-6">
+            <form onSubmit={handlePasswordSubmit}>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Input
+                  label="Current Password"
+                  name="currentPassword"
+                  type="password"
+                  value={passwordData.currentPassword}
+                  onChange={handlePasswordInputChange}
+                  required
+                />
+                <Input
+                  label="New Password"
+                  name="newPassword"
+                  type="password"
+                  value={passwordData.newPassword}
+                  onChange={handlePasswordInputChange}
+                  required
+                />
+                <Input
+                  label="Confirm New Password"
+                  name="confirmPassword"
+                  type="password"
+                  value={passwordData.confirmPassword}
+                  onChange={handlePasswordInputChange}
+                  required
+                />
+              </div>
+              <div className="flex justify-end mt-4">
+                <Button type="submit" variant="secondary">Update Password</Button>
+              </div>
+            </form>
           </Card>
         </div>
       </div>

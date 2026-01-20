@@ -206,6 +206,21 @@ To verify the fix, please follow these steps:
 5.  Go to **Leave Management** -> **Apply for Leave**.
 6.  Verify that "Maternity Leave" now appears in the **Leave Type** dropdown.
 
+### User Password Change
+- **Files**: `src/pages/Profile.js`, `src/context/AuthContext.js`
+- **Change**: 
+    - Added `changePassword` function with re-authentication support.
+    - Added a "Security" card to the Profile page with Current/New Password fields.
+- **Reason**: Users need to be able to keep their accounts secure by updating their credentials without administrator intervention.
+
+#### Verification
+1.  Login as any user.
+2.  Go to **My Profile**.
+3.  Scroll to the **Security** section.
+4.  Enter your current password and a new 6+ character password.
+5.  Click **Update Password**; verify the success message.
+
+
 
 
 

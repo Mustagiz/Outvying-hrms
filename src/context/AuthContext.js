@@ -8,7 +8,9 @@ import {
   getAuth,
   createUserWithEmailAndPassword,
   updatePassword,
-  updateEmail
+  updateEmail,
+  EmailAuthProvider,
+  reauthenticateWithCredential
 } from 'firebase/auth';
 import {
   collection,
@@ -664,6 +666,22 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const changePassword = async (currentPassword, newPassword) => {
+    try {
+      const user = auth.currentUser;
+      if (!user) return { success: false, message: 'No user logged in' };
+
+      const credential = EmailAuthProvider.credential(user.email, currentPassword);
+      await reauthenticateWithCredential(user, credential);
+      await updatePassword(user, newPassword);
+
+      return { success: true, message: 'Password changed successfully' };
+    } catch (e) {
+      console.error("Change Password Error:", e);
+      return { success: false, message: 'Failed to change password: ' + e.message };
+    }
+  };
+
   const updateUserId = async (currentEmail, currentPassword, newEmail) => {
     let secondaryApp = null;
     try {
@@ -788,6 +806,7 @@ export const AuthProvider = ({ children }) => {
     updateUserProfile: updateUser,
     resetPassword,
     forceUpdatePassword,
+    changePassword,
     updateUserId,
     deleteUser,
     assignRoster,
