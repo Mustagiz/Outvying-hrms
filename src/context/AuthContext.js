@@ -332,9 +332,12 @@ export const AuthProvider = ({ children }) => {
     const now = new Date();
     const clockInTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 
-    // Check if already clocked in (locally checked from state for speed, firebase rule will reject typically but good UX here)
-    const existingRecord = attendance.find(a => String(a.employeeId) === String(employeeId) && a.date === today);
-    if (existingRecord && existingRecord.clockIn) {
+    // Check if already clocked in today
+    const docId = `${employeeId}_${today}`;
+    const docRef = doc(db, 'attendance', docId);
+
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists() && docSnap.data().clockIn) {
       return { success: false, message: 'Already clocked in today' };
     }
 
@@ -343,14 +346,14 @@ export const AuthProvider = ({ children }) => {
       date: today,
       clockIn: clockInTime,
       clockOut: null,
-      status: clockInTime > '09:15' ? 'Late' : 'Present', // Basic logic, can be enhanced
+      status: clockInTime > '09:15' ? 'Late' : 'Present',
       workHours: 0,
       overtime: 0,
       createdAt: serverTimestamp()
     };
 
     // Roster Logic for Status
-    const todayRoster = rosters.find(r => r.employeeId === employeeId && r.date === today);
+    const todayRoster = rosters.find(r => String(r.employeeId) === String(employeeId) && r.date === today);
     if (todayRoster) {
       const result = calculateAttendanceStatus(clockInTime, null, today, todayRoster);
       newRecord.status = result.status;
@@ -358,7 +361,7 @@ export const AuthProvider = ({ children }) => {
     }
 
     try {
-      await addDoc(collection(db, 'attendance'), newRecord);
+      await setDoc(docRef, newRecord);
       return { success: true, message: 'Clocked in successfully', time: clockInTime };
     } catch (error) {
       console.error("ClockIn Error", error);
@@ -394,7 +397,8 @@ export const AuthProvider = ({ children }) => {
         overtime: result.workHours > 9 ? (result.workHours - 9).toFixed(2) : 0
       };
 
-      const docRef = doc(db, 'attendance', record.id);
+      const docId = `${employeeId}_${today}`;
+      const docRef = doc(db, 'attendance', docId);
       await updateDoc(docRef, updates);
       return { success: true, message: 'Clocked out successfully', time: clockOutTime };
 
