@@ -4,12 +4,23 @@ import { Card, Button, Input, Alert } from '../components/UI';
 import { Settings as SettingsIcon, Shield, Bell, Database } from 'lucide-react';
 
 const Settings = () => {
-  const { currentUser, toggleTheme, theme } = useAuth();
+  const { currentUser, toggleTheme, theme, repairAdminProfile } = useAuth();
   const [alert, setAlert] = useState(null);
 
   const handleSave = () => {
     setAlert({ type: 'success', message: 'Settings saved successfully' });
     setTimeout(() => setAlert(null), 3000);
+  };
+
+  const handleRepair = async () => {
+    if (window.confirm('This will attempt to repair your Admin profile in the database. Continue?')) {
+      const result = await repairAdminProfile();
+      setAlert({
+        type: result.success ? 'success' : 'error',
+        message: result.message
+      });
+      setTimeout(() => setAlert(null), 5000);
+    }
   };
 
   return (
@@ -87,6 +98,18 @@ const Settings = () => {
             <Button variant="danger" className="w-full">
               Clear Cache
             </Button>
+
+            <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+              <p className="text-xs text-gray-500 mb-2">Troubleshooting</p>
+              <Button
+                onClick={handleRepair}
+                variant="secondary"
+                className="w-full text-amber-600 hover:text-amber-700 bg-amber-50 hover:bg-amber-100 dark:bg-amber-900/20 dark:text-amber-400"
+              >
+                <Shield size={16} className="inline mr-2" />
+                Repair Admin Permissions
+              </Button>
+            </div>
           </div>
         </Card>
       </div>

@@ -572,6 +572,29 @@ export const AuthProvider = ({ children }) => {
   };
 
 
+  const repairAdminProfile = async () => {
+    if (!currentUser || currentUser.email !== 'admin@hrmspro.com') {
+      return { success: false, message: 'Only logged-in admin can perform repair.' };
+    }
+
+    try {
+      // Force write the admin profile to Firestore to satisfy Security Rules
+      await setDoc(doc(db, 'users', currentUser.uid), {
+        uid: currentUser.uid,
+        email: currentUser.email,
+        role: 'admin',
+        name: 'Admin User',
+        createdAt: serverTimestamp(),
+        lastRepaired: serverTimestamp()
+      }, { merge: true });
+
+      return { success: true, message: 'Admin profile restored. You should now have write permissions.' };
+    } catch (e) {
+      console.error("Repair failed:", e);
+      return { success: false, message: 'Repair failed: ' + e.message };
+    }
+  };
+
   const value = {
     currentUser,
     allUsers,
@@ -606,6 +629,7 @@ export const AuthProvider = ({ children }) => {
     updateRoster,
     // Add Employee wrapper
     addEmployee: addUser,
+    repairAdminProfile,
     seedDatabase: async () => {
       try {
         let count = 0;
