@@ -1,9 +1,12 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { auth, db } from '../config/firebase';
+import { auth, db, firebaseConfig } from '../config/firebase';
+import { initializeApp, deleteApp } from 'firebase/app';
 import {
   signInWithEmailAndPassword,
   signOut,
-  onAuthStateChanged
+  onAuthStateChanged,
+  getAuth,
+  createUserWithEmailAndPassword
 } from 'firebase/auth';
 import {
   collection,
@@ -24,7 +27,6 @@ import { calculateAttendanceStatus } from '../utils/biometricSync';
 // --- Default Data for Seeding (Optional) ---
 // You can remove this import if you don't plan to auto-seed
 import { leaveBalances as mockLeaveBalances, users as mockUsers } from '../data/mockData';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
 
 const AuthContext = createContext();
 
@@ -528,17 +530,38 @@ export const AuthProvider = ({ children }) => {
   // For this simple app, we can use a secondary function or just assume Admin creates manually in Console.
   // OR: We use the `addUser` purely for Firestore profile if Auth is handled differently.
   // For now: Simple Firestore Add.
+  // ADMIN - CREATE USER (Creates Auth User + Firestore Profile via Secondary App)
   const addUser = async (userData) => {
+    let secondaryApp = null;
     try {
-      // We can't set UID easily without Auth. 
-      // Suggestion: Just add to collection, let Auth happen separately or assume this is a 'profile' creation.
-      await addDoc(collection(db, 'users'), {
-        ...userData,
+      // 1. Initialize secondary app to create user without logging out current admin
+      secondaryApp = initializeApp(firebaseConfig, "SecondaryApp");
+      const secondaryAuth = getAuth(secondaryApp);
+
+      // 2. Create user in Firebase Auth
+      const password = userData.password || 'Default@123';
+      const userCredential = await createUserWithEmailAndPassword(secondaryAuth, userData.email, password);
+      const { uid } = userCredential.user;
+
+      // 3. Create user profile in Firestore (using the new UID)
+      const { password: _, ...userDataToStore } = userData; // Exclude password from Firestore
+
+      await setDoc(doc(db, 'users', uid), {
+        ...userDataToStore,
+        uid: uid,
         createdAt: serverTimestamp()
       });
-      return { success: true, message: 'User profile created (Auth separate)' };
+
+      // 4. Cleanup
+      await signOut(secondaryAuth);
+      await deleteApp(secondaryApp);
+
+      return { success: true, message: 'User created successfully with login access.' };
     } catch (e) {
       console.error("Error adding user:", e);
+      if (secondaryApp) {
+        try { await deleteApp(secondaryApp); } catch (err) { console.error("Error cleanup:", err); }
+      }
       return { success: false, message: 'Error adding user: ' + e.message };
     }
   };
