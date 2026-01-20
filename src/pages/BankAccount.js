@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Card, Button, Input, Alert } from '../components/UI';
 import { CreditCard, Building, Search, Download } from 'lucide-react';

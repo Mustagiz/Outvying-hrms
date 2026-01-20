@@ -23,8 +23,8 @@ const Dashboard = () => {
       const myLeaves = leaves.filter(l => l.employeeId === currentUser.id);
       const pendingLeaves = myLeaves.filter(l => l.status === 'Pending').length;
       const myBalance = leaveBalances.find(lb => lb.employeeId === currentUser.id);
-      const totalLeaveBalance = myBalance 
-        ? myBalance.sickLeave.available + myBalance.casualLeave.available + myBalance.annualLeave.available
+      const totalLeaveBalance = myBalance
+        ? (myBalance.paidLeave?.available || 0) + (myBalance.casualLeave?.available || 0)
         : 0;
 
       return [
@@ -54,7 +54,7 @@ const Dashboard = () => {
         .filter(a => a.employeeId === currentUser.id)
         .sort((a, b) => new Date(b.date) - new Date(a.date))
         .slice(0, 5);
-      
+
       return myAttendance.map(a => ({
         date: a.date,
         type: 'Attendance',
@@ -66,7 +66,7 @@ const Dashboard = () => {
         .filter(l => l.status === 'Pending')
         .sort((a, b) => new Date(b.appliedDate) - new Date(a.appliedDate))
         .slice(0, 5);
-      
+
       return recentLeaves.map(l => ({
         date: l.appliedDate,
         type: 'Leave Request',
@@ -81,15 +81,13 @@ const Dashboard = () => {
       <h1 className="text-3xl font-bold text-gray-800 dark:text-white mb-6">Dashboard</h1>
 
       {/* IP Status Banner */}
-      <div className={`mb-6 p-4 rounded-lg flex items-center justify-between ${
-        ipValidation.allowed 
+      <div className={`mb-6 p-4 rounded-lg flex items-center justify-between ${ipValidation.allowed
           ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800'
           : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800'
-      }`}>
+        }`}>
         <div>
-          <p className={`text-sm font-medium ${
-            ipValidation.allowed ? 'text-green-800 dark:text-green-200' : 'text-red-800 dark:text-red-200'
-          }`}>
+          <p className={`text-sm font-medium ${ipValidation.allowed ? 'text-green-800 dark:text-green-200' : 'text-red-800 dark:text-red-200'
+            }`}>
             {ipValidation.allowed ? '✓' : '⚠'} Connected from {currentIP} {ipValidation.allowed ? `(${ipValidation.location})` : '(Unauthorized)'}
           </p>
           {!ipValidation.allowed && (
@@ -134,12 +132,11 @@ const Dashboard = () => {
                     <p className="text-xs text-gray-600 dark:text-gray-400">{activity.details}</p>
                   </div>
                   <div className="text-right">
-                    <span className={`text-xs px-2 py-1 rounded-full ${
-                      activity.status === 'Present' ? 'bg-green-100 text-green-800' :
-                      activity.status === 'Pending' ? 'bg-yellow-100 text-yellow-800' :
-                      activity.status === 'Late' ? 'bg-orange-100 text-orange-800' :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
+                    <span className={`text-xs px-2 py-1 rounded-full ${activity.status === 'Present' ? 'bg-green-100 text-green-800' :
+                        activity.status === 'Pending' ? 'bg-yellow-100 text-yellow-800' :
+                          activity.status === 'Late' ? 'bg-orange-100 text-orange-800' :
+                            'bg-gray-100 text-gray-800'
+                      }`}>
                       {activity.status}
                     </span>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{activity.date}</p>
