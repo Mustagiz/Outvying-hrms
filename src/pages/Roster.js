@@ -54,9 +54,24 @@ const Roster = () => {
         }
     };
 
-    const handleEmployeeToggle = (e) => {
-        const options = Array.from(e.target.selectedOptions, option => parseInt(option.value));
-        setFormData({ ...formData, selectedEmployees: options });
+    const handleEmployeeToggle = (employeeId) => {
+        setFormData(prev => {
+            const currentSelected = prev.selectedEmployees;
+            if (currentSelected.includes(employeeId)) {
+                return { ...prev, selectedEmployees: currentSelected.filter(id => id !== employeeId) };
+            } else {
+                return { ...prev, selectedEmployees: [...currentSelected, employeeId] };
+            }
+        });
+    };
+
+    const handleSelectAll = (e) => {
+        if (e.target.checked) {
+            const allEmployeeIds = allUsers.filter(u => u.role === 'employee').map(u => u.id);
+            setFormData(prev => ({ ...prev, selectedEmployees: allEmployeeIds }));
+        } else {
+            setFormData(prev => ({ ...prev, selectedEmployees: [] }));
+        }
     };
 
     const handleSubmit = (e) => {
@@ -265,21 +280,39 @@ const Roster = () => {
             <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="Assign Roster">
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="mb-4">
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                            Select Employees (Hold Ctrl to select multiple)
-                        </label>
-                        <select
-                            multiple
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:text-white"
-                            value={formData.selectedEmployees}
-                            onChange={handleEmployeeToggle}
-                            size="5"
-                            required
-                        >
+                        <div className="flex justify-between items-center mb-2">
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                Select Employees
+                            </label>
+                            <label className="flex items-center space-x-2 text-sm text-primary-600 cursor-pointer hover:text-primary-700">
+                                <input
+                                    type="checkbox"
+                                    className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                                    onChange={handleSelectAll}
+                                    checked={allUsers.filter(u => u.role === 'employee').length > 0 && formData.selectedEmployees.length === allUsers.filter(u => u.role === 'employee').length}
+                                />
+                                <span>Select All</span>
+                            </label>
+                        </div>
+                        <div className="border border-gray-300 dark:border-gray-600 rounded-lg max-h-48 overflow-y-auto p-2 bg-white dark:bg-gray-700">
                             {allUsers.filter(u => u.role === 'employee').map(u => (
-                                <option key={u.id} value={u.id}>{u.name} ({u.employeeId})</option>
+                                <label key={u.id} className="flex items-center space-x-3 p-2 hover:bg-gray-50 dark:hover:bg-gray-600 rounded cursor-pointer transition-colors border-b border-gray-100 dark:border-gray-600 last:border-0">
+                                    <input
+                                        type="checkbox"
+                                        checked={formData.selectedEmployees.includes(u.id)}
+                                        onChange={() => handleEmployeeToggle(u.id)}
+                                        className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                                    />
+                                    <span className="text-sm text-gray-700 dark:text-gray-200 font-medium">{u.name} <span className="text-xs text-gray-500 dark:text-gray-400 font-normal">({u.employeeId})</span></span>
+                                </label>
                             ))}
-                        </select>
+                            {allUsers.filter(u => u.role === 'employee').length === 0 && (
+                                <p className="text-sm text-gray-500 text-center py-2">No employees found</p>
+                            )}
+                        </div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 text-right">
+                            {formData.selectedEmployees.length} selected
+                        </p>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
