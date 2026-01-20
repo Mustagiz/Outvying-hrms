@@ -190,6 +190,23 @@ To verify the fix, please follow these steps:
 4.  Click **User ID** for a user, enter their *current* password and a *new* email address.
 5.  Verify the update succeeds and their email changes in the table.
 
+### Dynamic Leave Policy & Type Sync
+- **Files**: `src/pages/LeavePolicy.js`, `src/pages/LeaveManagement.js`, `src/context/AuthContext.js`
+- **Change**: 
+    - Migrated leave policies and types from `localStorage` to Firestore.
+    - Added real-time listeners for leave types.
+    - Updated the "Apply for Leave" dropdown to use live data.
+- **Reason**: Previously, leave types added by admins were only stored in their local browser. Employees were seeing outdated mock data. Now, updates are shared instantly across the entire system.
+
+#### Verification
+1.  Login as an admin.
+2.  Go to **Leave Policy Management**.
+3.  Add a new leave type (e.g., "Maternity Leave") and save.
+4.  Logout and login as an employee (or check in a different browser).
+5.  Go to **Leave Management** -> **Apply for Leave**.
+6.  Verify that "Maternity Leave" now appears in the **Leave Type** dropdown.
+
+
 
 
 

@@ -1,21 +1,28 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Card, Button, Table, Modal, Input, Select, Alert, Badge, Pagination } from '../components/UI';
-import { leaveTypes } from '../data/mockData';
+// import { leaveTypes } from '../data/mockData';
 import { formatDate, getStatusColor } from '../utils/helpers';
 import { User, CheckCircle, XCircle } from 'lucide-react';
 
 const LeaveManagement = () => {
-  const { currentUser, leaves, leaveBalances, applyLeave, updateLeaveStatus } = useAuth();
+  const { currentUser, leaves, leaveBalances, applyLeave, updateLeaveStatus, allLeaveTypes } = useAuth();
   const [showModal, setShowModal] = useState(false);
   const [alert, setAlert] = useState(null);
   const [formData, setFormData] = useState({
-    leaveType: leaveTypes[0]?.name || 'Paid Leave',
+    leaveType: '', // Start empty, will be set by useEffect or default
     startDate: '',
     endDate: '',
     reason: '',
     days: 1
   });
+
+  // Default leave type when types load
+  useEffect(() => {
+    if (allLeaveTypes.length > 0 && !formData.leaveType) {
+      setFormData(prev => ({ ...prev, leaveType: allLeaveTypes[0].name }));
+    }
+  }, [allLeaveTypes]);
 
   // Tab State
   const [activeTab, setActiveTab] = useState('myLeaves'); // 'myLeaves' | 'allApplications'
@@ -81,7 +88,13 @@ const LeaveManagement = () => {
     setAlert({ type: result.success ? 'success' : 'error', message: result.message });
     if (result.success) {
       setShowModal(false);
-      setFormData({ leaveType: 'Paid Leave', startDate: '', endDate: '', reason: '', days: 1 });
+      setFormData({
+        leaveType: allLeaveTypes[0]?.name || '',
+        startDate: '',
+        endDate: '',
+        reason: '',
+        days: 1
+      });
     }
     setTimeout(() => setAlert(null), 3000);
   };
@@ -333,7 +346,7 @@ const LeaveManagement = () => {
             name="leaveType"
             value={formData.leaveType}
             onChange={handleInputChange}
-            options={leaveTypes.map(type => ({ value: type.name, label: type.name }))}
+            options={allLeaveTypes.map(type => ({ value: type.name, label: type.name }))}
             required
           />
           <div className="grid grid-cols-2 gap-4">

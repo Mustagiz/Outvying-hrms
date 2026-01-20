@@ -7,5 +7,6 @@
 - [x] Fix "Bank Account" update failure (strict ID comparison & async handling)
 - [x] Enable Roster Modify/Delete for Admin (async handlers & error reporting)
 - [x] Implement Password Reset & User ID updates in User Management
+- [x] Sync Leave Policy/Types between Admin and Employee panels
 - [x] Add extensive debug logging for troubleshooting
 - [x] Push all changes to GitHub

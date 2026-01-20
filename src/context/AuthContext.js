@@ -52,6 +52,12 @@ export const AuthProvider = ({ children }) => {
   const [allLeaveBalances, setAllLeaveBalances] = useState([]);
   const [allDocuments, setAllDocuments] = useState([]);
   const [allBankAccounts, setAllBankAccounts] = useState([]);
+  const [allLeaveTypes, setAllLeaveTypes] = useState([]);
+  const [leavePolicy, setLeavePolicy] = useState({
+    annualLeaves: 18,
+    monthlyAccrual: 1.5,
+    workingDaysRequired: 15
+  });
   const [announcements, setAnnouncements] = useState([]);
   const [rosters, setRosters] = useState([]);
 
@@ -194,6 +200,19 @@ export const AuthProvider = ({ children }) => {
       setAllBankAccounts(bankData);
     });
 
+    // Subscribe to Leave Types
+    const unsubLeaveTypes = onSnapshot(collection(db, 'leaveTypes'), (snapshot) => {
+      const types = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setAllLeaveTypes(types);
+    });
+
+    // Subscribe to Leave Policy (Single doc)
+    const unsubPolicy = onSnapshot(doc(db, 'settings', 'leavePolicy'), (docSnap) => {
+      if (docSnap.exists()) {
+        setLeavePolicy(docSnap.data());
+      }
+    });
+
     // Cleanup subscriptions on unmount or logout
     return () => {
       unsubUsers();
@@ -203,6 +222,8 @@ export const AuthProvider = ({ children }) => {
       unsubAnnouncements();
       unsubDocuments();
       unsubBank();
+      unsubLeaveTypes();
+      unsubPolicy();
     };
 
   }, [currentUser]);
@@ -676,6 +697,28 @@ export const AuthProvider = ({ children }) => {
     } catch (e) { return { success: false, message: 'Delete failed' }; }
   };
 
+  // LEAVE POLICY & TYPES
+  const updateLeavePolicy = async (policyData) => {
+    try {
+      await setDoc(doc(db, 'settings', 'leavePolicy'), { ...policyData, updatedAt: serverTimestamp() }, { merge: true });
+      return { success: true, message: 'Policy updated' };
+    } catch (e) { return { success: false, message: 'Error' }; }
+  };
+
+  const addLeaveType = async (typeData) => {
+    try {
+      await addDoc(collection(db, 'leaveTypes'), { ...typeData, createdAt: serverTimestamp() });
+      return { success: true, message: 'Type added' };
+    } catch (e) { return { success: false, message: 'Error' }; }
+  };
+
+  const deleteLeaveType = async (id) => {
+    try {
+      await deleteDoc(doc(db, 'leaveTypes', id));
+      return { success: true, message: 'Deleted' };
+    } catch (e) { return { success: false, message: 'Error' }; }
+  };
+
   // ANNOUNCEMENTS
   const addAnnouncement = async (data) => {
     try {
@@ -750,6 +793,11 @@ export const AuthProvider = ({ children }) => {
     assignRoster,
     deleteRoster,
     updateRoster,
+    updateLeavePolicy,
+    addLeaveType,
+    deleteLeaveType,
+    allLeaveTypes,
+    leavePolicy,
     // Add Employee wrapper
     addEmployee: addUser,
     repairAdminProfile,

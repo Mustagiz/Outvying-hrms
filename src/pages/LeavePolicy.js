@@ -1,8 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '../context/AuthContext';
 import { Card, Button, Input, Alert, Modal } from '../components/UI';
 import { Calendar, Gift, Globe, Plus, Trash2 } from 'lucide-react';
 
 const LeavePolicy = () => {
+  const {
+    leavePolicy: fbPolicy,
+    allLeaveTypes,
+    updateLeavePolicy,
+    addLeaveType,
+    deleteLeaveType
+  } = useAuth();
+
   const [alert, setAlert] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [newLeaveType, setNewLeaveType] = useState({ name: '', description: '' });
@@ -12,15 +21,10 @@ const LeavePolicy = () => {
     workingDaysRequired: 15
   });
 
-  const [leaveTypes, setLeaveTypes] = useState(() => {
-    const saved = localStorage.getItem('leaveTypes');
-    return saved ? JSON.parse(saved) : [
-      { name: 'Paid Leave', description: 'Fully paid leave' },
-      { name: 'Casual Leave', description: 'Short-term casual leave' },
-      { name: 'Leave without Pay', description: 'Unpaid leave' },
-      { name: 'Unplanned Leave', description: 'Emergency or unplanned leave' }
-    ];
-  });
+  // Keep local state in sync with Firestore
+  useEffect(() => {
+    if (fbPolicy) setPolicy(fbPolicy);
+  }, [fbPolicy]);
 
   const indianHolidays = [
     { name: 'EID', type: 'Indian Holiday' },
@@ -28,24 +32,27 @@ const LeavePolicy = () => {
     { name: 'Christmas', type: 'Indian Holiday' }
   ];
 
-  const handleSave = () => {
-    localStorage.setItem('leaveTypes', JSON.stringify(leaveTypes));
-    setAlert({ type: 'success', message: 'Leave policy updated successfully' });
+  const handleSave = async () => {
+    const result = await updateLeavePolicy(policy);
+    setAlert({ type: result.success ? 'success' : 'error', message: result.message });
     setTimeout(() => setAlert(null), 3000);
   };
 
-  const handleAddLeaveType = () => {
+  const handleAddLeaveType = async () => {
     if (!newLeaveType.name) return;
-    setLeaveTypes([...leaveTypes, newLeaveType]);
-    localStorage.setItem('leaveTypes', JSON.stringify([...leaveTypes, newLeaveType]));
-    setNewLeaveType({ name: '', description: '' });
-    setShowModal(false);
+    const result = await addLeaveType(newLeaveType);
+    if (result.success) {
+      setNewLeaveType({ name: '', description: '' });
+      setShowModal(false);
+    } else {
+      setAlert({ type: 'error', message: result.message });
+    }
   };
 
-  const handleDeleteLeaveType = (index) => {
-    const updated = leaveTypes.filter((_, i) => i !== index);
-    setLeaveTypes(updated);
-    localStorage.setItem('leaveTypes', JSON.stringify(updated));
+  const handleDeleteLeaveType = async (id) => {
+    if (window.confirm('Delete this leave type?')) {
+      await deleteLeaveType(id);
+    }
   };
 
   return (
@@ -90,8 +97,8 @@ const LeavePolicy = () => {
             <Plus size={14} className="inline mr-1" /> Add Leave Type
           </Button>
           <div className="space-y-3">
-            {leaveTypes.map((type, idx) => (
-              <div key={idx} className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+            {allLeaveTypes.map((type) => (
+              <div key={type.id} className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <h4 className="font-semibold text-gray-800 dark:text-white">{type.name}</h4>
@@ -99,7 +106,7 @@ const LeavePolicy = () => {
                   </div>
                   <div className="flex items-center gap-2">
                     <Calendar size={20} className="text-primary-600" />
-                    <button onClick={() => handleDeleteLeaveType(idx)} className="text-red-600 hover:text-red-800">
+                    <button onClick={() => handleDeleteLeaveType(type.id)} className="text-red-600 hover:text-red-800">
                       <Trash2 size={16} />
                     </button>
                   </div>
