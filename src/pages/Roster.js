@@ -1,16 +1,19 @@
 import React, { useState, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Card, Button, Table, Modal, Input, Select, Alert } from '../components/UI';
-import { Calendar, Clock, UserPlus, Trash2 } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, UserPlus, Trash2, ChevronLeft, ChevronRight, List } from 'lucide-react';
 import { formatDate } from '../utils/helpers';
 
 const Roster = () => {
     const { currentUser, rosters, allUsers, assignRoster, deleteRoster } = useAuth();
     const [showModal, setShowModal] = useState(false);
+    const [view, setView] = useState('list'); // 'list' or 'calendar'
+    const [currentDate, setCurrentDate] = useState(new Date());
     const [alert, setAlert] = useState(null);
     const [formData, setFormData] = useState({
         employeeId: '',
-        date: '',
+        startDate: '',
+        endDate: '',
         shiftName: 'Morning Shift',
         startTime: '09:00',
         endTime: '18:00',
@@ -18,11 +21,15 @@ const Roster = () => {
     });
 
     const shifts = [
-        { name: 'Morning Shift', startTime: '09:00', endTime: '18:00' },
-        { name: 'Evening Shift', startTime: '14:00', endTime: '23:00' },
-        { name: 'Night Shift', startTime: '22:00', endTime: '07:00' },
-        { name: 'Late Shift', startTime: '11:00', endTime: '20:00' }
+        { name: 'Morning Shift', startTime: '09:00', endTime: '18:00', color: 'bg-blue-100 text-blue-800 border-blue-200' },
+        { name: 'Evening Shift', startTime: '14:00', endTime: '23:00', color: 'bg-purple-100 text-purple-800 border-purple-200' },
+        { name: 'Night Shift', startTime: '22:00', endTime: '07:00', color: 'bg-indigo-100 text-indigo-800 border-indigo-200' },
+        { name: 'Late Shift', startTime: '11:00', endTime: '20:00', color: 'bg-orange-100 text-orange-800 border-orange-200' }
     ];
+
+    const getShiftColor = (name) => {
+        return shifts.find(s => s.name === name)?.color || 'bg-gray-100 text-gray-800 border-gray-200';
+    };
 
     const filteredRosters = useMemo(() => {
         if (currentUser.role === 'employee') {
@@ -49,8 +56,8 @@ const Roster = () => {
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        if (!formData.employeeId || !formData.date) {
-            setAlert({ type: 'error', message: 'Please select employee and date' });
+        if (!formData.employeeId || !formData.startDate) {
+            setAlert({ type: 'error', message: 'Please select employee and start date' });
             return;
         }
 
@@ -66,7 +73,8 @@ const Roster = () => {
             setShowModal(false);
             setFormData({
                 employeeId: '',
-                date: '',
+                startDate: '',
+                endDate: '',
                 shiftName: 'Morning Shift',
                 startTime: '09:00',
                 endTime: '18:00',
@@ -84,10 +92,51 @@ const Roster = () => {
         }
     };
 
+    // Calendar Logic
+    const getDaysInMonth = (date) => {
+        const year = date.getFullYear();
+        const month = date.getMonth();
+        const firstDay = new Date(year, month, 1);
+        const lastDay = new Date(year, month + 1, 0);
+        return {
+            daysInMonth: lastDay.getDate(),
+            startingDayOfWeek: firstDay.getDay(),
+            year,
+            month
+        };
+    };
+
+    const navigateMonth = (direction) => {
+        setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + direction, 1));
+    };
+
+    const calendarData = useMemo(() => {
+        const { daysInMonth, startingDayOfWeek, year, month } = getDaysInMonth(currentDate);
+        const days = [];
+
+        for (let i = 0; i < startingDayOfWeek; i++) {
+            days.push(null);
+        }
+
+        for (let d = 1; d <= daysInMonth; d++) {
+            const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+            const roster = filteredRosters.find(r => r.date === dateStr);
+            days.push({ day: d, roster });
+        }
+
+        return days;
+    }, [currentDate, filteredRosters]);
+
     const columns = [
         { header: 'Date', accessor: 'date', render: (row) => formatDate(row.date) },
         ...(currentUser.role !== 'employee' ? [{ header: 'Employee', accessor: 'employeeName' }] : []),
-        { header: 'Shift', accessor: 'shiftName' },
+        {
+            header: 'Shift', accessor: 'shiftName', render: (row) => (
+                <span className={`px-2 py-1 rounded-full text-xs font-semibold ${getShiftColor(row.shiftName)}`}>
+                    {row.shiftName}
+                </span>
+            )
+        },
         { header: 'Start Time', accessor: 'startTime' },
         { header: 'End Time', accessor: 'endTime' },
         { header: 'Grace Period', accessor: 'gracePeriod', render: (row) => `${row.gracePeriod} mins` },
@@ -103,24 +152,112 @@ const Roster = () => {
 
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
                     <h1 className="text-3xl font-bold text-gray-800 dark:text-white">Roster Management</h1>
                     <p className="text-gray-600 dark:text-gray-400">Manage and view employee shift assignments</p>
                 </div>
-                {(currentUser.role === 'admin' || currentUser.role === 'hr') && (
-                    <Button onClick={() => setShowModal(true)}>
-                        <UserPlus size={18} className="mr-2" />
-                        Assign Shift
-                    </Button>
-                )}
+                <div className="flex items-center gap-3">
+                    <div className="flex bg-white dark:bg-gray-800 rounded-lg p-1 shadow-sm border border-gray-200 dark:border-gray-700">
+                        <button
+                            onClick={() => setView('list')}
+                            className={`px-3 py-1.5 rounded-md flex items-center gap-2 text-sm font-medium transition-colors ${view === 'list'
+                                    ? 'bg-primary-100 text-primary-600 dark:bg-primary-900/40 dark:text-primary-400'
+                                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                }`}
+                        >
+                            <List size={16} /> List
+                        </button>
+                        <button
+                            onClick={() => setView('calendar')}
+                            className={`px-3 py-1.5 rounded-md flex items-center gap-2 text-sm font-medium transition-colors ${view === 'calendar'
+                                    ? 'bg-primary-100 text-primary-600 dark:bg-primary-900/40 dark:text-primary-400'
+                                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                }`}
+                        >
+                            <CalendarIcon size={16} /> Calendar
+                        </button>
+                    </div>
+                    {(currentUser.role === 'admin' || currentUser.role === 'hr') && (
+                        <Button onClick={() => setShowModal(true)}>
+                            <UserPlus size={18} className="mr-2" />
+                            Assign Shift
+                        </Button>
+                    )}
+                </div>
             </div>
 
             {alert && <Alert type={alert.type} message={alert.message} onClose={() => setAlert(null)} />}
 
-            <Card title={currentUser.role === 'employee' ? 'My Assigned Shifts' : 'All Roster Assignments'}>
-                <Table columns={columns} data={sortedRosters} />
-            </Card>
+            {view === 'list' ? (
+                <Card title={currentUser.role === 'employee' ? 'My Assigned Shifts' : 'All Roster Assignments'}>
+                    <Table columns={columns} data={sortedRosters} />
+                </Card>
+            ) : (
+                <div className="space-y-4">
+                    <div className="flex items-center justify-between bg-white dark:bg-gray-800 p-4 rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
+                        <h2 className="text-xl font-bold text-gray-800 dark:text-white">
+                            {currentDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
+                        </h2>
+                        <div className="flex gap-2">
+                            <button onClick={() => navigateMonth(-1)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors border border-gray-200 dark:border-gray-600">
+                                <ChevronLeft size={20} />
+                            </button>
+                            <button onClick={() => setCurrentDate(new Date())} className="px-4 py-2 text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors border border-gray-200 dark:border-gray-600">
+                                Today
+                            </button>
+                            <button onClick={() => navigateMonth(1)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors border border-gray-200 dark:border-gray-600">
+                                <ChevronRight size={20} />
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                        <div className="grid grid-cols-7 border-b border-gray-200 dark:border-gray-700">
+                            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                                <div key={day} className="py-3 text-center text-sm font-bold text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/50">
+                                    {day}
+                                </div>
+                            ))}
+                        </div>
+                        <div className="grid grid-cols-7">
+                            {calendarData.map((item, index) => (
+                                <div key={index} className={`min-h-[120px] p-2 border-r border-b border-gray-100 dark:border-gray-700 last:border-r-0 ${!item ? 'bg-gray-50/30 dark:bg-gray-900/10' : ''}`}>
+                                    {item && (
+                                        <div className="h-full flex flex-col">
+                                            <span className={`text-sm font-bold ${new Date(currentDate.getFullYear(), currentDate.getMonth(), item.day).toDateString() === new Date().toDateString()
+                                                    ? 'bg-primary-600 text-white w-7 h-7 flex items-center justify-center rounded-full mb-1'
+                                                    : 'text-gray-700 dark:text-gray-300 mb-1'
+                                                }`}>
+                                                {item.day}
+                                            </span>
+                                            {item.roster && (
+                                                <div className={`p-1.5 rounded-lg border text-[10px] leading-tight flex flex-col gap-1 shadow-sm ${getShiftColor(item.roster.shiftName)}`}>
+                                                    <p className="font-bold truncate">{item.roster.shiftName}</p>
+                                                    <div className="flex items-center gap-1 opacity-90">
+                                                        <Clock size={10} />
+                                                        <span>{item.roster.startTime} - {item.roster.endTime}</span>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-4 p-4 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+                        <p className="text-sm font-bold text-gray-700 dark:text-gray-300 w-full mb-1">Shift Legend:</p>
+                        {shifts.map(s => (
+                            <div key={s.name} className="flex items-center gap-2">
+                                <div className={`w-3 h-3 rounded-full ${s.color.split(' ')[0]}`}></div>
+                                <span className="text-xs font-medium text-gray-600 dark:text-gray-400">{s.name}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="Assign Roster">
                 <form onSubmit={handleSubmit} className="space-y-4">
@@ -135,13 +272,23 @@ const Roster = () => {
                         required
                     />
 
-                    <Input
-                        label="Date"
-                        type="date"
-                        value={formData.date}
-                        onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                        required
-                    />
+                    <div className="grid grid-cols-2 gap-4">
+                        <Input
+                            label="Start Date"
+                            type="date"
+                            value={formData.startDate}
+                            onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                            required
+                        />
+                        <Input
+                            label="End Date"
+                            type="date"
+                            value={formData.endDate}
+                            onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                            required
+                            placeholder="Keep same for single day"
+                        />
+                    </div>
 
                     <Select
                         label="Shift Template"

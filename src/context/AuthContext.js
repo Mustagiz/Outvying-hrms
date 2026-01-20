@@ -328,15 +328,33 @@ export const AuthProvider = ({ children }) => {
   };
 
   const assignRoster = (rosterData) => {
-    const newRoster = {
-      id: `R${Date.now()}`,
-      ...rosterData,
-      assignedAt: new Date().toISOString()
-    };
-    const updatedRosters = [...rosters, newRoster];
+    const { startDate, endDate, ...rest } = rosterData;
+    let newEntries = [];
+
+    if (startDate && endDate) {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        newEntries.push({
+          id: `R${Date.now()}-${d.getTime()}`,
+          ...rest,
+          date: d.toISOString().split('T')[0],
+          assignedAt: new Date().toISOString()
+        });
+      }
+    } else {
+      newEntries.push({
+        id: `R${Date.now()}`,
+        ...rosterData,
+        assignedAt: new Date().toISOString()
+      });
+    }
+
+    const updatedRosters = [...rosters, ...newEntries];
     setRosters(updatedRosters);
     setToLocalStorage('rosters', updatedRosters);
-    return { success: true, message: 'Roster assigned successfully' };
+    return { success: true, message: `Roster assigned successfully (${newEntries.length} days)` };
   };
 
   const deleteRoster = (id) => {
