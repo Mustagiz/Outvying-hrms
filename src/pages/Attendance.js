@@ -18,13 +18,17 @@ const Attendance = () => {
   );
 
   const handleClockIn = async () => {
-    const result = await clockIn(currentUser.id);
+    console.log("Attendance: handleClockIn clicked. currentUser.id:", currentUser?.id);
+    const result = await clockIn(currentUser?.id);
+    console.log("Attendance: clockIn result:", result);
     setAlert({ type: result.success ? 'success' : 'error', message: result.message });
     setTimeout(() => setAlert(null), 3000);
   };
 
   const handleClockOut = async () => {
-    const result = await clockOut(currentUser.id);
+    console.log("Attendance: handleClockOut clicked. currentUser.id:", currentUser?.id);
+    const result = await clockOut(currentUser?.id);
+    console.log("Attendance: clockOut result:", result);
     setAlert({ type: result.success ? 'success' : 'error', message: result.message });
     setTimeout(() => setAlert(null), 3000);
   };

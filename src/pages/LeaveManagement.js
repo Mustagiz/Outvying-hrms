@@ -200,8 +200,8 @@ const LeaveManagement = () => {
           <button
             onClick={() => setActiveTab('myLeaves')}
             className={`pb-2 px-2 text-sm font-medium transition-colors border-b-2 ${activeTab === 'myLeaves'
-                ? 'border-primary-600 text-primary-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
+              ? 'border-primary-600 text-primary-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
           >
             My Leaves
@@ -209,8 +209,8 @@ const LeaveManagement = () => {
           <button
             onClick={() => setActiveTab('allApplications')}
             className={`pb-2 px-2 text-sm font-medium transition-colors border-b-2 ${activeTab === 'allApplications'
-                ? 'border-primary-600 text-primary-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
+              ? 'border-primary-600 text-primary-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
           >
             All Applications
@@ -294,8 +294,8 @@ const LeaveManagement = () => {
               <button
                 onClick={() => { setAdminSubTab('pending'); setAdminCurrentPage(1); }}
                 className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${adminSubTab === 'pending'
-                    ? 'bg-white dark:bg-gray-600 text-primary-600 shadow-sm'
-                    : 'text-gray-500 hover:text-gray-700'
+                  ? 'bg-white dark:bg-gray-600 text-primary-600 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
                   }`}
               >
                 Pending
@@ -303,8 +303,8 @@ const LeaveManagement = () => {
               <button
                 onClick={() => { setAdminSubTab('history'); setAdminCurrentPage(1); }}
                 className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${adminSubTab === 'history'
-                    ? 'bg-white dark:bg-gray-600 text-primary-600 shadow-sm'
-                    : 'text-gray-500 hover:text-gray-700'
+                  ? 'bg-white dark:bg-gray-600 text-primary-600 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
                   }`}
               >
                 History

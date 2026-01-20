@@ -338,42 +338,50 @@ export const AuthProvider = ({ children }) => {
     const now = new Date();
     const clockInTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 
-    // Check if already clocked in today
-    const docId = `${employeeId}_${today}`;
-    const docRef = doc(db, 'attendance', docId);
-
-    const docSnap = await getDoc(docRef);
-    if (docSnap.exists() && docSnap.data().clockIn) {
+    // Check if already clocked in today (Local state first for speed/permissions)
+    const existingInState = attendance.find(a => String(a.employeeId) === String(employeeId) && a.date === today);
+    if (existingInState && existingInState.clockIn) {
+      console.log("Found existing record in state:", existingInState);
       return { success: false, message: 'Already clocked in today' };
     }
 
-    const newRecord = {
-      employeeId,
-      date: today,
-      clockIn: clockInTime,
-      clockOut: null,
-      status: clockInTime > '09:15' ? 'Late' : 'Present',
-      workHours: 0,
-      overtime: 0,
-      createdAt: serverTimestamp()
-    };
-
-    // Roster Logic for Status
-    const todayRoster = rosters.find(r => String(r.employeeId) === String(employeeId) && r.date === today);
-    if (todayRoster) {
-      const result = calculateAttendanceStatus(clockInTime, null, today, todayRoster);
-      newRecord.status = result.status;
-      newRecord.ruleApplied = result.ruleApplied;
-    }
+    const docId = `${employeeId}_${today}`;
+    const docRef = doc(db, 'attendance', docId);
 
     try {
-      console.log("Attempting Clock In for:", employeeId, "at:", clockInTime, "Doc ID:", docId);
+      // Secondary check via getDoc (handles cases where state might be filtering or slow)
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists() && docSnap.data().clockIn) {
+        return { success: false, message: 'Already clocked in today (DB)' };
+      }
+
+      console.log("Attempting Clock In - Doc ID:", docId);
+
+      const newRecord = {
+        employeeId,
+        date: today,
+        clockIn: clockInTime,
+        clockOut: null,
+        status: clockInTime > '09:15' ? 'Late' : 'Present',
+        workHours: 0,
+        overtime: 0,
+        createdAt: serverTimestamp()
+      };
+
+      // Roster Logic for Status
+      const todayRoster = rosters.find(r => String(r.employeeId) === String(employeeId) && r.date === today);
+      if (todayRoster) {
+        const result = calculateAttendanceStatus(clockInTime, null, today, todayRoster);
+        newRecord.status = result.status;
+        newRecord.ruleApplied = result.ruleApplied;
+      }
+
       await setDoc(docRef, newRecord);
       console.log("Clock In Success");
       return { success: true, message: 'Clocked in successfully', time: clockInTime };
     } catch (error) {
-      console.error("ClockIn Error:", error);
-      return { success: false, message: 'Failed to clock in: ' + (error.code || error.message) };
+      console.error("ClockIn Error Details:", error);
+      return { success: false, message: `Failed to clock in: ${error.message || 'Unknown error'}` };
     }
   };
 
@@ -398,23 +406,22 @@ export const AuthProvider = ({ children }) => {
 
       const updates = {
         clockOut: clockOutTime,
-        workHours: result.workHours,
+        workHours: parseFloat(result.workHours || 0),
         status: result.status,
         workingDays: result.workingDays,
         ruleApplied: result.ruleApplied || null,
-        overtime: result.workHours > 9 ? (result.workHours - 9).toFixed(2) : 0
+        overtime: result.workHours > 9 ? parseFloat((result.workHours - 9).toFixed(2)) : 0
       };
 
-      const docId = `${employeeId}_${today}`;
-      const docRef = doc(db, 'attendance', docId);
-      console.log("Attempting Clock Out for:", employeeId, "updates:", updates);
+      console.log("Attempting Clock Out - Doc ID:", record.id, "updates:", updates);
+      const docRef = doc(db, 'attendance', record.id);
       await updateDoc(docRef, updates);
       console.log("Clock Out Success");
       return { success: true, message: 'Clocked out successfully', time: clockOutTime };
 
     } catch (error) {
-      console.error("ClockOut Error:", error);
-      return { success: false, message: 'Failed to clock out: ' + (error.code || error.message) };
+      console.error("ClockOut Error Details:", error);
+      return { success: false, message: 'Failed to clock out: ' + (error.message || 'Unknown error') };
     }
   };
 
