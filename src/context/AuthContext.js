@@ -81,6 +81,10 @@ export const AuthProvider = ({ children }) => {
 
           if (userSnap.exists()) {
             const userData = userSnap.data();
+            // Force Admin Role for specific email even if DB is wrong
+            if (user.email === 'admin@hrmspro.com') {
+              userData.role = 'admin';
+            }
             // Merge Auth info with Firestore info
             setCurrentUser({ ...userData, uid: user.uid, email: user.email });
             // Fallback: If user exists in Auth but not in Firestore (should not happen in prod)
