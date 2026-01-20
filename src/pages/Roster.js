@@ -144,45 +144,48 @@ const Roster = () => {
         });
     }
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
 
-        if (editingRosterId) {
-            // Update Mode
-            const result = updateRoster(editingRosterId, {
-                shiftName: formData.shiftName,
-                startTime: formData.startTime,
-                endTime: formData.endTime,
-                gracePeriod: formData.gracePeriod,
-            });
-            setAlert({ type: result.success ? 'success' : 'error', message: result.message });
-            if (result.success) {
-                handleCloseModal();
-            }
-        } else {
-            // Create Mode
-            if (formData.selectedEmployees.length === 0 || !formData.startDate) {
-                setAlert({ type: 'error', message: 'Please select at least one employee and start date' });
-                return;
-            }
+        try {
+            if (editingRosterId) {
+                const result = await updateRoster(editingRosterId, {
+                    shiftName: formData.shiftName,
+                    startTime: formData.startTime,
+                    endTime: formData.endTime,
+                    gracePeriod: formData.gracePeriod,
+                });
+                setAlert({ type: result.success ? 'success' : 'error', message: result.message });
+                if (result.success) {
+                    handleCloseModal();
+                }
+            } else {
+                if (formData.selectedEmployees.length === 0 || !formData.startDate) {
+                    setAlert({ type: 'error', message: 'Please select at least one employee and start date' });
+                    return;
+                }
 
-            const result = assignRoster({
-                ...formData,
-                employeeIds: formData.selectedEmployees
-            });
+                const result = await assignRoster({
+                    ...formData,
+                    employeeIds: formData.selectedEmployees
+                });
 
-            setAlert({ type: result.success ? 'success' : 'error', message: result.message });
-            if (result.success) {
-                handleCloseModal();
+                setAlert({ type: result.success ? 'success' : 'error', message: result.message });
+                if (result.success) {
+                    handleCloseModal();
+                }
             }
+        } catch (error) {
+            console.error("Roster Action Error:", error);
+            setAlert({ type: 'error', message: 'An unexpected error occurred' });
         }
         setTimeout(() => setAlert(null), 3000);
     };
 
-    const handleDelete = (id) => {
+    const handleDelete = async (id) => {
         if (window.confirm('Are you sure you want to delete this roster assignment?')) {
-            const result = deleteRoster(id);
-            setAlert({ type: 'success', message: result.message });
+            const result = await deleteRoster(id);
+            setAlert({ type: result.success ? 'success' : 'error', message: result.message });
             setTimeout(() => setAlert(null), 3000);
         }
     };
