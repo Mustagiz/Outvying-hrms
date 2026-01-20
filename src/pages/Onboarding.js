@@ -43,7 +43,13 @@ const Onboarding = () => {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData(prev => {
+      const updates = { ...prev, [name]: value };
+      if (name === 'email') {
+        updates.userId = value;
+      }
+      return updates;
+    });
   };
 
   const handleSubmit = (e) => {
@@ -95,18 +101,18 @@ const Onboarding = () => {
 
   const downloadTemplate = () => {
     const headers = [
-      'firstName', 'lastName', 'employeeId', 'email', 'phone', 'department', 
-      'designation', 'reportingTo', 'bloodGroup', 'emergencyContact', 'userId', 
-      'password', 'panNumber', 'bankName', 'bankAccount', 'ifscCode', 
+      'firstName', 'lastName', 'employeeId', 'email', 'phone', 'department',
+      'designation', 'reportingTo', 'bloodGroup', 'emergencyContact', 'userId',
+      'password', 'panNumber', 'bankName', 'bankAccount', 'ifscCode',
       'addressLine1', 'city', 'state', 'country', 'zipCode'
     ];
     const sampleData = [
-      'John', 'Doe', 'EMP001', 'john.doe@outvying.com', '9876543210', 'Engineering', 
-      'Research Analyst', 'Manager Name', 'O+', '9876543211', 'john.doe', 
-      'Pass@123', 'ABCDE1234F', 'Federal Bank', '12345678901234', 'FDRL0001234', 
+      'John', 'Doe', 'EMP001', 'john.doe@outvying.com', '9876543210', 'Engineering',
+      'Research Analyst', 'Manager Name', 'O+', '9876543211', 'john.doe',
+      'Pass@123', 'ABCDE1234F', 'Federal Bank', '12345678901234', 'FDRL0001234',
       'Address Line 1', 'Pune', 'Maharashtra', 'India', '411014'
     ];
-    
+
     const csv = [headers.join(','), sampleData.join(',')].join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
