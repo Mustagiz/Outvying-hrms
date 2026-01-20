@@ -10,8 +10,8 @@
 - [x] Sync Leave Policy/Types between Admin and Employee panels
 - [x] Enable users to change their own password in Profile page
 - [x] Fix Bulk Employee Onboarding (App collisions & data mapping)
+- [x] Sort Employee Leave Balances and selection dropdown (A to Z)
+- [x] Implement pagination for manual leave balances table (10 per page)
 - [x] Give option to Admin to allocate Paid/Casual leaves manually
-- [x] Implement Leave Eligibility rules (15-day tenure for PL/CL, always LWP)
-- [x] Hide "Seed Database" button from login page
 - [x] Add extensive debug logging for troubleshooting
 - [x] Push all changes to GitHub
