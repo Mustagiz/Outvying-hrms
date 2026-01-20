@@ -91,7 +91,13 @@ export const AuthProvider = ({ children }) => {
             }
 
             // Merge Auth info with Firestore info
-            setCurrentUser({ ...userData, uid: user.uid, email: user.email });
+            setCurrentUser({
+              ...userData,
+              uid: user.uid,
+              email: user.email,
+              // Polyfill 'id' for compatibility with components using .id instead of .uid
+              id: userData.id || user.uid
+            });
           } else {
             // Fallback: If user exists in Auth but not in Firestore (should not happen in prod)
             // Fix for Admin Access: Check email to assign admin role if doc is missing
@@ -101,6 +107,7 @@ export const AuthProvider = ({ children }) => {
 
             setCurrentUser({
               uid: user.uid,
+              id: user.uid, // Polyfill
               email: user.email,
               name: user.email ? user.email.split('@')[0] : 'User',
               role
