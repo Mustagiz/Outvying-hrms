@@ -10,6 +10,14 @@ const LeaveManagement = () => {
   const [showModal, setShowModal] = useState(false);
   const [alert, setAlert] = useState(null);
 
+  // Define myLeaveBalance early to avoid ReferenceError
+  const myLeaveBalance = useMemo(() => {
+    return leaveBalances.find(lb =>
+      String(lb.employeeId) === String(currentUser.id) ||
+      String(lb.employeeId) === String(currentUser.uid)
+    );
+  }, [leaveBalances, currentUser]);
+
   // Calculate working days to check eligibility (15 days requirement for PL/CL)
   const workingDaysCount = useMemo(() => {
     return attendance.filter(a =>
@@ -66,11 +74,11 @@ const LeaveManagement = () => {
   const [activeTab, setActiveTab] = useState('myLeaves'); // 'myLeaves' | 'allApplications'
   const [adminSubTab, setAdminSubTab] = useState('pending'); // 'pending' | 'history'
 
-  const myLeaveBalance = leaveBalances.find(lb => lb.employeeId === currentUser.id);
+
 
   const myLeaves = useMemo(() => {
     return leaves
-      .filter(l => l.employeeId === currentUser.id)
+      .filter(l => String(l.employeeId) === String(currentUser.id) || String(l.employeeId) === String(currentUser.uid))
       .sort((a, b) => new Date(b.appliedDate) - new Date(a.appliedDate));
   }, [leaves, currentUser]);
 
