@@ -1,8 +1,41 @@
 import React, { useState, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Card, Button, Table, Modal, Input, Select, Alert } from '../components/UI';
-import { Calendar as CalendarIcon, Clock, UserPlus, Trash2, ChevronLeft, ChevronRight, List } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, UserPlus, Trash2, ChevronLeft, ChevronRight, List, ChevronDown, User } from 'lucide-react';
 import { formatDate } from '../utils/helpers';
+
+const EmployeeRosterGroup = ({ employeeName, rosters, columns }) => {
+    const [isExpanded, setIsExpanded] = useState(false);
+
+    return (
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <button
+                onClick={() => setIsExpanded(!isExpanded)}
+                className="w-full flex items-center justify-between p-4 bg-gray-50/50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                type="button"
+            >
+                <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400 flex items-center justify-center">
+                        <User size={16} />
+                    </div>
+                    <h3 className="font-semibold text-gray-800 dark:text-white">{employeeName}</h3>
+                </div>
+                <div className="flex items-center gap-4">
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600">
+                        {rosters.length} Shifts
+                    </span>
+                    {isExpanded ? <ChevronDown size={20} className="text-gray-500" /> : <ChevronRight size={20} className="text-gray-500" />}
+                </div>
+            </button>
+
+            {isExpanded && (
+                <div className="border-t border-gray-100 dark:border-gray-700">
+                    <Table columns={columns} data={rosters} />
+                </div>
+            )}
+        </div>
+    );
+};
 
 const Roster = () => {
     const { currentUser, rosters, allUsers, assignRoster, deleteRoster } = useAuth();
@@ -227,12 +260,15 @@ const Roster = () => {
                             <Table columns={columns} data={sortedRosters} />
                         </Card>
                     ) : (
-                        <div className="space-y-6">
+                        <div className="space-y-4">
                             {/* If grouped, we sort keys (names) for consistency */}
                             {Object.keys(groupedRosters).sort().map(employeeName => (
-                                <Card key={employeeName} title={employeeName}>
-                                    <Table columns={columns} data={groupedRosters[employeeName]} />
-                                </Card>
+                                <EmployeeRosterGroup
+                                    key={employeeName}
+                                    employeeName={employeeName}
+                                    rosters={groupedRosters[employeeName]}
+                                    columns={columns}
+                                />
                             ))}
                             {Object.keys(groupedRosters).length === 0 && (
                                 <p className="text-center text-gray-500 py-4">No rosters assigned yet.</p>
