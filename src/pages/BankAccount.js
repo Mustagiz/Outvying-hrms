@@ -89,7 +89,7 @@ const BankAccount = () => {
               Download CSV
             </Button>
           )}
-          {!isEditing && currentUser.role === 'employee' && (
+          {!isEditing && (currentUser.role === 'employee' || currentUser.role === 'admin') && selectedEmployee && (
             <Button onClick={() => setIsEditing(true)}>Edit Details</Button>
           )}
         </div>
