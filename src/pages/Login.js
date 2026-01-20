@@ -10,7 +10,7 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login, seedDatabase } = useAuth();
+  const { login, seedDatabase, resetPassword } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -86,6 +86,27 @@ const Login = () => {
                   {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                 </button>
               </div>
+            </div>
+
+            <div className="flex justify-end mb-6 -mt-4">
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!email) {
+                    setError('Please enter your email address first');
+                    return;
+                  }
+                  const res = await resetPassword(email);
+                  if (res.success) {
+                    setError({ type: 'success', message: 'Password reset email sent!' });
+                  } else {
+                    setError(res.message);
+                  }
+                }}
+                className="text-sm font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300"
+              >
+                Forgot Password?
+              </button>
             </div>
 
             <Button
