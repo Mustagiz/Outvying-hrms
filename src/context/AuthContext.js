@@ -82,14 +82,21 @@ export const AuthProvider = ({ children }) => {
           if (userSnap.exists()) {
             const userData = userSnap.data();
             // Force Admin Role for specific email even if DB is wrong
-            if (user.email === 'admin@hrmspro.com') {
+            const normalizedEmail = user.email ? user.email.toLowerCase().trim() : '';
+            if (normalizedEmail === 'admin@hrmspro.com') {
+              console.log("Forcing Admin Role for: ", user.email);
               userData.role = 'admin';
             }
+
             // Merge Auth info with Firestore info
             setCurrentUser({ ...userData, uid: user.uid, email: user.email });
+          } else {
             // Fallback: If user exists in Auth but not in Firestore (should not happen in prod)
             // Fix for Admin Access: Check email to assign admin role if doc is missing
-            const role = user.email === 'admin@hrmspro.com' ? 'admin' : 'employee';
+            const normalizedEmail = user.email ? user.email.toLowerCase().trim() : '';
+            const role = normalizedEmail === 'admin@hrmspro.com' ? 'admin' : 'employee';
+            if (role === 'admin') console.log("Forcing Admin Role (No Doc) for: ", user.email);
+
             setCurrentUser({
               uid: user.uid,
               email: user.email,
@@ -100,7 +107,8 @@ export const AuthProvider = ({ children }) => {
         } catch (error) {
           console.error("Error fetching user profile:", error);
           // Fallback: Hardcode admin role for admin email if DB fails
-          if (user.email === 'admin@hrmspro.com') {
+          const normalizedEmail = user.email ? user.email.toLowerCase().trim() : '';
+          if (normalizedEmail === 'admin@hrmspro.com') {
             setCurrentUser({ uid: user.uid, email: user.email, role: 'admin' });
           } else {
             setCurrentUser({ uid: user.uid, email: user.email, role: 'employee' });
