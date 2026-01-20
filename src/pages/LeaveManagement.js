@@ -115,14 +115,25 @@ const LeaveManagement = () => {
     return allApplications.slice(startIndex, startIndex + itemsPerPage);
   }, [allApplications, adminCurrentPage]);
 
+  // Admin: Sorted Balances (A-Z by Name)
+  const sortedBalances = useMemo(() => {
+    return [...leaveBalances].sort((a, b) => {
+      const userA = allUsers.find(u => String(u.id) === String(a.employeeId) || String(u.uid) === String(a.employeeId));
+      const userB = allUsers.find(u => String(u.id) === String(b.employeeId) || String(u.uid) === String(b.employeeId));
+      const nameA = userA?.name?.toLowerCase() || '';
+      const nameB = userB?.name?.toLowerCase() || '';
+      return nameA.localeCompare(nameB);
+    });
+  }, [leaveBalances, allUsers]);
+
   const paginatedBalances = useMemo(() => {
     const startIndex = (balanceCurrentPage - 1) * itemsPerPage;
-    return leaveBalances.slice(startIndex, startIndex + itemsPerPage);
-  }, [leaveBalances, balanceCurrentPage]);
+    return sortedBalances.slice(startIndex, startIndex + itemsPerPage);
+  }, [sortedBalances, balanceCurrentPage]);
 
   const totalPages = Math.ceil(myLeaves.length / itemsPerPage);
   const totalAdminPages = Math.ceil(allApplications.length / itemsPerPage);
-  const totalBalancePages = Math.ceil(leaveBalances.length / itemsPerPage);
+  const totalBalancePages = Math.ceil(sortedBalances.length / itemsPerPage);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -521,7 +532,7 @@ const LeaveManagement = () => {
             label="Employee"
             value={allocationData.employeeId}
             onChange={(e) => setAllocationData(prev => ({ ...prev, employeeId: e.target.value }))}
-            options={allUsers.map(u => ({ value: String(u.uid || u.id), label: `${u.name} (${u.employeeId})` }))}
+            options={[...allUsers].sort((a, b) => (a.name || '').localeCompare(b.name || '')).map(u => ({ value: String(u.uid || u.id), label: `${u.name} (${u.employeeId})` }))}
             required
           />
           <Select
