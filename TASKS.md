@@ -10,5 +10,6 @@
 - [x] Sync Leave Policy/Types between Admin and Employee panels
 - [x] Enable users to change their own password in Profile page
 - [x] Fix Bulk Employee Onboarding (App collisions & data mapping)
+- [x] Hide "Seed Database" button from login page
 - [x] Add extensive debug logging for troubleshooting
 - [x] Push all changes to GitHub
