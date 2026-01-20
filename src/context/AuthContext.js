@@ -83,11 +83,15 @@ export const AuthProvider = ({ children }) => {
             const userData = userSnap.data();
             // Merge Auth info with Firestore info
             setCurrentUser({ ...userData, uid: user.uid, email: user.email });
-          } else {
             // Fallback: If user exists in Auth but not in Firestore (should not happen in prod)
-            // For simplified setup, we might create a basic profile here or just error out.
-            // Keeping it clean: use Auth info
-            setCurrentUser({ uid: user.uid, email: user.email, name: user.email ? user.email.split('@')[0] : 'User', role: 'employee' });
+            // Fix for Admin Access: Check email to assign admin role if doc is missing
+            const role = user.email === 'admin@hrmspro.com' ? 'admin' : 'employee';
+            setCurrentUser({
+              uid: user.uid,
+              email: user.email,
+              name: user.email ? user.email.split('@')[0] : 'User',
+              role
+            });
           }
         } catch (error) {
           console.error("Error fetching user profile:", error);
