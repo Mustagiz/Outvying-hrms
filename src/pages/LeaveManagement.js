@@ -383,7 +383,7 @@ const LeaveManagement = () => {
                     Used: {myLeaveBalance.paidLeave.used}
                   </span>
                 </div>
-                <p className="text-xs mt-1 opacity-70">Accrues 1.5 per 15 days</p>
+                <p className="text-xs mt-1 opacity-70">Accrues 1.0 per 15 days</p>
               </div>
             </Card>
             <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
@@ -395,7 +395,7 @@ const LeaveManagement = () => {
                     Used: {myLeaveBalance.casualLeave.used}
                   </span>
                 </div>
-                <p className="text-xs mt-1 opacity-70">Fixed 6/Year</p>
+                <p className="text-xs mt-1 opacity-70">Accrues 0.5 per 15 days</p>
               </div>
             </Card>
             <Card className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200">
