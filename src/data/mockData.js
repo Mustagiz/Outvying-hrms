@@ -127,7 +127,7 @@ export const generateAttendanceData = () => {
           date: d.toISOString().split('T')[0],
           clockIn,
           clockOut,
-          status: isPresent ? (clockIn > '09:15' ? 'Late' : 'Present') : 'Absent',
+          status: isPresent ? (clockIn > '09:15' ? 'Late' : 'Present') : 'LWP',
           workHours: isPresent ? (Math.random() * 2 + 8).toFixed(2) : 0,
           overtime: isPresent && Math.random() > 0.8 ? (Math.random() * 2).toFixed(2) : 0
         });

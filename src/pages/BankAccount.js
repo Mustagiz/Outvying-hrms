@@ -23,6 +23,10 @@ const BankAccount = () => {
     };
   }, [bankAccounts, currentUser, selectedEmployee]);
 
+  useEffect(() => {
+    setFormData(myBankAccount);
+  }, [myBankAccount]);
+
   const [formData, setFormData] = useState(myBankAccount);
 
   const handleInputChange = (e) => {
@@ -107,7 +111,7 @@ const BankAccount = () => {
                 />
               </div>
             </div>
-            
+
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Department</label>
               <select
@@ -123,7 +127,7 @@ const BankAccount = () => {
                 <option value="Finance">Finance</option>
               </select>
             </div>
-            
+
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Joined Date</label>
               <select
@@ -139,7 +143,7 @@ const BankAccount = () => {
                 <option value="thisYear">This Year</option>
               </select>
             </div>
-            
+
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Select Employee</label>
               <select
@@ -179,104 +183,104 @@ const BankAccount = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {selectedEmployee && (
-        <Card title="Account Information">
-          {isEditing ? (
-            <form onSubmit={handleSubmit}>
-              <Input
-                label="Bank Name"
-                name="bankName"
-                value={formData.bankName}
-                onChange={handleInputChange}
-                required
-              />
+          <Card title="Account Information">
+            {isEditing ? (
+              <form onSubmit={handleSubmit}>
+                <Input
+                  label="Bank Name"
+                  name="bankName"
+                  value={formData.bankName}
+                  onChange={handleInputChange}
+                  required
+                />
 
-              <Input
-                label="Account Number"
-                name="accountNumber"
-                value={formData.accountNumber}
-                onChange={handleInputChange}
-                required
-              />
+                <Input
+                  label="Account Number"
+                  name="accountNumber"
+                  value={formData.accountNumber}
+                  onChange={handleInputChange}
+                  required
+                />
 
-              <Input
-                label="IFSC Code"
-                name="ifscCode"
-                value={formData.ifscCode}
-                onChange={handleInputChange}
-                required
-              />
+                <Input
+                  label="IFSC Code"
+                  name="ifscCode"
+                  value={formData.ifscCode}
+                  onChange={handleInputChange}
+                  required
+                />
 
-              <Input
-                label="Account Type"
-                name="accountType"
-                value={formData.accountType}
-                onChange={handleInputChange}
-                required
-              />
+                <Input
+                  label="Account Type"
+                  name="accountType"
+                  value={formData.accountType}
+                  onChange={handleInputChange}
+                  required
+                />
 
-              <Input
-                label="Branch"
-                name="branch"
-                value={formData.branch}
-                onChange={handleInputChange}
-                required
-              />
+                <Input
+                  label="Branch"
+                  name="branch"
+                  value={formData.branch}
+                  onChange={handleInputChange}
+                  required
+                />
 
-              <div className="flex justify-end space-x-3 mt-4">
-                <Button type="button" variant="secondary" onClick={() => {
-                  setIsEditing(false);
-                  setFormData(myBankAccount);
-                }}>
-                  Cancel
-                </Button>
-                <Button type="submit">Save Changes</Button>
-              </div>
-            </form>
-          ) : (
-            <div className="space-y-4">
-              <div className="flex items-start space-x-3">
-                <Building className="text-gray-400 mt-1" size={20} />
+                <div className="flex justify-end space-x-3 mt-4">
+                  <Button type="button" variant="secondary" onClick={() => {
+                    setIsEditing(false);
+                    setFormData(myBankAccount);
+                  }}>
+                    Cancel
+                  </Button>
+                  <Button type="submit">Save Changes</Button>
+                </div>
+              </form>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex items-start space-x-3">
+                  <Building className="text-gray-400 mt-1" size={20} />
+                  <div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Bank Name</p>
+                    <p className="text-sm font-medium text-gray-800 dark:text-white">
+                      {myBankAccount.bankName || 'Not provided'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start space-x-3">
+                  <CreditCard className="text-gray-400 mt-1" size={20} />
+                  <div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Account Number</p>
+                    <p className="text-sm font-medium text-gray-800 dark:text-white">
+                      {myBankAccount.accountNumber || 'Not provided'}
+                    </p>
+                  </div>
+                </div>
+
                 <div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Bank Name</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">IFSC Code</p>
                   <p className="text-sm font-medium text-gray-800 dark:text-white">
-                    {myBankAccount.bankName || 'Not provided'}
+                    {myBankAccount.ifscCode || 'Not provided'}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Account Type</p>
+                  <p className="text-sm font-medium text-gray-800 dark:text-white">
+                    {myBankAccount.accountType || 'Not provided'}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Branch</p>
+                  <p className="text-sm font-medium text-gray-800 dark:text-white">
+                    {myBankAccount.branch || 'Not provided'}
                   </p>
                 </div>
               </div>
-
-              <div className="flex items-start space-x-3">
-                <CreditCard className="text-gray-400 mt-1" size={20} />
-                <div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Account Number</p>
-                  <p className="text-sm font-medium text-gray-800 dark:text-white">
-                    {myBankAccount.accountNumber || 'Not provided'}
-                  </p>
-                </div>
-              </div>
-
-              <div>
-                <p className="text-xs text-gray-500 dark:text-gray-400">IFSC Code</p>
-                <p className="text-sm font-medium text-gray-800 dark:text-white">
-                  {myBankAccount.ifscCode || 'Not provided'}
-                </p>
-              </div>
-
-              <div>
-                <p className="text-xs text-gray-500 dark:text-gray-400">Account Type</p>
-                <p className="text-sm font-medium text-gray-800 dark:text-white">
-                  {myBankAccount.accountType || 'Not provided'}
-                </p>
-              </div>
-
-              <div>
-                <p className="text-xs text-gray-500 dark:text-gray-400">Branch</p>
-                <p className="text-sm font-medium text-gray-800 dark:text-white">
-                  {myBankAccount.branch || 'Not provided'}
-                </p>
-              </div>
-            </div>
-          )}
-        </Card>
+            )}
+          </Card>
         )}
       </div>
     </div>

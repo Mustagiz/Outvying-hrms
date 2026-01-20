@@ -49,12 +49,12 @@ const Attendance = () => {
     const present = filteredAttendance.filter(a => a.status === 'Present').length;
     const late = filteredAttendance.filter(a => a.status === 'Late').length;
     const halfDay = filteredAttendance.filter(a => a.status === 'Half Day').length;
-    const absent = filteredAttendance.filter(a => a.status === 'Absent').length;
+    const lwp = filteredAttendance.filter(a => a.status === 'LWP').length;
     const totalHours = filteredAttendance.reduce((sum, a) => sum + parseFloat(a.workHours || 0), 0);
     const totalOvertime = filteredAttendance.reduce((sum, a) => sum + parseFloat(a.overtime || 0), 0);
     const workingDays = filteredAttendance.reduce((sum, a) => sum + parseFloat(a.workingDays || 0), 0);
 
-    return { present, late, halfDay, absent, totalHours: totalHours.toFixed(1), totalOvertime: totalOvertime.toFixed(1), workingDays: workingDays.toFixed(1) };
+    return { present, late, halfDay, lwp, totalHours: totalHours.toFixed(1), totalOvertime: totalOvertime.toFixed(1), workingDays: workingDays.toFixed(1) };
   }, [filteredAttendance]);
 
   const columns = [
@@ -99,7 +99,7 @@ const Attendance = () => {
     { value: 'Present', label: 'Present' },
     { value: 'Late', label: 'Late' },
     { value: 'Half Day', label: 'Half Day' },
-    { value: 'Absent', label: 'Absent' }
+    { value: 'LWP', label: 'LWP' }
   ];
 
   return (
@@ -171,8 +171,8 @@ const Attendance = () => {
               <p className="text-2xl font-bold text-orange-600">{attendanceStats.halfDay}</p>
             </div>
             <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-lg">
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Absent Days</p>
-              <p className="text-2xl font-bold text-red-600">{attendanceStats.absent}</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">LWP Days</p>
+              <p className="text-2xl font-bold text-red-600">{attendanceStats.lwp}</p>
             </div>
             <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
               <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Total Hours</p>
@@ -242,8 +242,8 @@ const Attendance = () => {
                 <p className="text-xl font-bold text-orange-600">{attendanceStats.halfDay}</p>
               </div>
               <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
-                <p className="text-xs text-gray-600 dark:text-gray-400">Absent</p>
-                <p className="text-xl font-bold text-red-600">{attendanceStats.absent}</p>
+                <p className="text-xs text-gray-600 dark:text-gray-400">LWP</p>
+                <p className="text-xl font-bold text-red-600">{attendanceStats.lwp}</p>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4 mb-4">
