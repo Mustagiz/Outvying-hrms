@@ -39,11 +39,7 @@ const Login = () => {
     setLoading(false);
   };
 
-  const testAccounts = [
-    { email: 'john.doe@hrmspro.com', password: 'Employee@123', role: 'Employee' },
-    { email: 'sarah.smith@hrmspro.com', password: 'HRManager@123', role: 'HR Manager' },
-    { email: 'admin@hrmspro.com', password: 'Admin@123', role: 'Admin' }
-  ];
+
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-500 to-primary-700 px-4 py-8">
@@ -101,42 +97,11 @@ const Login = () => {
             </Button>
           </form>
 
-          <div className="mt-6 md:mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-3 font-semibold">Test Accounts:</p>
-            <div className="space-y-2">
-              {testAccounts.map((account, idx) => (
-                <div
-                  key={idx}
-                  className="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors active:bg-gray-200 dark:active:bg-gray-500"
-                  onClick={() => {
-                    setEmail(account.email);
-                    setPassword(account.password);
-                  }}
-                >
-                  <p className="text-sm font-medium text-gray-800 dark:text-white">{account.role}</p>
-                  <p className="text-xs text-gray-600 dark:text-gray-400">{account.email}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700 text-center">
-            <Button
-              variant="outline"
-              className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-900/20 border-red-200 dark:border-red-900"
-              onClick={() => {
-                if (window.confirm('This will clear all application data and reset to defaults. Are you sure?')) {
-                  localStorage.clear();
-                  window.location.reload();
-                }
-              }}
-              type="button"
-            >
-              Reset Application Data
-            </Button>
-            <p className="text-xs text-gray-500 dark:text-gray-500 mt-2">Use this if you are unable to login</p>
-          </div>
         </div>
+
+        <p className="text-center text-white text-xs md:text-sm mt-4">
+          © 2024 Outvying HRMS. All rights reserved.
+        </p>
 
         <p className="text-center text-white text-xs md:text-sm mt-4">
           © 2024 Outvying HRMS. All rights reserved.
