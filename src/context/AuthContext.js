@@ -592,7 +592,9 @@ export const AuthProvider = ({ children }) => {
     let secondaryApp = null;
     try {
       // 1. Initialize secondary app to create user without logging out current admin
-      secondaryApp = initializeApp(firebaseConfig, "SecondaryApp");
+      // Use unique name to avoid collisions in bulk loops
+      const appName = `SecondaryApp-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+      secondaryApp = initializeApp(firebaseConfig, appName);
       const secondaryAuth = getAuth(secondaryApp);
 
       // 2. Create user in Firebase Auth
@@ -609,7 +611,19 @@ export const AuthProvider = ({ children }) => {
         createdAt: serverTimestamp()
       });
 
-      // 4. Cleanup
+      // 4. Create Bank Account document if details provided
+      if (userData.bankName || userData.bankAccount || userData.ifscCode) {
+        await setDoc(doc(db, 'bankAccounts', uid), {
+          bankName: userData.bankName || '',
+          accountNumber: userData.bankAccount || '',
+          ifscCode: userData.ifscCode || '',
+          accountType: 'Savings',
+          branch: 'Main Branch',
+          updatedAt: serverTimestamp()
+        });
+      }
+
+      // 5. Cleanup
       await signOut(secondaryAuth);
       await deleteApp(secondaryApp);
 

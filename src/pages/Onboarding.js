@@ -136,55 +136,69 @@ const Onboarding = () => {
       const lines = text.split('\n');
       const headers = lines[0].split(',').map(h => h.trim());
 
-      const successCount = 0;
+      let successCount = 0;
       const errors = [];
 
-      // Basic CSV parsing (assuming no commas in fields for simplicity, or use a lib like papa-parse for robustness if allowed later)
-      // Skipping header row
-      for (let i = 1; i < lines.length; i++) {
-        if (!lines[i].trim()) continue;
+      setAlert({ type: 'info', message: 'Processing bulk upload... Please wait.' });
 
-        const values = lines[i].split(',').map(v => v.trim());
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+
+        // Simple CSV split (note: doesn't handle quoted commas, but better than nothing)
+        const values = line.split(',').map(v => v.trim());
         const employeeData = {};
 
         headers.forEach((header, index) => {
-          if (values[index]) employeeData[header] = values[index];
+          if (values[index] !== undefined) employeeData[header] = values[index];
         });
 
-        // specific required fields check or defaults
         if (!employeeData.email || !employeeData.firstName) {
           errors.push(`Row ${i + 1}: Missing email or first name`);
           continue;
         }
 
-        // Auto-generate name if missing
-        if (!employeeData.name) {
-          employeeData.name = `${employeeData.firstName} ${employeeData.lastName || ''}`.trim();
+        // Auto-generate name
+        employeeData.name = `${employeeData.firstName} ${employeeData.lastName || ''}`.trim();
+
+        // Construct address if components exist
+        if (employeeData.addressLine1 || employeeData.city) {
+          employeeData.address = `${employeeData.addressLine1 || ''}, ${employeeData.city || ''}, ${employeeData.state || ''}, ${employeeData.country || ''} - ${employeeData.zipCode || ''}`.replace(/^, |, $/, '').trim();
         }
 
-        // Auto-generate User ID if missing (matching our single-add logic)
-        if (!employeeData.userId && employeeData.email) {
-          employeeData.userId = employeeData.email;
+        // Mapping bankAccount to account Number if needed
+        if (employeeData.bankAccount) {
+          employeeData.accountNumber = employeeData.bankAccount;
         }
 
-        // Default role
+        if (!employeeData.userId) employeeData.userId = employeeData.email;
         if (!employeeData.role) employeeData.role = 'employee';
 
         try {
-          await addEmployee(employeeData);
+          const result = await addEmployee(employeeData);
+          if (result.success) {
+            successCount++;
+          } else {
+            errors.push(`Row ${i + 1} (${employeeData.email}): ${result.message}`);
+          }
         } catch (err) {
           errors.push(`Row ${i + 1} (${employeeData.email}): ${err.message}`);
         }
       }
 
       if (errors.length === 0) {
-        setAlert({ type: 'success', message: 'Bulk upload completed successfully!' });
+        setAlert({ type: 'success', message: `Successfully uploaded ${successCount} employees!` });
         setShowBulkUpload(false);
       } else {
-        setAlert({ type: 'warning', message: `Upload completed with some errors: ${errors.join('; ')}` });
+        setAlert({
+          type: successCount > 0 ? 'warning' : 'error',
+          message: `${successCount} uploaded. ${errors.length} failed. Errors: ${errors.slice(0, 3).join('; ')}${errors.length > 3 ? '...' : ''}`
+        });
       }
     };
     reader.readAsText(file);
+    // Reset input
+    e.target.value = '';
   };
 
   const completedTasks = tasks.filter(t => t.completed).length;

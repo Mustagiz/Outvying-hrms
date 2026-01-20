@@ -220,16 +220,21 @@ To verify the fix, please follow these steps:
 4.  Enter your current password and a new 6+ character password.
 5.  Click **Update Password**; verify the success message.
 
-### Forgot Password Flow
-- **Files**: `src/pages/Login.js`, `src/context/AuthContext.js`
-- **Change**: Added a "Forgot Password?" link that utilizes Firebase's `sendPasswordResetEmail`.
-- **Reason**: Allows users to recover their accounts independently if they lose their credentials.
+### Bulk Employee Onboarding
+- **Files**: `src/pages/Onboarding.js`, `src/context/AuthContext.js`
+- **Change**: 
+    - Updated `addUser` to use unique Firebase app names, preventing collisions during rapid sequential creation.
+    - Added logic to `addUser` to automatically create bank account records if bank details are provided.
+    - Improved `handleBulkUpload` in `Onboarding.js` to construct addresses and check results properly.
+- **Reason**: Bulk upload was failing because Firebase couldn't create secondary apps with the same name quickly enough, and data like bank details weren't being mapped to the correct collections.
 
 #### Verification
-1.  On the **Login** screen, enter your email.
-2.  Click **Forgot Password?**.
-3.  Check for a "Password reset email sent!" success message.
-4.  Verify the email receipt in your inbox.
+1.  Login as **Admin**.
+2.  Go to **Employee Onboarding**.
+3.  Click **Bulk Upload** and download the template.
+4.  Fill the template with test data (include bank/address info).
+5.  Upload the CSV and verify the success summary (e.g., "Successfully uploaded 5 employees!").
+6.  Check **Bank Account Details** to verify the new employees' bank info is present.
 
 
 
