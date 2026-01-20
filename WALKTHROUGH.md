@@ -236,13 +236,21 @@ To verify the fix, please follow these steps:
 5.  Upload the CSV and verify the success summary (e.g., "Successfully uploaded 5 employees!").
 6.  Check **Bank Account Details** to verify the new employees' bank info is present.
 
+### Leave Eligibility Rules
+- **Files**: `src/pages/LeaveManagement.js`, `src/context/AuthContext.js`
+- **Change**: 
+    - Calculated "Working Days" based on attendance records.
+    - Filtered the leave type dropdown to hide "Paid Leave" and "Casual Leave" unless an employee has 15+ working days AND a positive balance.
+    - Ensured "Leave Without Pay (LWP)" is always available as a default option.
+    - Added a backend check in `applyLeave` to enforce these rules.
+- **Reason**: To align with company policy where new employees are only eligible for paid leave types after an initial 15-day probation/working period.
 
-
-
-
-
-
-
+#### Verification
+1.  Login as a **New Employee** (with < 15 attendance records).
+2.  Go to **Leave Management** -> **Apply Leave**.
+3.  Verify that only **LWP** (and other non-restricted types) appear in the dropdown.
+4.  Mark 15 days of attendance for that employee (manually in DB or via clock-in logic).
+5.  Re-check the dropdown; verify that **PL** and **CL** now appear (if balance > 0).
 
 
 
