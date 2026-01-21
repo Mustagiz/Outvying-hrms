@@ -358,6 +358,26 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // BIOMETRIC SYNC (Firestore version)
+  const syncBiometric = async () => {
+    try {
+      // Import dynamically to avoid circular dependencies if any
+      const { processBiometricSync } = require('../utils/biometricSync');
+      const { updatedAttendance } = processBiometricSync(rosters, attendance);
+
+      const promises = updatedAttendance.map(record => {
+        const docRef = doc(db, 'attendance', record.id);
+        return setDoc(docRef, { ...record, updatedAt: serverTimestamp() }, { merge: true });
+      });
+
+      await Promise.all(promises);
+      return { success: true, message: `Synced ${updatedAttendance.length} records successfully` };
+    } catch (error) {
+      console.error("Biometric Sync Error:", error);
+      return { success: false, message: 'Sync failed' };
+    }
+  };
+
   // THEME
   const toggleTheme = () => {
     const newTheme = theme === 'light' ? 'dark' : 'light';
@@ -381,50 +401,57 @@ export const AuthProvider = ({ children }) => {
     const now = new Date();
     const clockInTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 
-    // Check if already clocked in today (Local state first for speed/permissions)
-    const existingInState = attendance.find(a => String(a.employeeId) === String(employeeId) && a.date === today);
+    // Intelligent Roster Matching (Business Day Logic)
+    const findRosterMatch = () => {
+      // 1. Direct match (IST date)
+      const direct = rosters.find(r => String(r.employeeId) === String(employeeId) && r.date === today);
+      if (direct && clockInTime > '06:00') return direct;
+
+      // 2. Cross-midnight match (Previous Day's US night shift)
+      const prevDate = new Date(today);
+      prevDate.setDate(prevDate.getDate() - 1);
+      const prevStr = prevDate.toISOString().split('T')[0];
+      const prevRoster = rosters.find(r => String(r.employeeId) === String(employeeId) && r.date === prevStr);
+
+      if (prevRoster && prevRoster.timezone !== 'Asia/Kolkata' && clockInTime < '06:00') {
+        return prevRoster;
+      }
+      return direct;
+    };
+
+    const targetRoster = findRosterMatch();
+    const effectiveDate = targetRoster?.date || today;
+
+    // Check if already clocked in for this logical Business Day
+    const existingInState = attendance.find(a => String(a.employeeId) === String(employeeId) && a.date === effectiveDate);
     if (existingInState && existingInState.clockIn) {
-      console.log("Found existing record in state:", existingInState);
-      return { success: false, message: 'Already clocked in today' };
+      return { success: false, message: `Already clocked in for Work Date: ${effectiveDate}` };
     }
 
-    const docId = `${employeeId}_${today}`;
+    const docId = `${employeeId}_${effectiveDate}`;
     const docRef = doc(db, 'attendance', docId);
 
     try {
-      // Secondary check via getDoc (handles cases where state might be filtering or slow)
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists() && docSnap.data().clockIn) {
-        return { success: false, message: 'Already clocked in today (DB)' };
-      }
-
-      console.log("Attempting Clock In - Doc ID:", docId);
+      const result = calculateAttendanceStatus(clockInTime, null, today, targetRoster);
 
       const newRecord = {
         employeeId,
-        date: today,
+        date: effectiveDate, // Store under the Business Day
+        istDate: today,     // Original IST date for audit
         clockIn: clockInTime,
         clockOut: null,
-        status: clockInTime > '09:15' ? 'Late' : 'Present',
+        status: result.status,
         workHours: 0,
-        overtime: 0,
+        workingDays: 0,
+        ruleApplied: result.ruleApplied,
         createdAt: serverTimestamp()
       };
 
-      // Roster Logic for Status
-      const todayRoster = rosters.find(r => String(r.employeeId) === String(employeeId) && r.date === today);
-      if (todayRoster) {
-        const result = calculateAttendanceStatus(clockInTime, null, today, todayRoster);
-        newRecord.status = result.status;
-        newRecord.ruleApplied = result.ruleApplied;
-      }
-
       await setDoc(docRef, newRecord);
-      console.log("Clock In Success");
-      return { success: true, message: 'Clocked in successfully', time: clockInTime };
+      return { success: true, message: `Clocked in for Work Date: ${effectiveDate}`, time: clockInTime };
     } catch (error) {
-      console.error("ClockIn Error Details:", error);
-      return { success: false, message: `Failed to clock in: ${error.message || 'Unknown error'}` };
+      console.error("ClockIn Error:", error);
+      return { success: false, message: `Failed to clock in: ${error.message}` };
     }
   };
 
@@ -434,18 +461,30 @@ export const AuthProvider = ({ children }) => {
     const now = new Date();
     const clockOutTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 
-    const record = attendance.find(a => String(a.employeeId) === String(employeeId) && a.date === today);
+    // Find the active record for this employee
+    // It might be on today's business day or yesterday's business day (if it's early morning IST)
+    const findActiveRecord = () => {
+      // Check current IST day first
+      const current = attendance.find(a => String(a.employeeId) === String(employeeId) && a.date === today && !a.clockOut);
+      if (current) return current;
+
+      // Check yesterday (for a night shift that crossed midnight)
+      const prevDate = new Date(today);
+      prevDate.setDate(prevDate.getDate() - 1);
+      const prevStr = prevDate.toISOString().split('T')[0];
+      return attendance.find(a => String(a.employeeId) === String(employeeId) && a.date === prevStr && !a.clockOut);
+    };
+
+    const record = findActiveRecord();
 
     if (!record || !record.clockIn) {
-      return { success: false, message: 'Please clock in first' };
-    }
-    if (record.clockOut) {
-      return { success: false, message: 'Already clocked out today' };
+      return { success: false, message: 'No active clock-in found to clock out from' };
     }
 
     try {
-      const todayRoster = rosters.find(r => String(r.employeeId) === String(employeeId) && r.date === today);
-      const result = calculateAttendanceStatus(record.clockIn, clockOutTime, today, todayRoster);
+      // Ensure we match with the correct roster for rules
+      const roster = rosters.find(r => String(r.employeeId) === String(employeeId) && r.date === record.date);
+      const result = calculateAttendanceStatus(record.clockIn, clockOutTime, record.istDate, roster);
 
       const updates = {
         clockOut: clockOutTime,
@@ -855,11 +894,9 @@ export const AuthProvider = ({ children }) => {
     loading,
     currentIP,
     ipValidation,
-    login,
-    logout,
-    toggleTheme,
     clockIn,
     clockOut,
+    syncBiometric,
     applyLeave,
     updateLeaveStatus,
     uploadDocument,

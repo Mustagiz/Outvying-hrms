@@ -5,8 +5,9 @@ import { Clock, Calendar } from 'lucide-react';
 import { formatDate, getStatusColor, exportToCSV, getYearOptions } from '../utils/helpers';
 
 const Attendance = () => {
-  const { currentUser, attendance, clockIn, clockOut, allUsers } = useAuth();
+  const { currentUser, attendance, clockIn, clockOut, syncBiometric, allUsers } = useAuth();
   const [alert, setAlert] = useState(null);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedEmployee, setSelectedEmployee] = useState(currentUser.role === 'employee' ? String(currentUser.id) : 'all');
@@ -29,6 +30,14 @@ const Attendance = () => {
     console.log("Attendance: handleClockOut clicked. currentUser.id:", currentUser?.id);
     const result = await clockOut(currentUser?.id);
     console.log("Attendance: clockOut result:", result);
+    setAlert({ type: result.success ? 'success' : 'error', message: result.message });
+    setTimeout(() => setAlert(null), 3000);
+  };
+
+  const handleSyncBiometric = async () => {
+    setIsSyncing(true);
+    const result = await syncBiometric();
+    setIsSyncing(false);
     setAlert({ type: result.success ? 'success' : 'error', message: result.message });
     setTimeout(() => setAlert(null), 3000);
   };
@@ -222,12 +231,23 @@ const Attendance = () => {
               </>
             )}
           </div>
-          <Button
-            onClick={() => exportToCSV(filteredAttendance, 'attendance_report')}
-            variant="secondary"
-          >
-            Export to CSV
-          </Button>
+          <div className="flex flex-wrap gap-4">
+            <Button
+              onClick={() => exportToCSV(filteredAttendance, 'attendance_report')}
+              variant="secondary"
+            >
+              Export to CSV
+            </Button>
+            {currentUser.role !== 'employee' && (
+              <Button
+                onClick={handleSyncBiometric}
+                loading={isSyncing}
+                variant="primary"
+              >
+                Sync Biometric Data
+              </Button>
+            )}
+          </div>
         </div>
 
         {currentUser.role !== 'employee' && (

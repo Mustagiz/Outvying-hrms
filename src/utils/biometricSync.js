@@ -135,10 +135,9 @@ export const syncBiometricData = () => {
   return mockBiometricData;
 };
 
-export const processBiometricSync = () => {
+export const processBiometricSync = (rosters = [], attendance = []) => {
   const biometricData = syncBiometricData();
-  const attendance = JSON.parse(localStorage.getItem('attendance') || '[]');
-  const rosters = JSON.parse(localStorage.getItem('rosters') || '[]');
+  const updatedAttendance = [...attendance];
 
   biometricData.forEach(data => {
     const { firstIn, lastOut } = getFirstInLastOut(data.punches);
@@ -146,16 +145,20 @@ export const processBiometricSync = () => {
     // Intelligent Roster Matching (Business Day Logic)
     const findRosterMatch = () => {
       // 1. Direct match (IST date)
-      const direct = rosters.find(r => r.employeeId === data.employeeId && r.date === data.date);
-      if (direct && firstIn > '12:00') return direct; // Likely start of shift
+      const direct = rosters.find(r => String(r.employeeId) === String(data.employeeId) && r.date === data.date);
+
+      // If it's daytime in IST (Standard Office), direct match is usually correct
+      if (direct && firstIn > '06:00' && firstIn < '18:00') return direct;
 
       // 2. Cross-midnight match (Previous Day's night shift)
+      // Check if there was a shift assigned yesterday that spans into today
       const prevDate = new Date(data.date);
       prevDate.setDate(prevDate.getDate() - 1);
       const prevStr = prevDate.toISOString().split('T')[0];
-      const prevRoster = rosters.find(r => r.employeeId === data.employeeId && r.date === prevStr);
+      const prevRoster = rosters.find(r => String(r.employeeId) === String(data.employeeId) && r.date === prevStr);
 
-      if (prevRoster && prevRoster.timezone !== 'Asia/Kolkata' && firstIn < '12:00') {
+      // Night Shift Logic: If first in is late night/early morning IST, it's likely part of yesterday's US business day
+      if (prevRoster && prevRoster.timezone !== 'Asia/Kolkata' && firstIn < '06:00') {
         return prevRoster;
       }
       return direct;
@@ -186,12 +189,11 @@ export const processBiometricSync = () => {
     };
 
     if (existingIndex >= 0) {
-      attendance[existingIndex] = record;
+      updatedAttendance[existingIndex] = record;
     } else {
-      attendance.push(record);
+      updatedAttendance.push(record);
     }
   });
 
-  localStorage.setItem('attendance', JSON.stringify(attendance));
-  return { success: true, processed: biometricData.length };
+  return { success: true, processed: biometricData.length, updatedAttendance };
 };
