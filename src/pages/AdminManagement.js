@@ -281,6 +281,30 @@ const AdminManagement = () => {
           </div>
         </div>
       </Modal>
+
+      <Modal isOpen={showPasswordModal} onClose={() => setShowPasswordModal(false)} title="Reset Admin Password">
+        <div className="space-y-4">
+          <p className="text-gray-600 dark:text-gray-400">
+            Send password reset email to <strong>{selectedAdmin?.name}</strong>?
+          </p>
+          <p className="text-sm text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20 p-2 rounded">
+            This will send an official Firebase password reset link to <strong>{selectedAdmin?.email}</strong>.
+          </p>
+          <div className="flex justify-end gap-2 pt-4 border-t">
+            <Button onClick={() => setShowPasswordModal(false)} variant="secondary">Cancel</Button>
+            <Button onClick={async () => {
+              const result = await resetPassword(selectedAdmin.email);
+              alert(result.message);
+              if (result.success) {
+                setShowPasswordModal(false);
+                setSelectedAdmin(null);
+              }
+            }} variant="primary">
+              <Key size={16} className="inline mr-2" />Send Reset Link
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

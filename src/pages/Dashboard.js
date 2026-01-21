@@ -1,12 +1,30 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Card } from '../components/UI';
+import { Card, Button, Alert } from '../components/UI';
 import { Users, Calendar, FileText, CheckCircle, Clock, TrendingUp } from 'lucide-react';
 
 const Dashboard = () => {
-  const { currentUser, allUsers, attendance, leaves, leaveBalances, currentIP, ipValidation } = useAuth();
+  const { currentUser, allUsers, attendance, leaves, leaveBalances, currentIP, ipValidation, clockIn, clockOut } = useAuth();
   const navigate = useNavigate();
+  const [alert, setAlert] = useState(null);
+
+  const today = new Date().toISOString().split('T')[0];
+  const todayAttendance = attendance.find(a =>
+    String(a.employeeId) === String(currentUser.id) && a.date === today
+  );
+
+  const handleClockIn = async () => {
+    const result = await clockIn(currentUser?.id);
+    setAlert({ type: result.success ? 'success' : 'error', message: result.message });
+    setTimeout(() => setAlert(null), 3000);
+  };
+
+  const handleClockOut = async () => {
+    const result = await clockOut(currentUser?.id);
+    setAlert({ type: result.success ? 'success' : 'error', message: result.message });
+    setTimeout(() => setAlert(null), 3000);
+  };
 
   const stats = useMemo(() => {
     const today = new Date().toISOString().split('T')[0];
@@ -80,10 +98,12 @@ const Dashboard = () => {
     <div>
       <h1 className="text-3xl font-bold text-gray-800 dark:text-white mb-6">Dashboard</h1>
 
+      {alert && <Alert type={alert.type} message={alert.message} onClose={() => setAlert(null)} />}
+
       {/* IP Status Banner */}
       <div className={`mb-6 p-4 rounded-lg flex items-center justify-between ${ipValidation.allowed
-          ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800'
-          : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800'
+        ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800'
+        : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800'
         }`}>
         <div>
           <p className={`text-sm font-medium ${ipValidation.allowed ? 'text-green-800 dark:text-green-200' : 'text-red-800 dark:text-red-200'
@@ -97,6 +117,54 @@ const Dashboard = () => {
           )}
         </div>
       </div>
+
+      {/* Clock In/Out Card - Only for Employees */}
+      {currentUser.role === 'employee' && (
+        <Card title="Today's Attendance" className="mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+              <div className="flex items-center space-x-3">
+                <Clock className="text-primary-600" size={24} />
+                <div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Clock In</p>
+                  <p className="text-lg font-semibold text-gray-800 dark:text-white">
+                    {todayAttendance?.clockIn || 'Not clocked in'}
+                  </p>
+                </div>
+              </div>
+              <Button onClick={handleClockIn} disabled={todayAttendance?.clockIn}>
+                Clock In
+              </Button>
+            </div>
+
+            <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+              <div className="flex items-center space-x-3">
+                <Clock className="text-primary-600" size={24} />
+                <div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Clock Out</p>
+                  <p className="text-lg font-semibold text-gray-800 dark:text-white">
+                    {todayAttendance?.clockOut || 'Not clocked out'}
+                  </p>
+                </div>
+              </div>
+              <Button
+                onClick={handleClockOut}
+                disabled={!todayAttendance?.clockIn || todayAttendance?.clockOut}
+                variant="secondary"
+              >
+                Clock Out
+              </Button>
+            </div>
+          </div>
+          {todayAttendance && (
+            <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+              <p className="text-sm text-blue-800 dark:text-blue-200">
+                <strong>Status:</strong> {todayAttendance.status} | <strong>Work Hours:</strong> {todayAttendance.workHours || 0}h
+              </p>
+            </div>
+          )}
+        </Card>
+      )}
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
@@ -133,9 +201,9 @@ const Dashboard = () => {
                   </div>
                   <div className="text-right">
                     <span className={`text-xs px-2 py-1 rounded-full ${activity.status === 'Present' ? 'bg-green-100 text-green-800' :
-                        activity.status === 'Pending' ? 'bg-yellow-100 text-yellow-800' :
-                          activity.status === 'Late' ? 'bg-orange-100 text-orange-800' :
-                            'bg-gray-100 text-gray-800'
+                      activity.status === 'Pending' ? 'bg-yellow-100 text-yellow-800' :
+                        activity.status === 'Late' ? 'bg-orange-100 text-orange-800' :
+                          'bg-gray-100 text-gray-800'
                       }`}>
                       {activity.status}
                     </span>
