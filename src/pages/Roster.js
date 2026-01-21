@@ -785,20 +785,32 @@ const Roster = () => {
                 </>
             ) : (
                 <div className="space-y-4">
-                    <div className="flex items-center justify-between bg-white dark:bg-gray-800 p-4 rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
-                        <h2 className="text-xl font-bold text-gray-800 dark:text-white">
-                            {currentDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
-                        </h2>
-                        <div className="flex gap-2">
-                            <button onClick={() => navigateMonth(-1)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors border border-gray-200 dark:border-gray-600">
-                                <ChevronLeft size={20} />
-                            </button>
-                            <button onClick={() => setCurrentDate(new Date())} className="px-4 py-2 text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors border border-gray-200 dark:border-gray-600">
-                                Today
-                            </button>
-                            <button onClick={() => navigateMonth(1)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors border border-gray-200 dark:border-gray-600">
-                                <ChevronRight size={20} />
-                            </button>
+                    <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-md border border-gray-200 dark:border-gray-700 flex flex-col md:flex-row gap-4 items-center justify-between">
+                        <div className="flex items-center gap-4">
+                            <h2 className="text-2xl font-black text-gray-900 dark:text-white">
+                                {currentDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
+                            </h2>
+                            <div className="flex gap-1">
+                                <button onClick={() => navigateMonth(-1)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-400">
+                                    <ChevronLeft size={18} />
+                                </button>
+                                <button onClick={() => setCurrentDate(new Date())} className="px-4 py-1.5 text-xs font-bold uppercase tracking-wider hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-400">
+                                    Today
+                                </button>
+                                <button onClick={() => navigateMonth(1)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-400">
+                                    <ChevronRight size={18} />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Shift Legend */}
+                        <div className="flex flex-wrap justify-center gap-3 bg-gray-50 dark:bg-gray-900/50 p-2 rounded-lg border border-gray-100 dark:border-gray-700">
+                            {shifts.map(shift => (
+                                <div key={shift.name} className="flex items-center gap-2">
+                                    <div className={`w-3 h-3 rounded-full ${shift.color.split(' ')[0]} border ${shift.color.split(' ')[2]}`}></div>
+                                    <span className="text-[10px] font-bold text-gray-600 dark:text-gray-400 uppercase tracking-tighter">{shift.name}</span>
+                                </div>
+                            ))}
                         </div>
                     </div>
 
@@ -828,11 +840,11 @@ const Roster = () => {
 
                                             <div className="flex flex-col gap-1 mt-1">
                                                 {item.rosters.slice(0, 3).map((roster, idx) => (
-                                                    <div key={idx} className={`px-1.5 py-1 rounded text-[10px] truncate border-l-2 ${getShiftColor(roster.shiftName)} border-l-current bg-opacity-20`}>
-                                                        <span className="font-semibold mr-1">
+                                                    <div key={idx} className={`px-2 py-1 rounded text-[10px] truncate border-l-4 ${getShiftColor(roster.shiftName)} border-l-current shadow-sm`}>
+                                                        <span className="font-bold mr-1">
                                                             {currentUser.role !== 'employee' ? roster.employeeName?.split(' ')[0] : roster.shiftName}
                                                         </span>
-                                                        <span className="opacity-75 hidden sm:inline">
+                                                        <span className="opacity-80 hidden sm:inline font-medium">
                                                             {roster.startTime}
                                                         </span>
                                                     </div>
