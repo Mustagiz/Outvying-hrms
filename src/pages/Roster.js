@@ -509,10 +509,13 @@ const Roster = () => {
                         </div>
                     )}
                     {(currentUser.role === 'admin' || currentUser.role === 'hr') && (
-                        <Button onClick={() => setShowModal(true)}>
-                            <UserPlus size={18} className="mr-2" />
-                            Assign Shift
-                        </Button>
+                        <button
+                            onClick={() => setShowModal(true)}
+                            className="flex items-center gap-2 bg-gradient-to-r from-primary-600 to-indigo-600 dark:from-primary-500 dark:to-indigo-500 text-white font-bold py-2.5 px-6 rounded-xl shadow-lg shadow-primary-500/25 dark:shadow-none hover:scale-105 hover:shadow-xl active:scale-95 transition-all duration-300 border border-white/10 group"
+                        >
+                            <UserPlus size={18} className="group-hover:rotate-12 transition-transform" />
+                            <span className="uppercase tracking-wider text-sm">Assign Shift</span>
+                        </button>
                     )}
                 </div>
             </div>
@@ -570,8 +573,8 @@ const Roster = () => {
                                                 <label
                                                     key={u.id}
                                                     className={`flex items-center space-x-3 p-1.5 hover:bg-gray-50 dark:hover:bg-gray-600 rounded cursor-pointer transition-all border-b border-gray-100 dark:border-gray-600 last:border-0 ${filters.employees.includes(u.id)
-                                                            ? 'bg-primary-50 dark:bg-primary-900/30 border-primary-200 dark:border-primary-800'
-                                                            : ''
+                                                        ? 'bg-primary-50 dark:bg-primary-900/30 border-primary-200 dark:border-primary-800'
+                                                        : ''
                                                         }`}
                                                 >
                                                     <input
@@ -588,8 +591,8 @@ const Roster = () => {
                                                         }}
                                                     />
                                                     <span className={`text-sm truncate font-medium ${filters.employees.includes(u.id)
-                                                            ? 'text-primary-700 dark:text-primary-300'
-                                                            : 'text-gray-700 dark:text-gray-200'
+                                                        ? 'text-primary-700 dark:text-primary-300'
+                                                        : 'text-gray-700 dark:text-gray-200'
                                                         }`}>
                                                         {u.name} <span className="text-[10px] opacity-60">({u.employeeId})</span>
                                                     </span>
