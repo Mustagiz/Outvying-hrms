@@ -64,7 +64,7 @@ const Roster = () => {
 
     // Filter State
     const [filters, setFilters] = useState({
-        employee: '',
+        employees: [],
         dateFrom: '',
         dateTo: '',
         shiftType: ''
@@ -106,9 +106,9 @@ const Roster = () => {
 
         // Apply admin filters
         if (currentUser.role !== 'employee') {
-            // Employee filter
-            if (filters.employee) {
-                filtered = filtered.filter(r => r.employeeId === filters.employee);
+            // Employee filter (Multi-select)
+            if (filters.employees.length > 0) {
+                filtered = filtered.filter(r => filters.employees.includes(r.employeeId));
             }
 
             // Date range filter
@@ -328,7 +328,7 @@ const Roster = () => {
 
     const resetFilters = () => {
         setFilters({
-            employee: '',
+            employees: [],
             dateFrom: '',
             dateTo: '',
             shiftType: ''
@@ -487,7 +487,7 @@ const Roster = () => {
                         <div className="flex items-center gap-2">
                             <Filter size={20} className="text-primary-600 dark:text-primary-400" />
                             <h3 className="font-semibold text-gray-800 dark:text-white">Filters</h3>
-                            {(filters.employee || filters.dateFrom || filters.dateTo || filters.shiftType) && (
+                            {(filters.employees.length > 0 || filters.dateFrom || filters.dateTo || filters.shiftType) && (
                                 <span className="px-2 py-0.5 bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400 text-xs font-medium rounded-full">
                                     Active
                                 </span>
@@ -502,26 +502,53 @@ const Roster = () => {
                     {showFilters && (
                         <div className="border-t border-gray-200 dark:border-gray-700 p-4 bg-gray-50/50 dark:bg-gray-800/50">
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                                {/* Employee Filter */}
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                        Employee
-                                    </label>
-                                    <select
-                                        value={filters.employee}
-                                        onChange={(e) => setFilters({ ...filters, employee: e.target.value })}
-                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                                    >
-                                        <option value="">All Employees</option>
-                                        {allUsers
-                                            .filter(u => u.role === 'employee')
+                                {/* Employee Filter (Bulk Selection) */}
+                                <div className="space-y-2">
+                                    <div className="flex justify-between items-center px-1">
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                            Select Employees
+                                        </label>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const allEmpIds = allUsers.filter(u => u.role === 'employee').map(u => u.id);
+                                                setFilters(prev => ({
+                                                    ...prev,
+                                                    employees: prev.employees.length === allEmpIds.length ? [] : allEmpIds
+                                                }));
+                                            }}
+                                            className="text-xs text-primary-600 hover:text-primary-700 dark:text-primary-400 font-medium"
+                                        >
+                                            {filters.employees.length === allUsers.filter(u => u.role === 'employee').length ? 'Deselect All' : 'Select All'}
+                                        </button>
+                                    </div>
+                                    <div className="border border-gray-300 dark:border-gray-600 rounded-lg max-h-40 overflow-y-auto p-2 bg-white dark:bg-gray-700 custom-scrollbar">
+                                        {allUsers.filter(u => u.role === 'employee')
                                             .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
                                             .map(u => (
-                                                <option key={u.id} value={u.id}>
-                                                    {u.name} ({u.employeeId})
-                                                </option>
+                                                <label key={u.id} className="flex items-center space-x-3 p-1.5 hover:bg-gray-50 dark:hover:bg-gray-600 rounded cursor-pointer transition-colors border-b border-gray-100 dark:border-gray-600 last:border-0">
+                                                    <input
+                                                        type="checkbox"
+                                                        className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                                                        checked={filters.employees.includes(u.id)}
+                                                        onChange={() => {
+                                                            setFilters(prev => ({
+                                                                ...prev,
+                                                                employees: prev.employees.includes(u.id)
+                                                                    ? prev.employees.filter(id => id !== u.id)
+                                                                    : [...prev.employees, u.id]
+                                                            }));
+                                                        }}
+                                                    />
+                                                    <span className="text-sm text-gray-700 dark:text-gray-200 truncate">
+                                                        {u.name} <span className="text-[10px] opacity-60">({u.employeeId})</span>
+                                                    </span>
+                                                </label>
                                             ))}
-                                    </select>
+                                    </div>
+                                    <p className="text-[10px] text-gray-500 dark:text-gray-400 px-1">
+                                        {filters.employees.length} selected
+                                    </p>
                                 </div>
 
                                 {/* Date From Filter */}
@@ -667,8 +694,8 @@ const Roster = () => {
                                             key={i + 1}
                                             onClick={() => setCurrentPage(i + 1)}
                                             className={`w-10 h-10 rounded-lg text-sm font-medium transition-colors ${currentPage === i + 1
-                                                    ? 'bg-primary-600 text-white'
-                                                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700'
+                                                ? 'bg-primary-600 text-white'
+                                                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700'
                                                 }`}
                                         >
                                             {i + 1}
