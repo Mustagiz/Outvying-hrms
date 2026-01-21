@@ -1,3 +1,5 @@
+import { calculateAbsDuration, getEffectiveWorkDate } from './helpers';
+
 // Biometric attendance calculation utilities
 
 export const calculateAttendanceStatus = (clockIn, clockOut, date = null, roster = null) => {
@@ -13,51 +15,55 @@ export const calculateAttendanceStatus = (clockIn, clockOut, date = null, roster
     gracePeriodMins: 15
   };
 
-  const [inHour, inMin] = clockIn.split(':').map(Number);
-  let clockInInMinutes = inHour * 60 + inMin;
-
   const timezone = roster?.timezone || 'Asia/Kolkata';
-  if (timezone !== 'Asia/Kolkata') {
-    // If the shift is in another timezone, convert the actual clock-in (IST) to that timezone
-    // to compare it with the shift's regional start time.
-    const dateToUse = date || new Date().toISOString().split('T')[0];
-    const istDate = new Date(`${dateToUse}T${clockIn}:00+05:30`);
+  const istDate = date || new Date().toISOString().split('T')[0];
 
-    const regionalTimeStr = new Intl.DateTimeFormat('en-US', {
-      timeZone: timezone,
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false
-    }).format(istDate);
-
-    const [regH, regM] = regionalTimeStr.split(':').map(Number);
-    clockInInMinutes = regH * 60 + regM;
-  }
+  // Map IST time to the regional Business Day
+  // If we have a roster, we use its assigned date. 
+  // Otherwise, we calculate the effective work date for the target region.
+  const workDate = roster?.date || getEffectiveWorkDate(clockIn, istDate, timezone);
 
   const shiftStartTime = roster?.startTime || '09:00';
   const [shiftHour, shiftMin] = shiftStartTime.split(':').map(Number);
   const shiftStartInMinutes = shiftHour * 60 + shiftMin;
   const gracePeriod = roster?.gracePeriod || defaultRule.gracePeriodMins;
 
-  // Initial status based on regional clockIn time
+  // Latency check in regional time
+  const istTimestamp = new Date(`${istDate}T${clockIn}:00+05:30`);
+  const regionalFormat = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  }).format(istTimestamp);
+
+  const [regH, regM] = regionalFormat.split(':').map(Number);
+  const clockInInMinutes = regH * 60 + regM;
+
   let status = clockInInMinutes > (shiftStartInMinutes + gracePeriod) ? 'Late' : 'Present';
-  let workingDays = 0; // Only count days after clockOut
+  let workingDays = 0;
   let workHours = 0;
 
   if (clockOut) {
-    const [outHour, outMin] = clockOut.split(':').map(Number);
-    workHours = outHour - inHour + (outMin - inMin) / 60;
+    let clockOutDate = istDate;
+    const [outH] = clockOut.split(':').map(Number);
+    const [inH] = clockIn.split(':').map(Number);
 
-    // Final status and working days calculation
-    const graceHours = defaultRule.gracePeriodMins / 60;
-    const adjustedHours = workHours + graceHours;
+    // Auto-detect cross-midnight clockout in IST
+    if (outH < inH) {
+      const nextDay = new Date(istDate);
+      nextDay.setDate(nextDay.getDate() + 1);
+      clockOutDate = nextDay.toISOString().split('T')[0];
+    }
 
-    if (adjustedHours >= defaultRule.fullDayHours) {
+    workHours = calculateAbsDuration(clockIn, istDate, clockOut, clockOutDate);
+
+    // Standard business day accounting
+    if (workHours >= defaultRule.fullDayHours) {
       workingDays = 1.0;
-    } else if (adjustedHours >= defaultRule.halfDayHours) {
-      status = 'Half Day';
-      workingDays = 0.5;
-    } else if (adjustedHours >= defaultRule.minPresentHours) {
+    } else if (workHours >= 5) {
+      workingDays = 1.0; // Overriding to 1 day if >= 5 hours as per rule
+    } else if (workHours >= defaultRule.halfDayHours) {
       status = 'Half Day';
       workingDays = 0.5;
     } else {
@@ -65,7 +71,6 @@ export const calculateAttendanceStatus = (clockIn, clockOut, date = null, roster
       workingDays = 0;
     }
 
-    // STRICT RULE: If work hours < 5, mark as LWP
     if (workHours < 5) {
       status = 'LWP';
       workingDays = 0;
@@ -78,8 +83,9 @@ export const calculateAttendanceStatus = (clockIn, clockOut, date = null, roster
 
   return {
     status,
-    workHours: typeof workHours === 'number' ? Math.round(workHours * 100) / 100 : 0,
+    workHours: Math.round(workHours * 100) / 100,
     workingDays,
+    workDate,
     ruleApplied: roster ? `Roster: ${roster.shiftName}` : (defaultRule.name || 'Standard Office')
   };
 };
@@ -114,7 +120,7 @@ export const calculateMonthlyWorkingDays = (attendance, employeeId, month, year)
 };
 
 export const syncBiometricData = () => {
-  // Simulated biometric sync - in production, this would call actual biometric API
+  // Simulated biometric sync
   const mockBiometricData = [
     {
       employeeId: 1, date: new Date().toISOString().split('T')[0], punches: [
@@ -136,17 +142,40 @@ export const processBiometricSync = () => {
 
   biometricData.forEach(data => {
     const { firstIn, lastOut } = getFirstInLastOut(data.punches);
-    const todayRoster = rosters.find(r => r.employeeId === data.employeeId && r.date === data.date);
-    const result = calculateAttendanceStatus(firstIn, lastOut, data.date, todayRoster);
+
+    // Intelligent Roster Matching (Business Day Logic)
+    const findRosterMatch = () => {
+      // 1. Direct match (IST date)
+      const direct = rosters.find(r => r.employeeId === data.employeeId && r.date === data.date);
+      if (direct && firstIn > '12:00') return direct; // Likely start of shift
+
+      // 2. Cross-midnight match (Previous Day's night shift)
+      const prevDate = new Date(data.date);
+      prevDate.setDate(prevDate.getDate() - 1);
+      const prevStr = prevDate.toISOString().split('T')[0];
+      const prevRoster = rosters.find(r => r.employeeId === data.employeeId && r.date === prevStr);
+
+      if (prevRoster && prevRoster.timezone !== 'Asia/Kolkata' && firstIn < '12:00') {
+        return prevRoster;
+      }
+      return direct;
+    };
+
+    const targetRoster = findRosterMatch();
+    const result = calculateAttendanceStatus(firstIn, lastOut, data.date, targetRoster);
+
+    // Use the Effective Work Date (Business Day)
+    const effectiveDate = targetRoster?.date || result.workDate || data.date;
 
     const existingIndex = attendance.findIndex(
-      a => a.employeeId === data.employeeId && a.date === data.date
+      a => a.employeeId === data.employeeId && a.date === effectiveDate
     );
 
     const record = {
-      id: `${data.employeeId}-${data.date}`,
+      id: `${data.employeeId}-${effectiveDate}`,
       employeeId: data.employeeId,
-      date: data.date,
+      date: effectiveDate, // Store under Business Day
+      istDate: data.date, // Preserve IST for audit
       clockIn: firstIn,
       clockOut: lastOut,
       status: result.status,

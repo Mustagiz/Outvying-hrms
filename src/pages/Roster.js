@@ -19,8 +19,8 @@ const DateRosterGroup = ({ date, rosters, columns }) => {
                         <CalendarIcon size={24} />
                     </div>
                     <div className="text-left">
-                        <h3 className="font-bold text-gray-900 dark:text-white text-lg leading-tight">{formatDate(date)}</h3>
-                        <p className="text-[10px] text-gray-500 dark:text-gray-400 font-medium uppercase tracking-widest">Daily Shift Assignments</p>
+                        <h3 className="font-bold text-gray-900 dark:text-white text-lg leading-tight">Work Date: {formatDate(date)}</h3>
+                        <p className="text-[10px] text-gray-500 dark:text-gray-400 font-medium uppercase tracking-widest text-primary-600 dark:text-primary-400">Effective Business Day</p>
                     </div>
                 </div>
                 <div className="flex items-center gap-6">
@@ -446,7 +446,14 @@ const Roster = () => {
                 />
             )
         }] : []),
-        { header: 'Date', accessor: 'date', render: (row) => formatDate(row.date) },
+        {
+            header: 'Work Date', accessor: 'date', render: (row) => (
+                <div className="flex flex-col">
+                    <span className="font-medium">{formatDate(row.date)}</span>
+                    <span className="text-[10px] text-gray-400 italic">Effective Day</span>
+                </div>
+            )
+        },
         ...(currentUser.role !== 'employee' ? [{
             header: 'Employee',
             accessor: 'employeeName',
@@ -782,7 +789,7 @@ const Roster = () => {
                         </Card>
                     ) : (
                         <div className="space-y-4">
-                            {/* Grouped by Date for logistical clarity */}
+                            {/* Grouped by Work Date for logistical clarity */}
                             {Object.keys(groupedByDate).sort((a, b) => new Date(b) - new Date(a)).map(date => (
                                 <DateRosterGroup
                                     key={date}
@@ -1005,7 +1012,7 @@ const Roster = () => {
 
                     <div className="grid grid-cols-2 gap-4">
                         <Input
-                            label="Start Date"
+                            label="Start Work Date"
                             type="date"
                             value={formData.startDate}
                             onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
@@ -1013,7 +1020,7 @@ const Roster = () => {
                             disabled={!!editingRosterId} // Disable date editing for now
                         />
                         <Input
-                            label="End Date"
+                            label="End Work Date"
                             type="date"
                             value={formData.endDate}
                             onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
@@ -1094,8 +1101,11 @@ const Roster = () => {
             </Modal>
 
             {/* Modal for viewing details of a specific day */}
-            <Modal isOpen={showDayModal} onClose={() => setShowDayModal(false)} title={`Roster for ${selectedDayDate}`}>
+            <Modal isOpen={showDayModal} onClose={() => setShowDayModal(false)} title={`Shifts for Work Date: ${selectedDayDate}`}>
                 <div className="space-y-4">
+                    <p className="text-[11px] text-gray-500 dark:text-gray-400 italic bg-gray-50 dark:bg-gray-700/30 p-2 rounded border-l-2 border-primary-500">
+                        Note: This view shows all shifts belonging to this Business Day. Night shifts crossing into the next day are included here.
+                    </p>
                     <div className="max-h-[60vh] overflow-y-auto">
                         {selectedDayRosters.length > 0 ? (
                             <Table columns={columns} data={selectedDayRosters} />

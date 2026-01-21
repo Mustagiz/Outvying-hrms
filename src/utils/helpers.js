@@ -185,3 +185,48 @@ export const convertTimeInRange = (timeStr, dateStr, fromTz, toTz = 'Asia/Kolkat
 export const getISTEquivalent = (timeStr, dateStr, sourceTz) => {
   return convertTimeInRange(timeStr, dateStr, sourceTz, 'Asia/Kolkata');
 };
+
+/**
+ * Determines the business date in a target timezone for a given IST time.
+ * e.g. 2026-01-23 01:00 IST -> 2026-01-22 in America/New_York
+ */
+export const getEffectiveWorkDate = (timeStr, dateStr, targetTz) => {
+  if (!timeStr || !dateStr || !targetTz || targetTz === 'Asia/Kolkata') return dateStr;
+  try {
+    const istDate = new Date(`${dateStr}T${timeStr}:00+05:30`);
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: targetTz,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+    return formatter.format(istDate);
+  } catch (error) {
+    console.error("Error getting work date:", error);
+    return dateStr;
+  }
+};
+
+/**
+ * Calculates absolute decimal hours between two IST time/date combinations.
+ */
+export const calculateAbsDuration = (inTime, inDate, outTime, outDate) => {
+  if (!inTime || !outTime) return 0;
+  try {
+    const start = new Date(`${inDate}T${inTime}:00+05:30`);
+    const end = new Date(`${outDate}T${outTime}:00+05:30`);
+
+    let diffMs = end - start;
+
+    // Safety check: if dates are the same and out < in, it's likely a cross-midnight shift
+    // where outDate wasn't explicitly bumped yet.
+    if (diffMs < 0 && inDate === outDate) {
+      diffMs += 24 * 60 * 60 * 1000;
+    }
+
+    return Math.max(0, Math.round((diffMs / (1000 * 60 * 60)) * 100) / 100);
+  } catch (error) {
+    return 0;
+  }
+};
+
