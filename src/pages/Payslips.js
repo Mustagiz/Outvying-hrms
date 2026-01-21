@@ -73,8 +73,17 @@ const Payslips = () => {
   };
 
   const canViewPayslip = (month, year) => {
-    if (currentUser.role === 'admin' || currentUser.role === 'hr') return true;
-    return isPayslipReleased(month, year);
+    if (currentUser.role === 'admin' || currentUser.role === 'hr' || currentUser.role === 'super_admin') return true;
+
+    // Allow employees to view last 3 months regardless of release status
+    const currentDate = new Date();
+    const payslipDate = new Date(year, month, 1);
+    const monthsDiff = (currentDate.getFullYear() - payslipDate.getFullYear()) * 12 + (currentDate.getMonth() - payslipDate.getMonth());
+
+    if (monthsDiff >= 0 && monthsDiff < 3) return true;
+
+    // For older months, check if released
+    return isPayslipReleased(month, year, currentUser.id);
   };
 
   const calculatePayslip = (employeeId, month, year) => {
@@ -359,10 +368,22 @@ const Payslips = () => {
     for (let i = 0; i < 6; i++) {
       const date = new Date(selectedYear, selectedMonth - i, 1);
       const payslip = calculatePayslip(empId, date.getMonth(), date.getFullYear());
-      if (currentUser.role === 'employee' && !payslip.released) continue;
-      if (statusFilter === 'released' && !payslip.released) continue;
-      if (statusFilter === 'pending' && payslip.released) continue;
-      history.push(payslip);
+
+      // For employees: show last 3 months regardless of release status, then only released ones
+      if (currentUser.role === 'employee') {
+        if (i < 3) {
+          // Always show last 3 months for employees
+          history.push(payslip);
+        } else if (payslip.released) {
+          // Show older months only if released
+          history.push(payslip);
+        }
+      } else {
+        // For admins/HR: apply status filter
+        if (statusFilter === 'released' && !payslip.released) continue;
+        if (statusFilter === 'pending' && payslip.released) continue;
+        history.push(payslip);
+      }
     }
     return history;
   }, [selectedEmployee, selectedMonth, selectedYear, currentUser, releasedPayslips, statusFilter]);
