@@ -48,7 +48,7 @@ const DateRosterGroup = ({ date, rosters, columns }) => {
 const Roster = () => {
     const { currentUser, rosters, allUsers, assignRoster, deleteRoster, updateRoster } = useAuth();
     const [showModal, setShowModal] = useState(false);
-    const [view, setView] = useState('list'); // 'list' or 'calendar'
+    const [view, setView] = useState('calendar'); // 'calendar' is now the default view for everyone
     const [currentDate, setCurrentDate] = useState(new Date());
     const [alert, setAlert] = useState(null);
 
@@ -478,26 +478,28 @@ const Roster = () => {
                     <p className="text-gray-600 dark:text-gray-400">Manage and view employee shift assignments</p>
                 </div>
                 <div className="flex items-center gap-3">
-                    <div className="flex bg-white dark:bg-gray-800 rounded-lg p-1 shadow-sm border border-gray-200 dark:border-gray-700">
-                        <button
-                            onClick={() => setView('list')}
-                            className={`px-3 py-1.5 rounded-md flex items-center gap-2 text-sm font-medium transition-colors ${view === 'list'
-                                ? 'bg-primary-100 text-primary-600 dark:bg-primary-900/40 dark:text-primary-400'
-                                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
-                                }`}
-                        >
-                            <List size={16} /> List
-                        </button>
-                        <button
-                            onClick={() => setView('calendar')}
-                            className={`px-3 py-1.5 rounded-md flex items-center gap-2 text-sm font-medium transition-colors ${view === 'calendar'
-                                ? 'bg-primary-100 text-primary-600 dark:bg-primary-900/40 dark:text-primary-400'
-                                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
-                                }`}
-                        >
-                            <CalendarIcon size={16} /> Calendar
-                        </button>
-                    </div>
+                    {currentUser.role === 'employee' && (
+                        <div className="flex bg-white dark:bg-gray-800 rounded-lg p-1 shadow-sm border border-gray-200 dark:border-gray-700">
+                            <button
+                                onClick={() => setView('list')}
+                                className={`px-3 py-1.5 rounded-md flex items-center gap-2 text-sm font-medium transition-colors ${view === 'list'
+                                    ? 'bg-primary-100 text-primary-600 dark:bg-primary-900/40 dark:text-primary-400'
+                                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                    }`}
+                            >
+                                <List size={16} /> List
+                            </button>
+                            <button
+                                onClick={() => setView('calendar')}
+                                className={`px-3 py-1.5 rounded-md flex items-center gap-2 text-sm font-medium transition-colors ${view === 'calendar'
+                                    ? 'bg-primary-100 text-primary-600 dark:bg-primary-900/40 dark:text-primary-400'
+                                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                    }`}
+                            >
+                                <CalendarIcon size={16} /> Calendar
+                            </button>
+                        </div>
+                    )}
                     {(currentUser.role === 'admin' || currentUser.role === 'hr') && (
                         <Button onClick={() => setShowModal(true)}>
                             <UserPlus size={18} className="mr-2" />
