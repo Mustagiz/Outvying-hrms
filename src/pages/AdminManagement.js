@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Card, Button, Modal, Table, Badge } from '../components/UI';
-import { Plus, Shield, Eye, EyeOff, Trash2, UserX } from 'lucide-react';
+import { Plus, Shield, Eye, EyeOff, Trash2, UserX, Key } from 'lucide-react';
 
 const AdminManagement = () => {
-  const { currentUser, allUsers, addUser, deleteUser } = useAuth();
+  const { currentUser, allUsers, addUser, deleteUser, resetPassword } = useAuth();
   const [showModal, setShowModal] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [selectedAdmin, setSelectedAdmin] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -121,14 +123,26 @@ const AdminManagement = () => {
     {
       header: 'Actions',
       render: (row) => (
-        <Button
-          onClick={() => handleDeleteAdmin(row.id)}
-          variant="danger"
-          className="text-xs py-1 px-2"
-          disabled={row.id === currentUser.id}
-        >
-          <Trash2 size={14} className="inline mr-1" />Delete
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            onClick={() => {
+              setSelectedAdmin(row);
+              setShowPasswordModal(true);
+            }}
+            variant="secondary"
+            className="text-xs py-1 px-2"
+          >
+            <Key size={14} className="inline mr-1" />Password
+          </Button>
+          <Button
+            onClick={() => handleDeleteAdmin(row.id)}
+            variant="danger"
+            className="text-xs py-1 px-2"
+            disabled={row.id === currentUser.id}
+          >
+            <Trash2 size={14} className="inline mr-1" />Delete
+          </Button>
+        </div>
       )
     }
   ];
