@@ -52,6 +52,16 @@ const Roster = () => {
     // Edit State
     const [editingRosterId, setEditingRosterId] = useState(null);
 
+    // Bulk Selection State
+    const [selectedRosters, setSelectedRosters] = useState([]);
+    const [showBulkModifyModal, setShowBulkModifyModal] = useState(false);
+    const [bulkModifyData, setBulkModifyData] = useState({
+        shiftName: '',
+        startTime: '',
+        endTime: '',
+        gracePeriod: ''
+    });
+
     const [formData, setFormData] = useState({
         selectedEmployees: [],
         startDate: '',
@@ -190,6 +200,72 @@ const Roster = () => {
         }
     };
 
+    const handleBulkDelete = async () => {
+        if (selectedRosters.length === 0) {
+            setAlert({ type: 'error', message: 'Please select at least one roster to delete' });
+            setTimeout(() => setAlert(null), 3000);
+            return;
+        }
+        if (window.confirm(`Are you sure you want to delete ${selectedRosters.length} roster assignment(s)?`)) {
+            let successCount = 0;
+            for (const id of selectedRosters) {
+                const result = await deleteRoster(id);
+                if (result.success) successCount++;
+            }
+            setAlert({ type: 'success', message: `${successCount} roster(s) deleted successfully` });
+            setSelectedRosters([]);
+            setTimeout(() => setAlert(null), 3000);
+        }
+    };
+
+    const handleBulkModify = async () => {
+        if (selectedRosters.length === 0) {
+            setAlert({ type: 'error', message: 'Please select at least one roster to modify' });
+            setTimeout(() => setAlert(null), 3000);
+            return;
+        }
+        setShowBulkModifyModal(true);
+    };
+
+    const handleBulkModifySubmit = async () => {
+        const updates = {};
+        if (bulkModifyData.shiftName) updates.shiftName = bulkModifyData.shiftName;
+        if (bulkModifyData.startTime) updates.startTime = bulkModifyData.startTime;
+        if (bulkModifyData.endTime) updates.endTime = bulkModifyData.endTime;
+        if (bulkModifyData.gracePeriod) updates.gracePeriod = parseInt(bulkModifyData.gracePeriod);
+
+        if (Object.keys(updates).length === 0) {
+            setAlert({ type: 'error', message: 'Please fill at least one field to update' });
+            setTimeout(() => setAlert(null), 3000);
+            return;
+        }
+
+        let successCount = 0;
+        for (const id of selectedRosters) {
+            const result = await updateRoster(id, updates);
+            if (result.success) successCount++;
+        }
+        setAlert({ type: 'success', message: `${successCount} roster(s) updated successfully` });
+        setSelectedRosters([]);
+        setShowBulkModifyModal(false);
+        setBulkModifyData({ shiftName: '', startTime: '', endTime: '', gracePeriod: '' });
+        setTimeout(() => setAlert(null), 3000);
+    };
+
+    const toggleSelectRoster = (id) => {
+        setSelectedRosters(prev =>
+            prev.includes(id) ? prev.filter(rosterId => rosterId !== id) : [...prev, id]
+        );
+    };
+
+    const toggleSelectAll = () => {
+        if (selectedRosters.length === sortedRosters.length) {
+            setSelectedRosters([]);
+        } else {
+            setSelectedRosters(sortedRosters.map(r => r.id));
+        }
+    };
+
     // Calendar Logic
     const getDaysInMonth = (date) => {
         const year = date.getFullYear();
@@ -236,6 +312,24 @@ const Roster = () => {
     };
 
     const columns = [
+        ...(currentUser.role !== 'employee' ? [{
+            header: () => (
+                <input
+                    type="checkbox"
+                    checked={selectedRosters.length === sortedRosters.length && sortedRosters.length > 0}
+                    onChange={toggleSelectAll}
+                    className="rounded border-gray-300"
+                />
+            ),
+            render: (row) => (
+                <input
+                    type="checkbox"
+                    checked={selectedRosters.includes(row.id)}
+                    onChange={() => toggleSelectRoster(row.id)}
+                    className="rounded border-gray-300"
+                />
+            )
+        }] : []),
         { header: 'Date', accessor: 'date', render: (row) => formatDate(row.date) },
         ...(currentUser.role !== 'employee' ? [{ header: 'Employee', accessor: 'employeeName' }] : []),
         {
@@ -309,6 +403,18 @@ const Roster = () => {
                             <UserPlus size={18} className="mr-2" />
                             Assign Shift
                         </Button>
+                    )}
+                    {(currentUser.role === 'admin' || currentUser.role === 'hr') && selectedRosters.length > 0 && (
+                        <>
+                            <Button onClick={handleBulkModify} variant="secondary">
+                                <Edit size={18} className="mr-2" />
+                                Bulk Modify ({selectedRosters.length})
+                            </Button>
+                            <Button onClick={handleBulkDelete} variant="danger">
+                                <Trash2 size={18} className="mr-2" />
+                                Bulk Delete ({selectedRosters.length})
+                            </Button>
+                        </>
                     )}
                 </div>
             </div>
@@ -520,6 +626,49 @@ const Roster = () => {
                     </div>
                     <div className="flex justify-end">
                         <Button variant="secondary" onClick={() => setShowDayModal(false)}>Close</Button>
+                    </div>
+                </div>
+            </Modal>
+
+            {/* Bulk Modify Modal */}
+            <Modal isOpen={showBulkModifyModal} onClose={() => setShowBulkModifyModal(false)} title="Bulk Modify Rosters">
+                <div className="space-y-4">
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                        Modifying {selectedRosters.length} roster assignment(s). Leave fields empty to keep current values.
+                    </p>
+                    <Select
+                        label="Shift Name (optional)"
+                        value={bulkModifyData.shiftName}
+                        onChange={(e) => setBulkModifyData({ ...bulkModifyData, shiftName: e.target.value })}
+                        options={[
+                            { value: '', label: 'Keep Current' },
+                            ...shifts.map(s => ({ value: s.name, label: s.name }))
+                        ]}
+                    />
+                    <Input
+                        label="Start Time (optional)"
+                        type="time"
+                        value={bulkModifyData.startTime}
+                        onChange={(e) => setBulkModifyData({ ...bulkModifyData, startTime: e.target.value })}
+                    />
+                    <Input
+                        label="End Time (optional)"
+                        type="time"
+                        value={bulkModifyData.endTime}
+                        onChange={(e) => setBulkModifyData({ ...bulkModifyData, endTime: e.target.value })}
+                    />
+                    <Input
+                        label="Grace Period (minutes, optional)"
+                        type="number"
+                        value={bulkModifyData.gracePeriod}
+                        onChange={(e) => setBulkModifyData({ ...bulkModifyData, gracePeriod: e.target.value })}
+                    />
+                    <div className="flex justify-end gap-2 pt-4 border-t">
+                        <Button variant="secondary" onClick={() => setShowBulkModifyModal(false)}>Cancel</Button>
+                        <Button onClick={handleBulkModifySubmit}>
+                            <Edit size={18} className="inline mr-2" />
+                            Update {selectedRosters.length} Roster(s)
+                        </Button>
                     </div>
                 </div>
             </Modal>
