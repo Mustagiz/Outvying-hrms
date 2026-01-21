@@ -4,27 +4,8 @@ import { Card, Button, Table, Modal, Input, Select, Alert } from '../components/
 import { Calendar as CalendarIcon, Clock, UserPlus, Trash2, ChevronLeft, ChevronRight, List, ChevronDown, User, Edit, Filter, X } from 'lucide-react';
 import { formatDate } from '../utils/helpers';
 
-const EmployeeRosterGroup = ({ employeeName, rosters, columns }) => {
+const DateRosterGroup = ({ date, rosters, columns }) => {
     const [isExpanded, setIsExpanded] = useState(true);
-    const employeeId = rosters[0]?.employeeId || 'N/A';
-
-    // Group by week range
-    const weeks = useMemo(() => {
-        const groups = {};
-        rosters.forEach(r => {
-            const date = new Date(r.date);
-            const startOfWeek = new Date(date);
-            startOfWeek.setDate(date.getDate() - date.getDay()); // Sunday
-            const endOfWeek = new Date(startOfWeek);
-            endOfWeek.setDate(startOfWeek.getDate() + 6); // Saturday
-
-            const weekKey = `Week: ${startOfWeek.getDate()} ${startOfWeek.toLocaleString('default', { month: 'short' })} - ${endOfWeek.getDate()} ${endOfWeek.toLocaleString('default', { month: 'short' })}`;
-
-            if (!groups[weekKey]) groups[weekKey] = [];
-            groups[weekKey].push(r);
-        });
-        return groups;
-    }, [rosters]);
 
     return (
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-200 dark:border-gray-700 overflow-hidden transform transition-all hover:shadow-lg">
@@ -35,20 +16,16 @@ const EmployeeRosterGroup = ({ employeeName, rosters, columns }) => {
             >
                 <div className="flex items-center gap-4">
                     <div className="w-12 h-12 rounded-xl bg-primary-100 dark:bg-primary-900/40 text-primary-600 dark:text-primary-400 flex items-center justify-center shadow-inner">
-                        <User size={24} />
+                        <CalendarIcon size={24} />
                     </div>
                     <div className="text-left">
-                        <h3 className="font-bold text-gray-900 dark:text-white text-lg leading-tight">{employeeName}</h3>
-                        <div className="flex items-center gap-2 mt-1">
-                            <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded border border-gray-200 dark:border-gray-700">
-                                ID: {employeeId}
-                            </span>
-                        </div>
+                        <h3 className="font-bold text-gray-900 dark:text-white text-lg leading-tight">{formatDate(date)}</h3>
+                        <p className="text-[10px] text-gray-500 dark:text-gray-400 font-medium uppercase tracking-widest">Daily Shift Assignments</p>
                     </div>
                 </div>
                 <div className="flex items-center gap-6">
                     <div className="hidden md:flex flex-col items-end">
-                        <span className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Total Assignments</span>
+                        <span className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Employee Count</span>
                         <span className="text-xl font-black text-primary-600 dark:text-primary-400">{rosters.length}</span>
                     </div>
                     <div className="h-8 w-px bg-gray-200 dark:bg-gray-700"></div>
@@ -57,21 +34,11 @@ const EmployeeRosterGroup = ({ employeeName, rosters, columns }) => {
             </button>
 
             {isExpanded && (
-                <div className="border-t border-gray-200 dark:border-gray-700 animate-in fade-in slide-in-from-top-2 duration-300 p-4 space-y-6">
-                    {Object.keys(weeks).map(weekKey => (
-                        <div key={weekKey} className="space-y-3">
-                            <div className="flex items-center gap-2 px-2">
-                                <Clock size={14} className="text-primary-500" />
-                                <h4 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">{weekKey}</h4>
-                                <div className="h-px flex-1 bg-gray-100 dark:bg-gray-800"></div>
-                                <span className="text-[10px] font-medium text-gray-400">{weeks[weekKey].length} shifts</span>
-                            </div>
-                            <Table
-                                columns={columns.filter(col => col.accessor !== 'employeeName')}
-                                data={weeks[weekKey]}
-                            />
-                        </div>
-                    ))}
+                <div className="border-t border-gray-200 dark:border-gray-700 animate-in fade-in slide-in-from-top-2 duration-300">
+                    <Table
+                        columns={columns.filter(col => col.accessor !== 'date')}
+                        data={rosters}
+                    />
                 </div>
             )}
         </div>
@@ -490,23 +457,15 @@ const Roster = () => {
         }] : [])
     ];
 
-    const groupedByMonth = useMemo(() => {
+    const groupedByDate = useMemo(() => {
         if (currentUser.role === 'employee') return {};
 
         const groups = {};
-        // Use sortedRosters instead of paginatedRosters.data if we want to show all months, 
-        // but since we have pagination, we'll keep it consistent with the current view.
         paginatedRosters.data.forEach(roster => {
-            const date = new Date(roster.date);
-            const monthKey = date.toLocaleString('default', { month: 'long', year: 'numeric' });
-
-            if (!groups[monthKey]) {
-                groups[monthKey] = {};
+            if (!groups[roster.date]) {
+                groups[roster.date] = [];
             }
-            if (!groups[monthKey][roster.employeeName]) {
-                groups[monthKey][roster.employeeName] = [];
-            }
-            groups[monthKey][roster.employeeName].push(roster);
+            groups[roster.date].push(roster);
         });
         return groups;
     }, [paginatedRosters.data, currentUser]);
@@ -740,30 +699,16 @@ const Roster = () => {
                         </Card>
                     ) : (
                         <div className="space-y-4">
-                            {/* Grouped by Month then Employee for better period-based organization */}
-                            {Object.keys(groupedByMonth).sort((a, b) => new Date(b) - new Date(a)).map(monthKey => (
-                                <div key={monthKey} className="space-y-4">
-                                    <div className="flex items-center gap-3 py-2 px-1">
-                                        <div className="h-px flex-1 bg-gray-200 dark:bg-gray-700"></div>
-                                        <h2 className="text-sm font-black text-gray-500 dark:text-gray-400 uppercase tracking-[0.2em] flex items-center gap-2">
-                                            <CalendarIcon size={14} />
-                                            {monthKey}
-                                        </h2>
-                                        <div className="h-px flex-1 bg-gray-200 dark:bg-gray-700"></div>
-                                    </div>
-                                    <div className="space-y-4">
-                                        {Object.keys(groupedByMonth[monthKey]).sort().map(employeeName => (
-                                            <EmployeeRosterGroup
-                                                key={`${monthKey}-${employeeName}`}
-                                                employeeName={employeeName}
-                                                rosters={groupedByMonth[monthKey][employeeName]}
-                                                columns={columns}
-                                            />
-                                        ))}
-                                    </div>
-                                </div>
+                            {/* Grouped by Date for logistical clarity */}
+                            {Object.keys(groupedByDate).sort((a, b) => new Date(b) - new Date(a)).map(date => (
+                                <DateRosterGroup
+                                    key={date}
+                                    date={date}
+                                    rosters={groupedByDate[date]}
+                                    columns={columns}
+                                />
                             ))}
-                            {Object.keys(groupedByMonth).length === 0 && (
+                            {Object.keys(groupedByDate).length === 0 && (
                                 <p className="text-center text-gray-500 py-4">No rosters assigned yet.</p>
                             )}
                         </div>
@@ -817,8 +762,8 @@ const Roster = () => {
                                                     key={page}
                                                     onClick={() => setCurrentPage(page)}
                                                     className={`w-10 h-10 rounded-lg text-sm font-medium transition-colors shadow-sm ${currentPage === page
-                                                            ? 'bg-primary-600 text-white shadow-primary-200 dark:shadow-none'
-                                                            : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'
+                                                        ? 'bg-primary-600 text-white shadow-primary-200 dark:shadow-none'
+                                                        : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'
                                                         }`}
                                                 >
                                                     {page}
