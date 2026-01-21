@@ -431,7 +431,15 @@ const Roster = () => {
             )
         }] : []),
         { header: 'Date', accessor: 'date', render: (row) => formatDate(row.date) },
-        ...(currentUser.role !== 'employee' ? [{ header: 'Employee', accessor: 'employeeName' }] : []),
+        ...(currentUser.role !== 'employee' ? [{
+            header: 'Employee',
+            accessor: 'employeeName',
+            render: (row) => (
+                <span className={`font-semibold ${filters.employees.includes(row.employeeId) ? 'text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/40 px-2 py-1 rounded-md' : ''}`}>
+                    {row.employeeName}
+                </span>
+            )
+        }] : []),
         {
             header: 'Shift', accessor: 'shiftName', render: (row) => (
                 <span className={`px-2 py-1 rounded-full text-xs font-semibold ${getShiftColor(row.shiftName)}`}>
@@ -559,7 +567,13 @@ const Roster = () => {
                                         {allUsers.filter(u => u.role === 'employee')
                                             .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
                                             .map(u => (
-                                                <label key={u.id} className="flex items-center space-x-3 p-1.5 hover:bg-gray-50 dark:hover:bg-gray-600 rounded cursor-pointer transition-colors border-b border-gray-100 dark:border-gray-600 last:border-0">
+                                                <label
+                                                    key={u.id}
+                                                    className={`flex items-center space-x-3 p-1.5 hover:bg-gray-50 dark:hover:bg-gray-600 rounded cursor-pointer transition-all border-b border-gray-100 dark:border-gray-600 last:border-0 ${filters.employees.includes(u.id)
+                                                            ? 'bg-primary-50 dark:bg-primary-900/30 border-primary-200 dark:border-primary-800'
+                                                            : ''
+                                                        }`}
+                                                >
                                                     <input
                                                         type="checkbox"
                                                         className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
@@ -573,7 +587,10 @@ const Roster = () => {
                                                             }));
                                                         }}
                                                     />
-                                                    <span className="text-sm text-gray-700 dark:text-gray-200 truncate">
+                                                    <span className={`text-sm truncate font-medium ${filters.employees.includes(u.id)
+                                                            ? 'text-primary-700 dark:text-primary-300'
+                                                            : 'text-gray-700 dark:text-gray-200'
+                                                        }`}>
                                                         {u.name} <span className="text-[10px] opacity-60">({u.employeeId})</span>
                                                     </span>
                                                 </label>
@@ -842,7 +859,7 @@ const Roster = () => {
 
                                             <div className="flex flex-col gap-1 mt-1">
                                                 {item.rosters.slice(0, 3).map((roster, idx) => (
-                                                    <div key={idx} className={`px-2 py-1 rounded text-[10px] truncate border-l-4 ${getShiftColor(roster.shiftName)} border-l-current shadow-sm`}>
+                                                    <div key={idx} className={`px-2 py-1 rounded text-[10px] truncate border-l-4 ${getShiftColor(roster.shiftName)} border-l-current shadow-sm ${filters.employees.includes(roster.employeeId) ? 'ring-2 ring-primary-400 dark:ring-primary-600 transform scale-[1.02] z-10' : ''}`}>
                                                         <span className="font-bold mr-1">
                                                             {currentUser.role !== 'employee' ? roster.employeeName?.split(' ')[0] : roster.shiftName}
                                                         </span>
