@@ -22,9 +22,11 @@ service cloud.firestore {
     
     // Check if user has admin role
     function isAdmin() {
+      let role = get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
       return isSignedIn() && 
-        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' || 
-         request.auth.token.email == 'admin@hrmspro.com');
+        (role == 'admin' || role == 'super_admin' || 
+         request.auth.token.email == 'admin@hrmspro.com' ||
+         request.auth.token.email == 'superadmin@hrmspro.com');
     }
 
     // --- COLLECTION RULES ---

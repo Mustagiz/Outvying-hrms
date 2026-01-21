@@ -71,7 +71,7 @@ const AdminManagement = () => {
     };
 
     addUser(newAdmin);
-    
+
     const auditLog = JSON.parse(localStorage.getItem('adminAuditLog') || '[]');
     auditLog.push({
       timestamp: new Date().toISOString(),
@@ -103,15 +103,15 @@ const AdminManagement = () => {
     }
   };
 
-  const admins = allUsers.filter(u => u.role === 'Admin' || u.role === 'admin');
+  const admins = allUsers.filter(u => u.role === 'Admin' || u.role === 'admin' || u.role === 'super_admin');
 
   const columns = [
     { header: 'Name', accessor: 'name' },
     { header: 'Email', accessor: 'email' },
     { header: 'Employee ID', accessor: 'employeeId' },
     { header: 'Department', accessor: 'department' },
-    { 
-      header: 'Role', 
+    {
+      header: 'Role',
       render: (row) => (
         <Badge variant={row.designation === 'Super Admin' ? 'success' : 'primary'}>
           {row.designation || 'Admin'}
@@ -121,9 +121,9 @@ const AdminManagement = () => {
     {
       header: 'Actions',
       render: (row) => (
-        <Button 
-          onClick={() => handleDeleteAdmin(row.id)} 
-          variant="danger" 
+        <Button
+          onClick={() => handleDeleteAdmin(row.id)}
+          variant="danger"
           className="text-xs py-1 px-2"
           disabled={row.id === currentUser.id}
         >
@@ -133,7 +133,7 @@ const AdminManagement = () => {
     }
   ];
 
-  if (currentUser.role !== 'Admin' && currentUser.role !== 'admin') {
+  if (currentUser.role !== 'Admin' && currentUser.role !== 'admin' && currentUser.role !== 'super_admin') {
     return <div className="text-center py-8 text-gray-600 dark:text-gray-400">Access denied. Admin only.</div>;
   }
 

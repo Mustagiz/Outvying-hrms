@@ -80,7 +80,7 @@ const Layout = ({ children }) => {
     ]
   };
 
-  const currentMenuItems = menuItems[currentUser?.role] || [];
+  const currentMenuItems = menuItems[currentUser?.role] || (currentUser?.role === 'super_admin' ? menuItems.admin : []);
 
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
@@ -118,8 +118,8 @@ const Layout = ({ children }) => {
                     to={item.path}
                     onClick={() => setSidebarOpen(false)}
                     className={`flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors ${isActive
-                        ? 'bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400'
-                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                      ? 'bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400'
+                      : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                       }`}
                   >
                     <Icon size={20} />

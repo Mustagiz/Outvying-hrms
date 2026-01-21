@@ -179,6 +179,7 @@ const UserManagement = () => {
             <option value="employee">Employee</option>
             <option value="hr">HR Manager</option>
             <option value="admin">Admin</option>
+            <option value="super_admin">Super Admin</option>
           </select>
           <input
             type="text"
