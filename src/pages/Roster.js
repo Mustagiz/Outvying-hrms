@@ -4,8 +4,8 @@ import { Card, Button, Table, Modal, Input, Select, Alert } from '../components/
 import { Calendar as CalendarIcon, Clock, UserPlus, Trash2, ChevronLeft, ChevronRight, List, ChevronDown, User, Edit, Filter, X } from 'lucide-react';
 import { formatDate } from '../utils/helpers';
 
-const EmployeeRosterGroup = ({ employeeName, rosters, columns }) => {
-    const [isExpanded, setIsExpanded] = useState(false);
+const ShiftRosterGroup = ({ shiftName, rosters, columns }) => {
+    const [isExpanded, setIsExpanded] = useState(true);
 
     return (
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
@@ -15,14 +15,17 @@ const EmployeeRosterGroup = ({ employeeName, rosters, columns }) => {
                 type="button"
             >
                 <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400 flex items-center justify-center">
-                        <User size={16} />
+                    <div className="w-10 h-10 rounded-lg bg-primary-100 dark:bg-primary-900/40 text-primary-600 dark:text-primary-400 flex items-center justify-center">
+                        <Clock size={20} />
                     </div>
-                    <h3 className="font-semibold text-gray-800 dark:text-white">{employeeName}</h3>
+                    <div className="text-left">
+                        <h3 className="font-bold text-gray-800 dark:text-white uppercase tracking-wider text-xs">{shiftName}</h3>
+                        <p className="text-[10px] text-gray-500 dark:text-gray-400 font-medium">Shift Assignment Group</p>
+                    </div>
                 </div>
                 <div className="flex items-center gap-4">
-                    <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600">
-                        {rosters.length} Shifts
+                    <span className="px-2.5 py-1 rounded-md text-xs font-bold bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300 border border-primary-100 dark:border-primary-800">
+                        {rosters.length} {rosters.length === 1 ? 'Assignment' : 'Assignments'}
                     </span>
                     {isExpanded ? <ChevronDown size={20} className="text-gray-500" /> : <ChevronRight size={20} className="text-gray-500" />}
                 </div>
@@ -454,10 +457,10 @@ const Roster = () => {
 
         const groups = {};
         paginatedRosters.data.forEach(roster => {
-            if (!groups[roster.employeeName]) {
-                groups[roster.employeeName] = [];
+            if (!groups[roster.shiftName]) {
+                groups[roster.shiftName] = [];
             }
-            groups[roster.employeeName].push(roster);
+            groups[roster.shiftName].push(roster);
         });
         return groups;
     }, [paginatedRosters.data, currentUser]);
@@ -691,12 +694,12 @@ const Roster = () => {
                         </Card>
                     ) : (
                         <div className="space-y-4">
-                            {/* If grouped, we sort keys (names) for consistency */}
-                            {Object.keys(groupedRosters).sort().map(employeeName => (
-                                <EmployeeRosterGroup
-                                    key={employeeName}
-                                    employeeName={employeeName}
-                                    rosters={groupedRosters[employeeName]}
+                            {/* If grouped, we sort keys (shifts) for consistency */}
+                            {Object.keys(groupedRosters).sort().map(shiftName => (
+                                <ShiftRosterGroup
+                                    key={shiftName}
+                                    shiftName={shiftName}
+                                    rosters={groupedRosters[shiftName]}
                                     columns={columns}
                                 />
                             ))}
