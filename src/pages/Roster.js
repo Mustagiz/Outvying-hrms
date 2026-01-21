@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Card, Button, Table, Modal, Input, Select, Alert } from '../components/UI';
-import { Calendar as CalendarIcon, Clock, UserPlus, Trash2, ChevronLeft, ChevronRight, List, ChevronDown, User, Edit } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, UserPlus, Trash2, ChevronLeft, ChevronRight, List, ChevronDown, User, Edit, Filter, X } from 'lucide-react';
 import { formatDate } from '../utils/helpers';
 
 const EmployeeRosterGroup = ({ employeeName, rosters, columns }) => {
@@ -62,6 +62,15 @@ const Roster = () => {
         gracePeriod: ''
     });
 
+    // Filter State
+    const [filters, setFilters] = useState({
+        employee: '',
+        dateFrom: '',
+        dateTo: '',
+        shiftType: ''
+    });
+    const [showFilters, setShowFilters] = useState(false);
+
     const [formData, setFormData] = useState({
         selectedEmployees: [],
         startDate: '',
@@ -84,11 +93,36 @@ const Roster = () => {
     };
 
     const filteredRosters = useMemo(() => {
+        let filtered = rosters;
+
+        // Role-based filtering
         if (currentUser.role === 'employee') {
-            return rosters.filter(r => r.employeeId === currentUser.id);
+            filtered = filtered.filter(r => r.employeeId === currentUser.id);
         }
-        return rosters;
-    }, [rosters, currentUser]);
+
+        // Apply admin filters
+        if (currentUser.role !== 'employee') {
+            // Employee filter
+            if (filters.employee) {
+                filtered = filtered.filter(r => r.employeeId === filters.employee);
+            }
+
+            // Date range filter
+            if (filters.dateFrom) {
+                filtered = filtered.filter(r => r.date >= filters.dateFrom);
+            }
+            if (filters.dateTo) {
+                filtered = filtered.filter(r => r.date <= filters.dateTo);
+            }
+
+            // Shift type filter
+            if (filters.shiftType) {
+                filtered = filtered.filter(r => r.shiftName === filters.shiftType);
+            }
+        }
+
+        return filtered;
+    }, [rosters, currentUser, filters]);
 
     const sortedRosters = useMemo(() => {
         return [...filteredRosters].sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -266,6 +300,15 @@ const Roster = () => {
         }
     };
 
+    const resetFilters = () => {
+        setFilters({
+            employee: '',
+            dateFrom: '',
+            dateTo: '',
+            shiftType: ''
+        });
+    };
+
     // Calendar Logic
     const getDaysInMonth = (date) => {
         const year = date.getFullYear();
@@ -418,6 +461,118 @@ const Roster = () => {
                     )}
                 </div>
             </div>
+
+            {/* Filter Panel - Only for Admin/HR */}
+            {(currentUser.role === 'admin' || currentUser.role === 'hr') && (
+                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                    <button
+                        onClick={() => setShowFilters(!showFilters)}
+                        className="w-full flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                        type="button"
+                    >
+                        <div className="flex items-center gap-2">
+                            <Filter size={20} className="text-primary-600 dark:text-primary-400" />
+                            <h3 className="font-semibold text-gray-800 dark:text-white">Filters</h3>
+                            {(filters.employee || filters.dateFrom || filters.dateTo || filters.shiftType) && (
+                                <span className="px-2 py-0.5 bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400 text-xs font-medium rounded-full">
+                                    Active
+                                </span>
+                            )}
+                        </div>
+                        <ChevronDown
+                            size={20}
+                            className={`text-gray-500 transition-transform ${showFilters ? 'rotate-180' : ''}`}
+                        />
+                    </button>
+
+                    {showFilters && (
+                        <div className="border-t border-gray-200 dark:border-gray-700 p-4 bg-gray-50/50 dark:bg-gray-800/50">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                {/* Employee Filter */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        Employee
+                                    </label>
+                                    <select
+                                        value={filters.employee}
+                                        onChange={(e) => setFilters({ ...filters, employee: e.target.value })}
+                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                    >
+                                        <option value="">All Employees</option>
+                                        {allUsers
+                                            .filter(u => u.role === 'employee')
+                                            .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+                                            .map(u => (
+                                                <option key={u.id} value={u.id}>
+                                                    {u.name} ({u.employeeId})
+                                                </option>
+                                            ))}
+                                    </select>
+                                </div>
+
+                                {/* Date From Filter */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        Date From
+                                    </label>
+                                    <input
+                                        type="date"
+                                        value={filters.dateFrom}
+                                        onChange={(e) => setFilters({ ...filters, dateFrom: e.target.value })}
+                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                    />
+                                </div>
+
+                                {/* Date To Filter */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        Date To
+                                    </label>
+                                    <input
+                                        type="date"
+                                        value={filters.dateTo}
+                                        onChange={(e) => setFilters({ ...filters, dateTo: e.target.value })}
+                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                    />
+                                </div>
+
+                                {/* Shift Type Filter */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        Shift Type
+                                    </label>
+                                    <select
+                                        value={filters.shiftType}
+                                        onChange={(e) => setFilters({ ...filters, shiftType: e.target.value })}
+                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                    >
+                                        <option value="">All Shifts</option>
+                                        {shifts.map(s => (
+                                            <option key={s.name} value={s.name}>
+                                                {s.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+
+                            {/* Filter Actions */}
+                            <div className="flex items-center justify-end gap-2 mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                                <button
+                                    onClick={resetFilters}
+                                    className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors flex items-center gap-2"
+                                >
+                                    <X size={16} />
+                                    Reset Filters
+                                </button>
+                                <div className="text-sm text-gray-600 dark:text-gray-400">
+                                    Showing {sortedRosters.length} roster{sortedRosters.length !== 1 ? 's' : ''}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
 
             {alert && <Alert type={alert.type} message={alert.message} onClose={() => setAlert(null)} />}
 
