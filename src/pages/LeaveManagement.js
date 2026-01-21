@@ -5,6 +5,25 @@ import { Card, Button, Table, Modal, Input, Select, Alert, Badge, Pagination } f
 import { formatDate, getStatusColor } from '../utils/helpers';
 import { User, CheckCircle, XCircle, Search } from 'lucide-react';
 
+// Helper: Calculate business days (excluding Sat/Sun)
+const calculateBusinessDays = (startDate, endDate) => {
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+
+  if (isNaN(start.getTime()) || isNaN(end.getTime()) || start > end) {
+    return 0;
+  }
+
+  let count = 0;
+  const curDate = new Date(start);
+  while (curDate <= end) {
+    const dayOfWeek = curDate.getDay();
+    if (dayOfWeek !== 0 && dayOfWeek !== 6) count++; // Exclude Sun(0) and Sat(6)
+    curDate.setDate(curDate.getDate() + 1);
+  }
+  return count;
+};
+
 const LeaveManagement = () => {
   const { currentUser, leaves, leaveBalances, applyLeave, updateLeaveStatus, allLeaveTypes, attendance, allocateLeave, allUsers } = useAuth();
   const [showModal, setShowModal] = useState(false);
@@ -156,10 +175,8 @@ const LeaveManagement = () => {
 
       if (name === 'startDate' || name === 'endDate') {
         if (updated.startDate && updated.endDate) {
-          const start = new Date(updated.startDate);
-          const end = new Date(updated.endDate);
-          const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
-          updated.days = days > 0 ? days : 1;
+          // Use the new business day calculator
+          updated.days = calculateBusinessDays(updated.startDate, updated.endDate);
         }
       }
 
@@ -371,59 +388,7 @@ const LeaveManagement = () => {
       )}
 
       {/* Leave Balance Cards (Always Visible) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {myLeaveBalance && (
-          <>
-            <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
-              <div className="text-blue-800">
-                <p className="text-sm font-medium opacity-80">Paid Leave (PL)</p>
-                <div className="flex justify-between items-end mt-2">
-                  <h3 className="text-2xl font-bold">{myLeaveBalance.paidLeave.available}</h3>
-                  <span className="text-xs bg-blue-200 px-2 py-1 rounded">
-                    Used: {myLeaveBalance.paidLeave.used}
-                  </span>
-                </div>
-                <p className="text-xs mt-1 opacity-70">Accrues 1.0 per 15 days</p>
-              </div>
-            </Card>
-            <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
-              <div className="text-green-800">
-                <p className="text-sm font-medium opacity-80">Casual Leave (CL)</p>
-                <div className="flex justify-between items-end mt-2">
-                  <h3 className="text-2xl font-bold">{myLeaveBalance.casualLeave.available}</h3>
-                  <span className="text-xs bg-green-200 px-2 py-1 rounded">
-                    Used: {myLeaveBalance.casualLeave.used}
-                  </span>
-                </div>
-                <p className="text-xs mt-1 opacity-70">Accrues 0.5 per 15 days</p>
-              </div>
-            </Card>
-            <Card className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200">
-              <div className="text-orange-800">
-                <p className="text-sm font-medium opacity-80">Leave Without Pay (LWP)</p>
-                <div className="flex justify-between items-end mt-2">
-                  <h3 className="text-2xl font-bold">{myLeaveBalance.lwp.used}</h3>
-                  <span className="text-xs bg-orange-200 px-2 py-1 rounded">
-                    Total Taken
-                  </span>
-                </div>
-                <p className="text-xs mt-1 opacity-70">Auto-marked if absent</p>
-              </div>
-            </Card>
-            <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
-              <div className="text-purple-800">
-                <p className="text-sm font-medium opacity-80">Unplanned Leave (UPL)</p>
-                <div className="flex justify-between items-end mt-2">
-                  <h3 className="text-2xl font-bold">{myLeaveBalance.upl.used}</h3>
-                  <span className="text-xs bg-purple-200 px-2 py-1 rounded">
-                    Total Taken
-                  </span>
-                </div>
-              </div>
-            </Card>
-          </>
-        )}
-      </div>
+      <LeaveBalanceSection balance={myLeaveBalance} />
 
       {activeTab === 'manageBalances' ? (
         <Card title="Manage Employee Leave Balances">
@@ -596,6 +561,63 @@ const LeaveManagement = () => {
           </div>
         </form>
       </Modal>
+    </div>
+  );
+};
+
+// Sub-component for cleaner main render
+const LeaveBalanceSection = ({ balance }) => {
+  if (!balance) return null;
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+        <div className="text-blue-800">
+          <p className="text-sm font-medium opacity-80">Paid Leave (PL)</p>
+          <div className="flex justify-between items-end mt-2">
+            <h3 className="text-2xl font-bold">{balance.paidLeave.available}</h3>
+            <span className="text-xs bg-blue-200 px-2 py-1 rounded">
+              Used: {balance.paidLeave.used}
+            </span>
+          </div>
+          <p className="text-xs mt-1 opacity-70">Accrues 1.0 per 15 days</p>
+        </div>
+      </Card>
+      <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
+        <div className="text-green-800">
+          <p className="text-sm font-medium opacity-80">Casual Leave (CL)</p>
+          <div className="flex justify-between items-end mt-2">
+            <h3 className="text-2xl font-bold">{balance.casualLeave.available}</h3>
+            <span className="text-xs bg-green-200 px-2 py-1 rounded">
+              Used: {balance.casualLeave.used}
+            </span>
+          </div>
+          <p className="text-xs mt-1 opacity-70">Accrues 0.5 per 15 days</p>
+        </div>
+      </Card>
+      <Card className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200">
+        <div className="text-orange-800">
+          <p className="text-sm font-medium opacity-80">Leave Without Pay (LWP)</p>
+          <div className="flex justify-between items-end mt-2">
+            <h3 className="text-2xl font-bold">{balance.lwp.used}</h3>
+            <span className="text-xs bg-orange-200 px-2 py-1 rounded">
+              Total Taken
+            </span>
+          </div>
+          <p className="text-xs mt-1 opacity-70">Auto-marked if absent</p>
+        </div>
+      </Card>
+      <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
+        <div className="text-purple-800">
+          <p className="text-sm font-medium opacity-80">Unplanned Leave (UPL)</p>
+          <div className="flex justify-between items-end mt-2">
+            <h3 className="text-2xl font-bold">{balance.upl.used}</h3>
+            <span className="text-xs bg-purple-200 px-2 py-1 rounded">
+              Total Taken
+            </span>
+          </div>
+        </div>
+      </Card>
     </div>
   );
 };

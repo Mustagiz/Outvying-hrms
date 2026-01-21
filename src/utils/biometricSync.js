@@ -47,6 +47,12 @@ export const calculateAttendanceStatus = (clockIn, clockOut, date = null, roster
       workingDays = 0;
     }
 
+    // STRICT RULE: If work hours < 5, mark as LWP
+    if (workHours < 5) {
+      status = 'LWP';
+      workingDays = 0;
+    }
+
     if (status === 'Present' && clockInInMinutes > (shiftStartInMinutes + gracePeriod)) {
       status = 'Late';
     }

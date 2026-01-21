@@ -47,7 +47,8 @@ export const getStatusColor = (status) => {
     'Late': 'text-yellow-600 bg-yellow-100',
     'Approved': 'text-green-600 bg-green-100',
     'Pending': 'text-yellow-600 bg-yellow-100',
-    'Rejected': 'text-red-600 bg-red-100'
+    'Rejected': 'text-red-600 bg-red-100',
+    'LWP': 'text-orange-600 bg-orange-100'
   };
   return colors[status] || 'text-gray-600 bg-gray-100';
 };

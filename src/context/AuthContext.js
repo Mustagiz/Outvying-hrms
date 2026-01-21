@@ -447,19 +447,11 @@ export const AuthProvider = ({ children }) => {
       const todayRoster = rosters.find(r => String(r.employeeId) === String(employeeId) && r.date === today);
       const result = calculateAttendanceStatus(record.clockIn, clockOutTime, today, todayRoster);
 
-      // Auto-mark as LWP if worked less than 5 hours
-      let finalStatus = result.status;
-      let finalWorkingDays = result.workingDays;
-      if (result.workHours < 5) {
-        finalStatus = 'LWP';
-        finalWorkingDays = 0;
-      }
-
       const updates = {
         clockOut: clockOutTime,
         workHours: parseFloat(result.workHours || 0),
-        status: finalStatus,
-        workingDays: finalWorkingDays,
+        status: result.status,
+        workingDays: result.workingDays,
         ruleApplied: result.ruleApplied || null,
         overtime: result.workHours > 9 ? parseFloat((result.workHours - 9).toFixed(2)) : 0
       };
