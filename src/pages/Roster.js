@@ -783,19 +783,49 @@ const Roster = () => {
                                 >
                                     <ChevronLeft size={20} />
                                 </button>
-                                <div className="flex items-center gap-1">
-                                    {[...Array(paginatedRosters.totalPages)].map((_, i) => (
-                                        <button
-                                            key={i + 1}
-                                            onClick={() => setCurrentPage(i + 1)}
-                                            className={`w-10 h-10 rounded-lg text-sm font-medium transition-colors ${currentPage === i + 1
-                                                ? 'bg-primary-600 text-white'
-                                                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700'
-                                                }`}
-                                        >
-                                            {i + 1}
-                                        </button>
-                                    ))}
+                                <div className="flex items-center gap-1 flex-wrap justify-center">
+                                    {(() => {
+                                        const total = paginatedRosters.totalPages;
+                                        const current = currentPage;
+                                        const pages = [];
+
+                                        if (total <= 5) {
+                                            for (let i = 1; i <= total; i++) pages.push(i);
+                                        } else {
+                                            pages.push(1);
+                                            if (current > 3) pages.push('...');
+
+                                            let start = Math.max(2, current - 1);
+                                            let end = Math.min(total - 1, current + 1);
+
+                                            if (current <= 3) end = 4;
+                                            if (current >= total - 2) start = total - 3;
+
+                                            for (let i = Math.max(2, start); i <= Math.min(total - 1, end); i++) {
+                                                if (!pages.includes(i)) pages.push(i);
+                                            }
+
+                                            if (current < total - 2) pages.push('...');
+                                            if (total > 1 && !pages.includes(total)) pages.push(total);
+                                        }
+
+                                        return pages.map((page, i) => (
+                                            page === '...' ? (
+                                                <span key={`dots-${i}`} className="px-2 text-gray-400 font-bold">...</span>
+                                            ) : (
+                                                <button
+                                                    key={page}
+                                                    onClick={() => setCurrentPage(page)}
+                                                    className={`w-10 h-10 rounded-lg text-sm font-medium transition-colors shadow-sm ${currentPage === page
+                                                            ? 'bg-primary-600 text-white shadow-primary-200 dark:shadow-none'
+                                                            : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'
+                                                        }`}
+                                                >
+                                                    {page}
+                                                </button>
+                                            )
+                                        ));
+                                    })()}
                                 </div>
                                 <button
                                     onClick={() => setCurrentPage(prev => Math.min(prev + 1, paginatedRosters.totalPages))}
