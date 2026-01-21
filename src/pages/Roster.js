@@ -59,6 +59,7 @@ const Roster = () => {
 
     // Edit State
     const [editingRosterId, setEditingRosterId] = useState(null);
+    const [isCustomTz, setIsCustomTz] = useState(false);
 
     // Bulk Selection State
     const [selectedRosters, setSelectedRosters] = useState([]);
@@ -75,7 +76,8 @@ const Roster = () => {
         employees: [],
         dateFrom: '',
         dateTo: '',
-        shiftType: ''
+        shiftType: '',
+        timezone: ''
     });
     const [showFilters, setShowFilters] = useState(false);
 
@@ -131,6 +133,11 @@ const Roster = () => {
             // Shift type filter
             if (filters.shiftType) {
                 filtered = filtered.filter(r => r.shiftName === filters.shiftType);
+            }
+
+            // Timezone filter
+            if (filters.timezone) {
+                filtered = filtered.filter(r => r.timezone === filters.timezone);
             }
         }
 
@@ -193,14 +200,17 @@ const Roster = () => {
 
     const handleEdit = (roster) => {
         setEditingRosterId(roster.id);
+        const inPreset = TIMEZONES.some(tz => tz.value === roster.timezone);
+        setIsCustomTz(!inPreset && roster.timezone !== 'Asia/Kolkata' && !!roster.timezone);
         setFormData({
-            selectedEmployees: [roster.employeeId], // Kept for consistency, though hidden
+            selectedEmployees: [roster.employeeId],
             startDate: roster.date,
             endDate: roster.date,
             shiftName: roster.shiftName,
             startTime: roster.startTime,
             endTime: roster.endTime,
-            gracePeriod: roster.gracePeriod
+            gracePeriod: roster.gracePeriod,
+            timezone: roster.timezone || 'Asia/Kolkata'
         });
         setShowModal(true);
     };
@@ -208,6 +218,7 @@ const Roster = () => {
     const handleCloseModal = () => {
         setShowModal(false);
         setEditingRosterId(null);
+        setIsCustomTz(false);
         setFormData({
             selectedEmployees: [],
             startDate: '',
@@ -215,9 +226,10 @@ const Roster = () => {
             shiftName: 'Morning Shift',
             startTime: '09:00',
             endTime: '18:00',
-            gracePeriod: 15
+            gracePeriod: 15,
+            timezone: 'Asia/Kolkata'
         });
-    }
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -365,7 +377,8 @@ const Roster = () => {
             employees: [],
             dateFrom: '',
             dateTo: '',
-            shiftType: ''
+            shiftType: '',
+            timezone: ''
         });
     };
 
@@ -673,6 +686,25 @@ const Roster = () => {
                                         {shifts.map(s => (
                                             <option key={s.name} value={s.name}>
                                                 {s.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                {/* Timezone Filter */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        Region / Timezone
+                                    </label>
+                                    <select
+                                        value={filters.timezone}
+                                        onChange={(e) => setFilters({ ...filters, timezone: e.target.value })}
+                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                    >
+                                        <option value="">All Regions</option>
+                                        {TIMEZONES.map(tz => (
+                                            <option key={tz.value} value={tz.value}>
+                                                {tz.label}
                                             </option>
                                         ))}
                                     </select>
@@ -998,12 +1030,34 @@ const Roster = () => {
                         options={shifts.map(s => ({ value: s.name, label: s.name }))}
                     />
 
-                    <Select
-                        label="Region / Timezone"
-                        value={formData.timezone}
-                        onChange={(e) => setFormData({ ...formData, timezone: e.target.value })}
-                        options={TIMEZONES.map(tz => ({ value: tz.value, label: tz.label }))}
-                    />
+                    <div className="flex flex-col gap-2 mb-4">
+                        <Select
+                            label="Region / Timezone"
+                            value={isCustomTz ? "custom" : formData.timezone}
+                            onChange={(e) => {
+                                if (e.target.value === "custom") {
+                                    setIsCustomTz(true);
+                                    setFormData({ ...formData, timezone: "" });
+                                } else {
+                                    setIsCustomTz(false);
+                                    setFormData({ ...formData, timezone: e.target.value });
+                                }
+                            }}
+                            options={[
+                                ...TIMEZONES.map(tz => ({ value: tz.value, label: tz.label })),
+                                { value: "custom", label: "Other / Custom..." }
+                            ]}
+                        />
+                        {isCustomTz && (
+                            <Input
+                                placeholder="Enter timezone e.g. Australia/Sydney"
+                                value={formData.timezone}
+                                onChange={(e) => setFormData({ ...formData, timezone: e.target.value })}
+                                className="mt-[-1rem]"
+                                autoFocus
+                            />
+                        )}
+                    </div>
 
                     <div className="grid grid-cols-2 gap-4">
                         <Input

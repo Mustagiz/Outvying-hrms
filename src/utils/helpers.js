@@ -124,7 +124,10 @@ export const TIMEZONES = [
   { label: 'MST (US Mountain)', value: 'America/Denver', offset: '-7:00' },
   { label: 'PST (US Pacific)', value: 'America/Los_Angeles', offset: '-8:00' },
   { label: 'UK (London)', value: 'Europe/London', offset: '+0:00' },
-  { label: 'APAC (Singapore)', value: 'Asia/Singapore', offset: '+8:00' },
+  { label: 'Dubai (GST)', value: 'Asia/Dubai', offset: '+4:00' },
+  { label: 'Singapore (APAC)', value: 'Asia/Singapore', offset: '+8:00' },
+  { label: 'Japan (JST)', value: 'Asia/Tokyo', offset: '+9:00' },
+  { label: 'Australia (AEST)', value: 'Australia/Sydney', offset: '+10:00' },
 ];
 
 /**
@@ -134,44 +137,49 @@ export const TIMEZONES = [
 export const convertTimeInRange = (timeStr, dateStr, fromTz, toTz = 'Asia/Kolkata') => {
   if (!timeStr || !dateStr) return null;
 
-  // Combine date and time to create a full Date object context
-  const [hours, minutes] = timeStr.split(':').map(Number);
-  const dateObj = new Date(dateStr);
-  dateObj.setHours(hours, minutes, 0, 0);
+  try {
+    // Combine date and time to create a full Date object context
+    const [hours, minutes] = timeStr.split(':').map(Number);
+    const dateObj = new Date(dateStr);
+    dateObj.setHours(hours, minutes, 0, 0);
 
-  // Use Intl to format the date in the source timezone to get the offset and correct time
-  const formatter = new Intl.DateTimeFormat('en-US', {
-    timeZone: fromTz,
-    year: 'numeric',
-    month: 'numeric',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: 'numeric',
-    second: 'numeric',
-    hour12: false
-  });
+    // Use Intl to format the date in the source timezone to get the offset and correct time
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: fromTz,
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: 'numeric',
+      second: 'numeric',
+      hour12: false
+    });
 
-  // Calculate the difference between the intended time in source timezone and the system's local time
-  const parts = formatter.formatToParts(dateObj);
-  const tzYear = parseInt(parts.find(p => p.type === 'year').value);
-  const tzMonth = parseInt(parts.find(p => p.type === 'month').value) - 1;
-  const tzDay = parseInt(parts.find(p => p.type === 'day').value);
-  const tzHour = parseInt(parts.find(p => p.type === 'hour').value);
-  const tzMin = parseInt(parts.find(p => p.type === 'minute').value);
+    // Calculate the difference between the intended time in source timezone and the system's local time
+    const parts = formatter.formatToParts(dateObj);
+    const tzYear = parseInt(parts.find(p => p.type === 'year').value);
+    const tzMonth = parseInt(parts.find(p => p.type === 'month').value) - 1;
+    const tzDay = parseInt(parts.find(p => p.type === 'day').value);
+    const tzHour = parseInt(parts.find(p => p.type === 'hour').value);
+    const tzMin = parseInt(parts.find(p => p.type === 'minute').value);
 
-  const tzDate = new Date(Date.UTC(tzYear, tzMonth, tzDay, tzHour, tzMin));
-  const localDate = new Date(Date.UTC(dateObj.getUTCFullYear(), dateObj.getUTCMonth(), dateObj.getUTCDate(), dateObj.getUTCHours(), dateObj.getUTCMinutes()));
+    const tzDate = new Date(Date.UTC(tzYear, tzMonth, tzDay, tzHour, tzMin));
+    const localDate = new Date(Date.UTC(dateObj.getUTCFullYear(), dateObj.getUTCMonth(), dateObj.getUTCDate(), dateObj.getUTCHours(), dateObj.getUTCMinutes()));
 
-  const diffMs = localDate.getTime() - tzDate.getTime();
-  const convertedDate = new Date(dateObj.getTime() + diffMs);
+    const diffMs = localDate.getTime() - tzDate.getTime();
+    const convertedDate = new Date(dateObj.getTime() + diffMs);
 
-  // Now format that converted date into the target timezone
-  return new Intl.DateTimeFormat('en-US', {
-    timeZone: toTz,
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false
-  }).format(convertedDate);
+    // Now format that converted date into the target timezone
+    return new Intl.DateTimeFormat('en-US', {
+      timeZone: toTz,
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    }).format(convertedDate);
+  } catch (error) {
+    console.error("Timezone conversion error:", error);
+    return timeStr; // Fallback to original time if invalid timezone
+  }
 };
 
 export const getISTEquivalent = (timeStr, dateStr, sourceTz) => {
