@@ -4,36 +4,46 @@ import { Card, Button, Table, Modal, Input, Select, Alert } from '../components/
 import { Calendar as CalendarIcon, Clock, UserPlus, Trash2, ChevronLeft, ChevronRight, List, ChevronDown, User, Edit, Filter, X } from 'lucide-react';
 import { formatDate } from '../utils/helpers';
 
-const ShiftRosterGroup = ({ shiftName, rosters, columns }) => {
+const EmployeeRosterGroup = ({ employeeName, rosters, columns }) => {
     const [isExpanded, setIsExpanded] = useState(true);
+    const employeeId = rosters[0]?.employeeId || 'N/A';
 
     return (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-200 dark:border-gray-700 overflow-hidden transform transition-all hover:shadow-lg">
             <button
                 onClick={() => setIsExpanded(!isExpanded)}
-                className="w-full flex items-center justify-between p-4 bg-gray-50/50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                className="w-full flex items-center justify-between p-5 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800/50 dark:to-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors"
                 type="button"
             >
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-primary-100 dark:bg-primary-900/40 text-primary-600 dark:text-primary-400 flex items-center justify-center">
-                        <Clock size={20} />
+                <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-primary-100 dark:bg-primary-900/40 text-primary-600 dark:text-primary-400 flex items-center justify-center shadow-inner">
+                        <User size={24} />
                     </div>
                     <div className="text-left">
-                        <h3 className="font-bold text-gray-800 dark:text-white uppercase tracking-wider text-xs">{shiftName}</h3>
-                        <p className="text-[10px] text-gray-500 dark:text-gray-400 font-medium">Shift Assignment Group</p>
+                        <h3 className="font-bold text-gray-900 dark:text-white text-lg leading-tight">{employeeName}</h3>
+                        <div className="flex items-center gap-2 mt-1">
+                            <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded border border-gray-200 dark:border-gray-700">
+                                ID: {employeeId}
+                            </span>
+                        </div>
                     </div>
                 </div>
-                <div className="flex items-center gap-4">
-                    <span className="px-2.5 py-1 rounded-md text-xs font-bold bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300 border border-primary-100 dark:border-primary-800">
-                        {rosters.length} {rosters.length === 1 ? 'Assignment' : 'Assignments'}
-                    </span>
-                    {isExpanded ? <ChevronDown size={20} className="text-gray-500" /> : <ChevronRight size={20} className="text-gray-500" />}
+                <div className="flex items-center gap-6">
+                    <div className="hidden md:flex flex-col items-end">
+                        <span className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Total Assignments</span>
+                        <span className="text-xl font-black text-primary-600 dark:text-primary-400">{rosters.length}</span>
+                    </div>
+                    <div className="h-8 w-px bg-gray-200 dark:bg-gray-700"></div>
+                    {isExpanded ? <ChevronDown size={24} className="text-gray-400" /> : <ChevronRight size={24} className="text-gray-400" />}
                 </div>
             </button>
 
             {isExpanded && (
-                <div className="border-t border-gray-100 dark:border-gray-700">
-                    <Table columns={columns} data={rosters} />
+                <div className="border-t border-gray-200 dark:border-gray-700 animate-in fade-in slide-in-from-top-2 duration-300">
+                    <Table
+                        columns={columns.filter(col => col.accessor !== 'employeeName')}
+                        data={rosters}
+                    />
                 </div>
             )}
         </div>
@@ -457,10 +467,10 @@ const Roster = () => {
 
         const groups = {};
         paginatedRosters.data.forEach(roster => {
-            if (!groups[roster.shiftName]) {
-                groups[roster.shiftName] = [];
+            if (!groups[roster.employeeName]) {
+                groups[roster.employeeName] = [];
             }
-            groups[roster.shiftName].push(roster);
+            groups[roster.employeeName].push(roster);
         });
         return groups;
     }, [paginatedRosters.data, currentUser]);
@@ -694,12 +704,12 @@ const Roster = () => {
                         </Card>
                     ) : (
                         <div className="space-y-4">
-                            {/* If grouped, we sort keys (shifts) for consistency */}
-                            {Object.keys(groupedRosters).sort().map(shiftName => (
-                                <ShiftRosterGroup
-                                    key={shiftName}
-                                    shiftName={shiftName}
-                                    rosters={groupedRosters[shiftName]}
+                            {/* Grouped by Employee for better organization */}
+                            {Object.keys(groupedRosters).sort().map(employeeName => (
+                                <EmployeeRosterGroup
+                                    key={employeeName}
+                                    employeeName={employeeName}
+                                    rosters={groupedRosters[employeeName]}
                                     columns={columns}
                                 />
                             ))}
