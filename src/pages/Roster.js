@@ -110,12 +110,17 @@ const Roster = () => {
     const filteredRosters = useMemo(() => {
         let filtered = rosters;
 
-        // Role-based filtering
+        // 1. Initial Sanity Check: Remove orphaned records (Ghost employees)
+        // Ensure the employee still exists in our current users list
+        const activeUserIds = new Set(allUsers.map(u => String(u.id)));
+        filtered = filtered.filter(r => activeUserIds.has(String(r.employeeId)));
+
+        // 2. Role-based filtering
         if (currentUser.role === 'employee') {
-            filtered = filtered.filter(r => r.employeeId === currentUser.id);
+            filtered = filtered.filter(r => String(r.employeeId) === String(currentUser.id));
         }
 
-        // Apply admin filters
+        // 3. Apply admin filters
         if (currentUser.role !== 'employee') {
             // Employee filter (Multi-select)
             if (filters.employees.length > 0) {
@@ -142,7 +147,7 @@ const Roster = () => {
         }
 
         return filtered;
-    }, [rosters, currentUser, filters]);
+    }, [rosters, allUsers, currentUser, filters]);
 
     const sortedRosters = useMemo(() => {
         return [...filteredRosters].sort((a, b) => new Date(b.date) - new Date(a.date));

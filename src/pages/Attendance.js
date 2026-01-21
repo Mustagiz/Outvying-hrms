@@ -43,7 +43,12 @@ const Attendance = () => {
   };
 
   const filteredAttendance = useMemo(() => {
-    let filtered = attendance.filter(a => {
+    // 1. Sanity Check: Remove orphaned records
+    const activeUserIds = new Set(allUsers.map(u => String(u.id)));
+    let filtered = attendance.filter(a => activeUserIds.has(String(a.employeeId)));
+
+    // 2. Apply filters
+    filtered = filtered.filter(a => {
       const date = new Date(a.date);
       const matchesMonth = date.getMonth() === selectedMonth;
       const matchesYear = date.getFullYear() === selectedYear;
@@ -56,7 +61,7 @@ const Attendance = () => {
     });
 
     return filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
-  }, [attendance, selectedMonth, selectedYear, selectedEmployee, selectedStatus, currentUser]);
+  }, [attendance, allUsers, selectedMonth, selectedYear, selectedEmployee, selectedStatus, currentUser]);
 
   const attendanceStats = useMemo(() => {
     const present = filteredAttendance.filter(a => (a.status === 'Present' || a.status === 'Late') && parseFloat(a.workHours || 0) >= 8).length;
