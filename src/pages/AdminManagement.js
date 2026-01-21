@@ -4,10 +4,11 @@ import { Card, Button, Modal, Table, Badge } from '../components/UI';
 import { Plus, Shield, Eye, EyeOff, Trash2, UserX, Key } from 'lucide-react';
 
 const AdminManagement = () => {
-  const { currentUser, allUsers, addUser, deleteUser, resetPassword } = useAuth();
+  const { currentUser, allUsers, addUser, deleteUser, resetPassword, forceUpdatePassword } = useAuth();
   const [showModal, setShowModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [selectedAdmin, setSelectedAdmin] = useState(null);
+  const [passwordData, setPasswordData] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -282,25 +283,61 @@ const AdminManagement = () => {
         </div>
       </Modal>
 
-      <Modal isOpen={showPasswordModal} onClose={() => setShowPasswordModal(false)} title="Reset Admin Password">
+      <Modal isOpen={showPasswordModal} onClose={() => {
+        setShowPasswordModal(false);
+        setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      }} title="Change Admin Password">
         <div className="space-y-4">
           <p className="text-gray-600 dark:text-gray-400">
-            Send password reset email to <strong>{selectedAdmin?.name}</strong>?
+            Change password for <strong>{selectedAdmin?.name}</strong>
           </p>
-          <p className="text-sm text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20 p-2 rounded">
-            This will send an official Firebase password reset link to <strong>{selectedAdmin?.email}</strong>.
+          <p className="text-sm text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 p-2 rounded">
+            Enter the admin's current password and a new password to update it immediately.
           </p>
+          <input
+            type="password"
+            placeholder="Current Password"
+            value={passwordData.currentPassword}
+            onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
+            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+          />
+          <input
+            type="password"
+            placeholder="New Password (min 6 characters)"
+            value={passwordData.newPassword}
+            onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+          />
+          <input
+            type="password"
+            placeholder="Confirm New Password"
+            value={passwordData.confirmPassword}
+            onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+          />
           <div className="flex justify-end gap-2 pt-4 border-t">
-            <Button onClick={() => setShowPasswordModal(false)} variant="secondary">Cancel</Button>
+            <Button onClick={() => {
+              setShowPasswordModal(false);
+              setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+            }} variant="secondary">Cancel</Button>
             <Button onClick={async () => {
-              const result = await resetPassword(selectedAdmin.email);
+              if (passwordData.newPassword !== passwordData.confirmPassword) {
+                alert('New passwords do not match');
+                return;
+              }
+              if (passwordData.newPassword.length < 6) {
+                alert('Password must be at least 6 characters');
+                return;
+              }
+              const result = await forceUpdatePassword(selectedAdmin.email, passwordData.currentPassword, passwordData.newPassword);
               alert(result.message);
               if (result.success) {
                 setShowPasswordModal(false);
                 setSelectedAdmin(null);
+                setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
               }
             }} variant="primary">
-              <Key size={16} className="inline mr-2" />Send Reset Link
+              <Key size={16} className="inline mr-2" />Change Password
             </Button>
           </div>
         </div>
