@@ -24,10 +24,10 @@ export const formatDate = (dateString) => {
 
 export const calculateWorkHours = (clockIn, clockOut) => {
   if (!clockIn || !clockOut) return 0;
-  const [inHour, inMin] = clockIn.split(':').map(Number);
-  const [outHour, outMin] = clockOut.split(':').map(Number);
-  const hours = outHour - inHour + (outMin - inMin) / 60;
-  return hours.toFixed(2);
+  // DEPRECATED WRAPPER: Redirecting to the robust absolute duration calculator
+  // Assuming same-day if no date context, but this function should be phased out.
+  const today = new Date().toISOString().split('T')[0];
+  return calculateAbsDuration(clockIn, today, clockOut, today);
 };
 
 export const getMonthName = (monthIndex) => {

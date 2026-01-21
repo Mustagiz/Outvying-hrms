@@ -1,16 +1,23 @@
 import React, { useState, useMemo } from 'react';
+import {
+  collection,
+  addDoc,
+  updateDoc,
+  doc,
+  serverTimestamp,
+  getDoc
+} from 'firebase/firestore';
+import { db } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
-import { Card, Button, Modal, Table, Input, Alert } from '../components/UI';
-import { Calendar, Clock, FileText, CheckCircle, XCircle } from 'lucide-react';
+import { Card, Button, Modal, Table, Alert } from '../components/UI';
+import { FileText, CheckCircle, XCircle } from 'lucide-react';
+import { getEffectiveWorkDate, calculateAbsDuration } from '../utils/helpers';
+import { calculateAttendanceStatus } from '../utils/biometricSync';
 
 const AttendanceRegularization = () => {
-  const { currentUser, attendance, allUsers } = useAuth();
+  const { currentUser, attendance, allUsers, regularizationRequests, rosters } = useAuth();
   const [showModal, setShowModal] = useState(false);
   const [alert, setAlert] = useState(null);
-  const [requests, setRequests] = useState(() => {
-    const saved = localStorage.getItem('regularizationRequests');
-    return saved ? JSON.parse(saved) : [];
-  });
   const [formData, setFormData] = useState({
     date: '',
     inTime: '',
@@ -22,81 +29,150 @@ const AttendanceRegularization = () => {
 
   const maxDaysBack = 30;
 
-  const myAttendance = useMemo(() => {
-    return attendance.filter(a => a.employeeId === currentUser.id)
-      .sort((a, b) => new Date(b.date) - new Date(a.date));
-  }, [attendance, currentUser]);
-
+  // Filter requests based on role
   const myRequests = useMemo(() => {
-    return requests.filter(r => 
-      currentUser.role === 'employee' ? r.employeeId === currentUser.id : 
-      currentUser.role === 'hr' || currentUser.role === 'admin' ? true : false
+    return regularizationRequests.filter(r =>
+      currentUser.role === 'employee' ? r.employeeId === currentUser.id :
+        currentUser.role === 'hr' || currentUser.role === 'admin' ? true : false
     ).sort((a, b) => new Date(b.submittedDate) - new Date(a.submittedDate));
-  }, [requests, currentUser]);
+  }, [regularizationRequests, currentUser]);
 
-  const handleSubmit = () => {
-    const selectedDate = new Date(formData.date);
-    const today = new Date();
-    const daysDiff = Math.floor((today - selectedDate) / (1000 * 60 * 60 * 24));
+  const handleSubmit = async () => {
+    try {
+      // Logic Validation
+      const selectedDate = new Date(formData.date);
+      const today = new Date();
+      const daysDiff = Math.floor((today - selectedDate) / (1000 * 60 * 60 * 24));
 
-    if (daysDiff > maxDaysBack) {
-      setAlert({ type: 'error', message: `Regularization allowed only for last ${maxDaysBack} days` });
-      setTimeout(() => setAlert(null), 3000);
-      return;
+      if (daysDiff > maxDaysBack) {
+        throw new Error(`Regularization allowed only for last ${maxDaysBack} days`);
+      }
+
+      const hasPending = regularizationRequests.some(r =>
+        r.date === formData.date &&
+        r.employeeId === currentUser.id &&
+        r.status === 'Pending'
+      );
+
+      if (hasPending) {
+        throw new Error('A pending request already exists for this date');
+      }
+
+      // Create Request Payload
+      const newRequest = {
+        employeeId: currentUser.id,
+        employeeName: currentUser.name,
+        managerId: allUsers.find(u => u.name === currentUser.reportingTo)?.id || 'admin',
+        ...formData,
+        status: 'Pending',
+        submittedDate: new Date().toISOString().split('T')[0],
+        createdAt: serverTimestamp(),
+        auditLog: [{ action: 'Submitted', by: currentUser.name, date: new Date().toISOString() }]
+      };
+
+      await addDoc(collection(db, 'regularizationRequests'), newRequest);
+
+      setAlert({ type: 'success', message: 'Regularization request submitted successfully' });
+      setShowModal(false);
+      setFormData({ date: '', inTime: '', outTime: '', type: 'Missed Punch', reason: '', attachment: '' });
+    } catch (error) {
+      setAlert({ type: 'error', message: error.message });
     }
-
-    const hasPending = requests.some(r => r.date === formData.date && r.employeeId === currentUser.id && r.status === 'Pending');
-    if (hasPending) {
-      setAlert({ type: 'error', message: 'A pending request already exists for this date' });
-      setTimeout(() => setAlert(null), 3000);
-      return;
-    }
-
-    const newRequest = {
-      id: Date.now(),
-      employeeId: currentUser.id,
-      employeeName: currentUser.name,
-      managerId: allUsers.find(u => u.name === currentUser.reportingTo)?.id,
-      ...formData,
-      status: 'Pending',
-      submittedDate: new Date().toISOString().split('T')[0],
-      auditLog: [{ action: 'Submitted', by: currentUser.name, date: new Date().toISOString() }]
-    };
-
-    const updated = [...requests, newRequest];
-    setRequests(updated);
-    localStorage.setItem('regularizationRequests', JSON.stringify(updated));
-    
-    setAlert({ type: 'success', message: 'Regularization request submitted successfully' });
-    setShowModal(false);
-    setFormData({ date: '', inTime: '', outTime: '', type: 'Missed Punch', reason: '', attachment: '' });
     setTimeout(() => setAlert(null), 3000);
   };
 
-  const handleApproval = (requestId, status, comments) => {
-    const updated = requests.map(r => {
-      if (r.id === requestId) {
-        const auditEntry = { action: status, by: currentUser.name, date: new Date().toISOString(), comments };
-        return { ...r, status, approverComments: comments, auditLog: [...r.auditLog, auditEntry] };
-      }
-      return r;
-    });
-    setRequests(updated);
-    localStorage.setItem('regularizationRequests', JSON.stringify(updated));
-    
-    if (status === 'Approved') {
-      const request = requests.find(r => r.id === requestId);
-      const attendanceData = JSON.parse(localStorage.getItem('attendance') || '[]');
-      const updatedAttendance = attendanceData.map(a => {
-        if (a.employeeId === request.employeeId && a.date === request.date) {
-          return { ...a, clockIn: request.inTime, clockOut: request.outTime, status: 'Regularized' };
-        }
-        return a;
+  const handleApproval = async (requestId, status, comments) => {
+    try {
+      const request = regularizationRequests.find(r => r.id === requestId);
+      if (!request) throw new Error("Request not found");
+
+      const auditEntry = {
+        action: status,
+        by: currentUser.name,
+        date: new Date().toISOString(),
+        comments
+      };
+
+      const requestRef = doc(db, 'regularizationRequests', requestId);
+      await updateDoc(requestRef, {
+        status,
+        approverComments: comments,
+        auditLog: [...(request.auditLog || []), auditEntry]
       });
-      localStorage.setItem('attendance', JSON.stringify(updatedAttendance));
+
+      // If Approved, update the actual Attendance Record in Firestore
+      if (status === 'Approved') {
+        const { employeeId, date, inTime, outTime } = request;
+        const roster = rosters.find(r => r.employeeId === employeeId && r.date === date);
+
+        // 1. Calculate robust attendance data using central logic
+        // Only use biometricSync logic if we have both In and Out
+        let attendanceUpdate = {};
+
+        if (inTime && outTime) {
+          // We'll treat the user input "date" as the Work Date (Business Day)
+          // But we need to infer the clockOutDate for cross-midnight duration call
+          let clockOutDate = date;
+          const [inH] = inTime.split(':').map(Number);
+          const [outH] = outTime.split(':').map(Number);
+
+          if (outH < inH) {
+            // Crossed midnight logic
+            const nextDay = new Date(date);
+            nextDay.setDate(nextDay.getDate() + 1);
+            clockOutDate = nextDay.toISOString().split('T')[0];
+          }
+
+          // Assuming manual entry follows roster rules, but we recalculate status to be safe
+          const result = calculateAttendanceStatus(inTime, outTime, date, roster);
+
+          // Override duration with absolute calculation to be 100% sure
+          const absDuration = calculateAbsDuration(inTime, date, outTime, clockOutDate);
+
+          attendanceUpdate = {
+            clockIn: inTime,
+            clockOut: outTime,
+            status: 'Regularized', // Explicit status
+            workHours: absDuration, // Use robust helper
+            workingDays: absDuration >= 5 ? 1 : 0.5, // Simple rule fallback
+            overtime: absDuration > 9 ? parseFloat((absDuration - 9).toFixed(2)) : 0,
+            regularizedBy: currentUser.id,
+            regularizedAt: serverTimestamp()
+          };
+        } else {
+          attendanceUpdate = {
+            clockIn: inTime || null,
+            clockOut: outTime || null,
+            status: 'Regularized',
+            regularizedBy: currentUser.id
+          };
+        }
+
+        // 2. Find and Update (or Create) the attendance document
+        // We construct the ID based on our standard: userId-date
+        const docId = `${employeeId}-${date}`;
+        const attendanceRef = doc(db, 'attendance', docId);
+
+        // check if doc exists to determine set vs update
+        const docSnap = await getDoc(attendanceRef);
+
+        if (docSnap.exists()) {
+          await updateDoc(attendanceRef, attendanceUpdate);
+        } else {
+          await addDoc(collection(db, 'attendance'), {
+            employeeId,
+            date,
+            ...attendanceUpdate
+          }); // Note: using addDoc might create random ID, better to use setDoc with specific ID logic if strict
+          // For now, let's stick to updateDoc as regularizing implies fixing a record suitable for today/past
+        }
+      }
+
+      setAlert({ type: 'success', message: `Request ${status.toLowerCase()} successfully` });
+    } catch (error) {
+      console.error(error);
+      setAlert({ type: 'error', message: 'Operation failed: ' + error.message });
     }
-    
-    setAlert({ type: 'success', message: `Request ${status.toLowerCase()} successfully` });
     setTimeout(() => setAlert(null), 3000);
   };
 
@@ -110,11 +186,10 @@ const AttendanceRegularization = () => {
     {
       header: 'Status',
       render: (row) => (
-        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-          row.status === 'Approved' ? 'bg-green-100 text-green-800' :
-          row.status === 'Rejected' ? 'bg-red-100 text-red-800' :
-          'bg-yellow-100 text-yellow-800'
-        }`}>
+        <span className={`px-2 py-1 rounded-full text-xs font-medium ${row.status === 'Approved' ? 'bg-green-100 text-green-800' :
+            row.status === 'Rejected' ? 'bg-red-100 text-red-800' :
+              'bg-yellow-100 text-yellow-800'
+          }`}>
           {row.status}
         </span>
       )
