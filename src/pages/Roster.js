@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Card, Button, Table, Modal, Input, Select, Alert } from '../components/UI';
 import { Calendar as CalendarIcon, Clock, UserPlus, Trash2, ChevronLeft, ChevronRight, List, ChevronDown, User, Edit, Filter, X } from 'lucide-react';
@@ -71,6 +71,10 @@ const Roster = () => {
     });
     const [showFilters, setShowFilters] = useState(false);
 
+    // Pagination State
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 10;
+
     const [formData, setFormData] = useState({
         selectedEmployees: [],
         startDate: '',
@@ -127,6 +131,23 @@ const Roster = () => {
     const sortedRosters = useMemo(() => {
         return [...filteredRosters].sort((a, b) => new Date(b.date) - new Date(a.date));
     }, [filteredRosters]);
+
+    // Pagination calculation
+    const paginatedRosters = useMemo(() => {
+        const totalPages = Math.ceil(sortedRosters.length / itemsPerPage);
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        const endIndex = startIndex + itemsPerPage;
+        return {
+            data: sortedRosters.slice(startIndex, endIndex),
+            totalPages,
+            totalItems: sortedRosters.length
+        };
+    }, [sortedRosters, currentPage, itemsPerPage]);
+
+    // Reset to page 1 when filters change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [filters]);
 
     const handleShiftChange = (e) => {
         const shift = shifts.find(s => s.name === e.target.value);
@@ -293,10 +314,15 @@ const Roster = () => {
     };
 
     const toggleSelectAll = () => {
-        if (selectedRosters.length === sortedRosters.length) {
-            setSelectedRosters([]);
+        const currentPageIds = paginatedRosters.data.map(r => r.id);
+        const allCurrentPageSelected = currentPageIds.every(id => selectedRosters.includes(id));
+
+        if (allCurrentPageSelected) {
+            // Deselect all from current page
+            setSelectedRosters(prev => prev.filter(id => !currentPageIds.includes(id)));
         } else {
-            setSelectedRosters(sortedRosters.map(r => r.id));
+            // Select all from current page
+            setSelectedRosters(prev => [...new Set([...prev, ...currentPageIds])]);
         }
     };
 
@@ -359,7 +385,7 @@ const Roster = () => {
             header: () => (
                 <input
                     type="checkbox"
-                    checked={selectedRosters.length === sortedRosters.length && sortedRosters.length > 0}
+                    checked={paginatedRosters.data.length > 0 && paginatedRosters.data.every(r => selectedRosters.includes(r.id))}
                     onChange={toggleSelectAll}
                     className="rounded border-gray-300"
                 />
@@ -404,14 +430,14 @@ const Roster = () => {
         if (currentUser.role === 'employee') return {};
 
         const groups = {};
-        sortedRosters.forEach(roster => {
+        paginatedRosters.data.forEach(roster => {
             if (!groups[roster.employeeName]) {
                 groups[roster.employeeName] = [];
             }
             groups[roster.employeeName].push(roster);
         });
         return groups;
-    }, [sortedRosters, currentUser]);
+    }, [paginatedRosters.data, currentUser]);
 
     return (
         <div className="space-y-6">
@@ -446,18 +472,6 @@ const Roster = () => {
                             <UserPlus size={18} className="mr-2" />
                             Assign Shift
                         </Button>
-                    )}
-                    {(currentUser.role === 'admin' || currentUser.role === 'hr') && selectedRosters.length > 0 && (
-                        <>
-                            <Button onClick={handleBulkModify} variant="secondary">
-                                <Edit size={18} className="mr-2" />
-                                Bulk Modify ({selectedRosters.length})
-                            </Button>
-                            <Button onClick={handleBulkDelete} variant="danger">
-                                <Trash2 size={18} className="mr-2" />
-                                Bulk Delete ({selectedRosters.length})
-                            </Button>
-                        </>
                     )}
                 </div>
             </div>
@@ -574,13 +588,47 @@ const Roster = () => {
                 </div>
             )}
 
+            {/* Bulk Actions Bar - Only for Admin/HR when rosters are selected */}
+            {(currentUser.role === 'admin' || currentUser.role === 'hr') && selectedRosters.length > 0 && (
+                <div className="bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800 rounded-xl p-4">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                        <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-full bg-primary-600 text-white flex items-center justify-center font-semibold text-sm">
+                                {selectedRosters.length}
+                            </div>
+                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                {selectedRosters.length} roster{selectedRosters.length !== 1 ? 's' : ''} selected
+                            </span>
+                        </div>
+                        <div className="flex items-center gap-2 w-full sm:w-auto">
+                            <Button
+                                onClick={handleBulkModify}
+                                variant="secondary"
+                                className="flex-1 sm:flex-none"
+                            >
+                                <Edit size={18} className="mr-2" />
+                                Bulk Modify
+                            </Button>
+                            <Button
+                                onClick={handleBulkDelete}
+                                variant="danger"
+                                className="flex-1 sm:flex-none"
+                            >
+                                <Trash2 size={18} className="mr-2" />
+                                Bulk Delete
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {alert && <Alert type={alert.type} message={alert.message} onClose={() => setAlert(null)} />}
 
             {view === 'list' ? (
                 <>
                     {currentUser.role === 'employee' ? (
                         <Card title="My Assigned Shifts">
-                            <Table columns={columns} data={sortedRosters} />
+                            <Table columns={columns} data={paginatedRosters.data} />
                         </Card>
                     ) : (
                         <div className="space-y-4">
@@ -596,6 +644,45 @@ const Roster = () => {
                             {Object.keys(groupedRosters).length === 0 && (
                                 <p className="text-center text-gray-500 py-4">No rosters assigned yet.</p>
                             )}
+                        </div>
+                    )}
+
+                    {/* Pagination Controls */}
+                    {paginatedRosters.totalPages > 1 && (
+                        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 mt-4">
+                            <div className="text-sm text-gray-600 dark:text-gray-400">
+                                Showing <span className="font-semibold text-gray-900 dark:text-white">{(currentPage - 1) * itemsPerPage + 1}</span> to <span className="font-semibold text-gray-900 dark:text-white">{Math.min(currentPage * itemsPerPage, paginatedRosters.totalItems)}</span> of <span className="font-semibold text-gray-900 dark:text-white">{paginatedRosters.totalItems}</span> entries
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                                    disabled={currentPage === 1}
+                                    className="p-2 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                >
+                                    <ChevronLeft size={20} />
+                                </button>
+                                <div className="flex items-center gap-1">
+                                    {[...Array(paginatedRosters.totalPages)].map((_, i) => (
+                                        <button
+                                            key={i + 1}
+                                            onClick={() => setCurrentPage(i + 1)}
+                                            className={`w-10 h-10 rounded-lg text-sm font-medium transition-colors ${currentPage === i + 1
+                                                    ? 'bg-primary-600 text-white'
+                                                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700'
+                                                }`}
+                                        >
+                                            {i + 1}
+                                        </button>
+                                    ))}
+                                </div>
+                                <button
+                                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, paginatedRosters.totalPages))}
+                                    disabled={currentPage === paginatedRosters.totalPages}
+                                    className="p-2 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                >
+                                    <ChevronRight size={20} />
+                                </button>
+                            </div>
                         </div>
                     )}
                 </>
