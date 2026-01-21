@@ -6,11 +6,11 @@ const Departments = () => {
   const [departments, setDepartments] = useState(() => {
     const saved = localStorage.getItem('departments');
     return saved ? JSON.parse(saved) : [
-      { id: 1, name: 'Engineering', headCount: 25, manager: 'John Smith' },
-      { id: 2, name: 'Sales', headCount: 15, manager: 'Sarah Johnson' },
-      { id: 3, name: 'Marketing', headCount: 10, manager: 'Mike Brown' },
-      { id: 4, name: 'HR', headCount: 5, manager: 'Emily Davis' },
-      { id: 5, name: 'Finance', headCount: 8, manager: 'David Wilson' }
+      { id: 1, name: 'Engineering', headCount: 0, manager: 'TBD' },
+      { id: 2, name: 'Sales', headCount: 0, manager: 'TBD' },
+      { id: 3, name: 'Marketing', headCount: 0, manager: 'TBD' },
+      { id: 4, name: 'HR', headCount: 0, manager: 'TBD' },
+      { id: 5, name: 'Finance', headCount: 0, manager: 'TBD' }
     ];
   });
 

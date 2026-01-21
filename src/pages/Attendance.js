@@ -64,7 +64,7 @@ const Attendance = () => {
   }, [attendance, allUsers, selectedMonth, selectedYear, selectedEmployee, selectedStatus, currentUser]);
 
   const attendanceStats = useMemo(() => {
-    const present = filteredAttendance.filter(a => (a.status === 'Present' || a.status === 'Late') && parseFloat(a.workHours || 0) >= 8).length;
+    const present = filteredAttendance.filter(a => (a.status === 'Present' || a.status === 'Late' || !a.clockOut) && a.status !== 'Absent' && a.status !== 'LWP').length;
     const late = filteredAttendance.filter(a => a.status === 'Late').length;
     const halfDay = filteredAttendance.filter(a => a.status === 'Half Day').length;
     const lwp = filteredAttendance.filter(a => a.status === 'LWP').length;

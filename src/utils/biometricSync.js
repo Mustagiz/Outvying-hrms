@@ -120,17 +120,8 @@ export const calculateMonthlyWorkingDays = (attendance, employeeId, month, year)
 };
 
 export const syncBiometricData = () => {
-  // Simulated biometric sync
-  const mockBiometricData = [
-    {
-      employeeId: 1, date: new Date().toISOString().split('T')[0], punches: [
-        { time: '09:05', type: 'IN' },
-        { time: '13:00', type: 'OUT' },
-        { time: '14:00', type: 'IN' },
-        { time: '18:15', type: 'OUT' }
-      ]
-    }
-  ];
+  // Disabled mock biometric data to prevent ghost records
+  const mockBiometricData = [];
 
   return mockBiometricData;
 };

@@ -9,10 +9,16 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const [alert, setAlert] = useState(null);
 
-  const today = new Date().toISOString().split('T')[0];
-  const todayAttendance = attendance.find(a =>
-    String(a.employeeId) === String(currentUser.id) && a.date === today
-  );
+  // Intelligent Active Session Detection for Dashboard
+  const activeAttendance = useMemo(() => {
+    // 1. Try to find an open session (no clockOut) first
+    const openSession = attendance.find(a => String(a.employeeId) === String(currentUser.id) && !a.clockOut);
+    if (openSession) return openSession;
+
+    // 2. Otherwise, find the record for the current logical business day
+    const today = new Date().toISOString().split('T')[0];
+    return attendance.find(a => String(a.employeeId) === String(currentUser.id) && a.date === today);
+  }, [attendance, currentUser]);
 
   const handleClockIn = async () => {
     const result = await clockIn(currentUser?.id);
@@ -32,15 +38,15 @@ const Dashboard = () => {
     const currentYear = new Date().getFullYear();
 
     if (currentUser.role === 'employee') {
-      const myAttendance = attendance.filter(a => a.employeeId === currentUser.id);
+      const myAttendance = attendance.filter(a => String(a.employeeId) === String(currentUser.id));
       const monthAttendance = myAttendance.filter(a => {
         const date = new Date(a.date);
         return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
       });
-      const presentDays = monthAttendance.filter(a => a.status === 'Present' || a.status === 'Late').length;
-      const myLeaves = leaves.filter(l => l.employeeId === currentUser.id);
+      const presentDays = monthAttendance.filter(a => a.status === 'Present' || a.status === 'Late' || a.status === 'Half Day').length;
+      const myLeaves = leaves.filter(l => String(l.employeeId) === String(currentUser.id));
       const pendingLeaves = myLeaves.filter(l => l.status === 'Pending').length;
-      const myBalance = leaveBalances.find(lb => lb.employeeId === currentUser.id);
+      const myBalance = leaveBalances.find(lb => String(lb.employeeId) === String(currentUser.id));
       const totalLeaveBalance = myBalance
         ? (myBalance.paidLeave?.available || 0) + (myBalance.casualLeave?.available || 0)
         : 0;
@@ -52,14 +58,14 @@ const Dashboard = () => {
         { label: 'Total Work Hours (Month)', value: monthAttendance.reduce((sum, a) => sum + parseFloat(a.workHours || 0), 0).toFixed(1), icon: Clock, color: 'text-purple-600', bg: 'bg-purple-100' }
       ];
     } else {
-      const todayAttendance = attendance.filter(a => a.date === today);
-      const presentToday = todayAttendance.filter(a => a.status === 'Present' || a.status === 'Late').length;
+      // Admin View: Employees "Present Today" should include anyone with an active session OR a clock-in today
+      const presentToday = attendance.filter(a => (a.date === today || !a.clockOut) && (a.status === 'Present' || a.status === 'Late' || a.status === 'Pending' || !a.clockOut)).length;
       const pendingLeaves = leaves.filter(l => l.status === 'Pending').length;
       const activeEmployees = allUsers.filter(u => u.role === 'employee').length;
 
       return [
         { label: 'Total Employees', value: activeEmployees, icon: Users, color: 'text-blue-600', bg: 'bg-blue-100' },
-        { label: 'Present Today', value: presentToday, icon: CheckCircle, color: 'text-green-600', bg: 'bg-green-100' },
+        { label: 'Active/Present', value: presentToday, icon: CheckCircle, color: 'text-green-600', bg: 'bg-green-100' },
         { label: 'Pending Leave Approvals', value: pendingLeaves, icon: FileText, color: 'text-yellow-600', bg: 'bg-yellow-100' },
         { label: 'Departments', value: new Set(allUsers.map(u => u.department)).size, icon: TrendingUp, color: 'text-purple-600', bg: 'bg-purple-100' }
       ];
@@ -128,11 +134,11 @@ const Dashboard = () => {
                 <div>
                   <p className="text-sm text-gray-600 dark:text-gray-400">Clock In</p>
                   <p className="text-lg font-semibold text-gray-800 dark:text-white">
-                    {todayAttendance?.clockIn || 'Not clocked in'}
+                    {activeAttendance?.clockIn || 'Not clocked in'}
                   </p>
                 </div>
               </div>
-              <Button onClick={handleClockIn} disabled={todayAttendance?.clockIn}>
+              <Button onClick={handleClockIn} disabled={activeAttendance?.clockIn}>
                 Clock In
               </Button>
             </div>
@@ -143,23 +149,23 @@ const Dashboard = () => {
                 <div>
                   <p className="text-sm text-gray-600 dark:text-gray-400">Clock Out</p>
                   <p className="text-lg font-semibold text-gray-800 dark:text-white">
-                    {todayAttendance?.clockOut || 'Not clocked out'}
+                    {activeAttendance?.clockOut || 'Not clocked out'}
                   </p>
                 </div>
               </div>
               <Button
                 onClick={handleClockOut}
-                disabled={!todayAttendance?.clockIn || todayAttendance?.clockOut}
+                disabled={!activeAttendance?.clockIn || activeAttendance?.clockOut}
                 variant="secondary"
               >
                 Clock Out
               </Button>
             </div>
           </div>
-          {todayAttendance && (
+          {activeAttendance && (
             <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
               <p className="text-sm text-blue-800 dark:text-blue-200">
-                <strong>Status:</strong> {todayAttendance.status} | <strong>Work Hours:</strong> {todayAttendance.workHours || 0}h
+                <strong>Status:</strong> {activeAttendance.status} | <strong>Work Hours:</strong> {activeAttendance.workHours || 0}h
               </p>
             </div>
           )}
