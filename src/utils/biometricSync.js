@@ -14,14 +14,32 @@ export const calculateAttendanceStatus = (clockIn, clockOut, date = null, roster
   };
 
   const [inHour, inMin] = clockIn.split(':').map(Number);
-  const clockInInMinutes = inHour * 60 + inMin;
+  let clockInInMinutes = inHour * 60 + inMin;
+
+  const timezone = roster?.timezone || 'Asia/Kolkata';
+  if (timezone !== 'Asia/Kolkata') {
+    // If the shift is in another timezone, convert the actual clock-in (IST) to that timezone
+    // to compare it with the shift's regional start time.
+    const dateToUse = date || new Date().toISOString().split('T')[0];
+    const istDate = new Date(`${dateToUse}T${clockIn}:00+05:30`);
+
+    const regionalTimeStr = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    }).format(istDate);
+
+    const [regH, regM] = regionalTimeStr.split(':').map(Number);
+    clockInInMinutes = regH * 60 + regM;
+  }
 
   const shiftStartTime = roster?.startTime || '09:00';
   const [shiftHour, shiftMin] = shiftStartTime.split(':').map(Number);
   const shiftStartInMinutes = shiftHour * 60 + shiftMin;
   const gracePeriod = roster?.gracePeriod || defaultRule.gracePeriodMins;
 
-  // Initial status based on clockIn time
+  // Initial status based on regional clockIn time
   let status = clockInInMinutes > (shiftStartInMinutes + gracePeriod) ? 'Late' : 'Present';
   let workingDays = 0; // Only count days after clockOut
   let workHours = 0;

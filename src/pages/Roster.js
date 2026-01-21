@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Card, Button, Table, Modal, Input, Select, Alert } from '../components/UI';
 import { Calendar as CalendarIcon, Clock, UserPlus, Trash2, ChevronLeft, ChevronRight, List, ChevronDown, User, Edit, Filter, X } from 'lucide-react';
-import { formatDate } from '../utils/helpers';
+import { formatDate, TIMEZONES, getISTEquivalent } from '../utils/helpers';
 
 const DateRosterGroup = ({ date, rosters, columns }) => {
     const [isExpanded, setIsExpanded] = useState(true);
@@ -90,14 +90,15 @@ const Roster = () => {
         shiftName: 'Morning Shift',
         startTime: '09:00',
         endTime: '18:00',
-        gracePeriod: 15
+        gracePeriod: 15,
+        timezone: 'Asia/Kolkata'
     });
 
     const shifts = [
-        { name: 'Morning Shift', startTime: '09:00', endTime: '18:00', color: 'bg-blue-100 text-blue-800 border-blue-200' },
-        { name: 'Evening Shift', startTime: '14:00', endTime: '23:00', color: 'bg-purple-100 text-purple-800 border-purple-200' },
-        { name: 'Night Shift', startTime: '22:00', endTime: '07:00', color: 'bg-indigo-100 text-indigo-800 border-indigo-200' },
-        { name: 'Late Shift', startTime: '11:00', endTime: '20:00', color: 'bg-orange-100 text-orange-800 border-orange-200' }
+        { name: 'Morning Shift', startTime: '09:00', endTime: '18:00', timezone: 'Asia/Kolkata', color: 'bg-blue-100 text-blue-800 border-blue-200' },
+        { name: 'Evening Shift', startTime: '14:00', endTime: '23:00', timezone: 'Asia/Kolkata', color: 'bg-purple-100 text-purple-800 border-purple-200' },
+        { name: 'Night Shift', startTime: '22:00', endTime: '07:00', timezone: 'America/New_York', color: 'bg-indigo-100 text-indigo-800 border-indigo-200' },
+        { name: 'Late Shift', startTime: '11:00', endTime: '20:00', timezone: 'America/Los_Angeles', color: 'bg-orange-100 text-orange-800 border-orange-200' }
     ];
 
     const getShiftColor = (name) => {
@@ -164,7 +165,8 @@ const Roster = () => {
                 ...formData,
                 shiftName: shift.name,
                 startTime: shift.startTime,
-                endTime: shift.endTime
+                endTime: shift.endTime,
+                timezone: shift.timezone || 'Asia/Kolkata'
             });
         }
     };
@@ -227,6 +229,7 @@ const Roster = () => {
                     startTime: formData.startTime,
                     endTime: formData.endTime,
                     gracePeriod: formData.gracePeriod,
+                    timezone: formData.timezone
                 });
                 setAlert({ type: result.success ? 'success' : 'error', message: result.message });
                 if (result.success) {
@@ -447,8 +450,34 @@ const Roster = () => {
                 </span>
             )
         },
-        { header: 'Start Time', accessor: 'startTime' },
-        { header: 'End Time', accessor: 'endTime' },
+        {
+            header: 'Start Time',
+            accessor: 'startTime',
+            render: (row) => {
+                const tz = TIMEZONES.find(t => t.value === row.timezone)?.label.split(' ')[0] || 'IST';
+                const ist = row.timezone && row.timezone !== 'Asia/Kolkata' ? getISTEquivalent(row.startTime, row.date, row.timezone) : null;
+                return (
+                    <div className="flex flex-col">
+                        <span className="font-medium">{row.startTime} {tz}</span>
+                        {ist && <span className="text-[10px] text-gray-400 italic">({ist} IST)</span>}
+                    </div>
+                );
+            }
+        },
+        {
+            header: 'End Time',
+            accessor: 'endTime',
+            render: (row) => {
+                const tz = TIMEZONES.find(t => t.value === row.timezone)?.label.split(' ')[0] || 'IST';
+                const ist = row.timezone && row.timezone !== 'Asia/Kolkata' ? getISTEquivalent(row.endTime, row.date, row.timezone) : null;
+                return (
+                    <div className="flex flex-col">
+                        <span className="font-medium">{row.endTime} {tz}</span>
+                        {ist && <span className="text-[10px] text-gray-400 italic">({ist} IST)</span>}
+                    </div>
+                );
+            }
+        },
         { header: 'Grace Period', accessor: 'gracePeriod', render: (row) => `${row.gracePeriod} mins` },
         ...(currentUser.role !== 'employee' ? [{
             header: 'Actions',
@@ -861,16 +890,32 @@ const Roster = () => {
                                             </span>
 
                                             <div className="flex flex-col gap-1 mt-1">
-                                                {item.rosters.slice(0, 3).map((roster, idx) => (
-                                                    <div key={idx} className={`px-2 py-1 rounded text-[10px] truncate border-l-4 ${getShiftColor(roster.shiftName)} border-l-current shadow-sm ${filters.employees.includes(roster.employeeId) ? 'ring-2 ring-primary-400 dark:ring-primary-600 transform scale-[1.02] z-10' : ''}`}>
-                                                        <span className="font-bold mr-1">
-                                                            {currentUser.role !== 'employee' ? roster.employeeName?.split(' ')[0] : roster.shiftName}
-                                                        </span>
-                                                        <span className="opacity-80 hidden sm:inline font-medium">
-                                                            {roster.startTime}
-                                                        </span>
-                                                    </div>
-                                                ))}
+                                                {item.rosters.slice(0, 3).map((roster, idx) => {
+                                                    const isNotIST = roster.timezone && roster.timezone !== 'Asia/Kolkata';
+                                                    const tzLabel = TIMEZONES.find(t => t.value === roster.timezone)?.label.split(' ')[0] || '';
+                                                    const istTime = isNotIST ? getISTEquivalent(roster.startTime, roster.date, roster.timezone) : null;
+
+                                                    return (
+                                                        <div key={idx} className={`px-2 py-1 rounded text-[10px] truncate border-l-4 ${getShiftColor(roster.shiftName)} border-l-current shadow-sm ${filters.employees.includes(roster.employeeId) ? 'ring-2 ring-primary-400 dark:ring-primary-600 transform scale-[1.02] z-10' : ''}`}>
+                                                            <div className="flex justify-between items-center mb-0.5">
+                                                                <span className="font-bold truncate">
+                                                                    {currentUser.role !== 'employee' ? roster.employeeName?.split(' ')[0] : roster.shiftName}
+                                                                </span>
+                                                                {isNotIST && <span className="text-[8px] font-black opacity-60 bg-black/10 px-1 rounded-sm">{tzLabel}</span>}
+                                                            </div>
+                                                            <div className="flex flex-col leading-none">
+                                                                <span className="opacity-90 font-medium">
+                                                                    {roster.startTime}
+                                                                </span>
+                                                                {istTime && (
+                                                                    <span className="text-[8px] opacity-60 font-bold italic">
+                                                                        ({istTime} IST)
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
                                                 {item.rosters.length > 3 && (
                                                     <div className="text-[10px] text-center text-gray-500 font-medium bg-gray-100 dark:bg-gray-700 rounded py-0.5">
                                                         +{item.rosters.length - 3} More
@@ -951,6 +996,13 @@ const Roster = () => {
                         value={formData.shiftName}
                         onChange={handleShiftChange}
                         options={shifts.map(s => ({ value: s.name, label: s.name }))}
+                    />
+
+                    <Select
+                        label="Region / Timezone"
+                        value={formData.timezone}
+                        onChange={(e) => setFormData({ ...formData, timezone: e.target.value })}
+                        options={TIMEZONES.map(tz => ({ value: tz.value, label: tz.label }))}
                     />
 
                     <div className="grid grid-cols-2 gap-4">
