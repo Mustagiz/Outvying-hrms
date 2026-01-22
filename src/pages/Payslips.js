@@ -623,12 +623,14 @@ const Payslips = () => {
                     {/* Tax Display Removed */}
                   </div>
 
-                  {currentPayslip.computedCustomDeductions.map(cd => (
-                    <div key={cd.name} className="flex justify-between w-full gap-4 text-gray-600 dark:text-gray-300">
-                      <span>{cd.name}:</span>
-                      <span>₹{cd.amount}</span>
-                    </div>
-                  ))}
+                  {currentPayslip.computedCustomDeductions
+                    .filter(cd => parseFloat(cd.amount) > 0)
+                    .map(cd => (
+                      <div key={cd.name} className="flex justify-between w-full gap-4 text-gray-600 dark:text-gray-300">
+                        <span>{cd.name}:</span>
+                        <span>₹{cd.amount}</span>
+                      </div>
+                    ))}
 
                   {parseFloat(currentPayslip.customDeduction) > 0 && (
                     <div className="flex justify-between w-full gap-4 text-red-500 font-medium">
