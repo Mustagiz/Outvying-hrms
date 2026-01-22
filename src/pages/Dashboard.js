@@ -118,7 +118,7 @@ const Dashboard = () => {
           </p>
           {!ipValidation.allowed && (
             <p className="text-[10px] sm:text-xs text-red-700 dark:text-red-300 mt-1">
-              Some features may be restricted. Connect from office network or approved VPN.
+              {ipSettings.blockMessage || 'Some features may be restricted. Connect from office network or approved VPN.'}
             </p>
           )}
         </div>

@@ -19,9 +19,7 @@ export const ipMatchesRange = (clientIP, allowedIP) => {
   return clientNum >= range.start && clientNum <= range.end;
 };
 
-export const validateIP = (clientIP) => {
-  const config = JSON.parse(localStorage.getItem('ipRestrictions') || '{}');
-  
+export const validateIP = (clientIP, config = {}) => {
   if (!config.enabled || !config.ipList || config.ipList.length === 0) {
     return { allowed: true, location: 'Unrestricted' };
   }
@@ -66,7 +64,6 @@ export const getCurrentIP = async () => {
   }
 };
 
-export const checkModuleAccess = (module) => {
-  const config = JSON.parse(localStorage.getItem('ipRestrictions') || '{}');
+export const checkModuleAccess = (module, config = {}) => {
   return config.enabled && config.modules && config.modules[module];
 };

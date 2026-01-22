@@ -4,7 +4,8 @@ import { Card, Button, Badge, Table } from '../components/UI';
 import { Shield, Plus, Trash2, Save } from 'lucide-react';
 
 const IPRestrictions = () => {
-  const { currentUser } = useAuth();
+  const { currentUser, ipSettings, updateIPSettings } = useAuth();
+
   const [enabled, setEnabled] = useState(false);
   const [ipList, setIpList] = useState([]);
   const [newIP, setNewIP] = useState('');
@@ -17,18 +18,24 @@ const IPRestrictions = () => {
   });
   const [blockMessage, setBlockMessage] = useState('Access denied. Please connect from office network or approved VPN.');
 
+  // Sync local UI state with Firestore settings
   useEffect(() => {
-    const config = JSON.parse(localStorage.getItem('ipRestrictions') || '{}');
-    setEnabled(config.enabled || false);
-    setIpList(config.ipList || []);
-    setModules(config.modules || { employeePortal: false, attendance: true, leaveRequests: true, payslip: false });
-    setBlockMessage(config.blockMessage || 'Access denied. Please connect from office network or approved VPN.');
-  }, []);
+    if (ipSettings) {
+      setEnabled(ipSettings.enabled || false);
+      setIpList(ipSettings.ipList || []);
+      setModules(ipSettings.modules || { employeePortal: false, attendance: true, leaveRequests: true, payslip: false });
+      setBlockMessage(ipSettings.blockMessage || 'Access denied. Please connect from office network or approved VPN.');
+    }
+  }, [ipSettings]);
 
-  const saveConfig = () => {
-    const config = { enabled, ipList, modules, blockMessage };
-    localStorage.setItem('ipRestrictions', JSON.stringify(config));
-    alert('IP restrictions saved successfully');
+  const saveConfig = async () => {
+    const newSettings = { enabled, ipList, modules, blockMessage };
+    const result = await updateIPSettings(newSettings);
+    if (result.success) {
+      alert('IP restrictions saved successfully to Firestore');
+    } else {
+      alert('Failed to save: ' + result.message);
+    }
   };
 
   const addIP = () => {
@@ -42,7 +49,7 @@ const IPRestrictions = () => {
     setIpList(ipList.filter((_, i) => i !== index));
   };
 
-  if (currentUser.role !== 'Admin' && currentUser.role !== 'admin') {
+  if (currentUser.role !== 'Admin' && currentUser.role !== 'admin' && currentUser.role !== 'super_admin') {
     return <div className="text-center py-8 text-gray-600 dark:text-gray-400">Access denied. Admin only.</div>;
   }
 
@@ -112,9 +119,9 @@ const IPRestrictions = () => {
                   />
                   <label className="text-gray-700 dark:text-gray-300">
                     {key === 'employeePortal' ? 'Employee Portal' :
-                     key === 'attendance' ? 'Attendance Module' :
-                     key === 'leaveRequests' ? 'Leave Requests' :
-                     'Payslip Download'}
+                      key === 'attendance' ? 'Attendance Module' :
+                        key === 'leaveRequests' ? 'Leave Requests' :
+                          'Payslip Download'}
                   </label>
                 </div>
               ))}

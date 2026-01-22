@@ -67,6 +67,7 @@ export const AuthProvider = ({ children }) => {
   // Local State
   const [theme, setTheme] = useState('light');
   const [currentIP, setCurrentIP] = useState('127.0.0.1');
+  const [ipSettings, setIpSettings] = useState({ enabled: false, ipList: [], modules: {}, blockMessage: '' });
   const [ipValidation, setIpValidation] = useState({ allowed: true, location: 'Unrestricted' });
 
   // --- 1. Initialization & Auth Listener ---
@@ -76,11 +77,9 @@ export const AuthProvider = ({ children }) => {
     setTheme(savedTheme);
     if (savedTheme === 'dark') document.documentElement.classList.add('dark');
 
-    // IP Check
+    // IP Initialization
     getCurrentIP().then(ip => {
       setCurrentIP(ip);
-      const validation = validateIP(ip);
-      setIpValidation(validation);
     });
 
     // Firebase Auth Listener
@@ -225,6 +224,16 @@ export const AuthProvider = ({ children }) => {
       setManualLeaveAllocations(manualData);
     });
 
+    // Subscribe to IP Restrictions Settings
+    const unsubIPSettings = onSnapshot(doc(db, 'settings', 'ipRestrictions'), (docSnap) => {
+      if (docSnap.exists()) {
+        setIpSettings(docSnap.data());
+      } else {
+        // Default if doc doesn't exist
+        setIpSettings({ enabled: false, ipList: [], modules: {}, blockMessage: 'Access denied.' });
+      }
+    });
+
     // Cleanup subscriptions on unmount or logout
     return () => {
       unsubUsers();
@@ -237,6 +246,7 @@ export const AuthProvider = ({ children }) => {
       unsubLeaveTypes();
       unsubPolicy();
       unsubManualLeaves();
+      unsubIPSettings();
     };
 
   }, [currentUser]);
@@ -393,7 +403,7 @@ export const AuthProvider = ({ children }) => {
   // CLOCK IN
   const clockIn = async (employeeId) => {
     // IP Check
-    if (checkModuleAccess('attendance') && !ipValidation.allowed) {
+    if (checkAccess('attendance') && !ipValidation.allowed) {
       return { success: false, message: ipValidation.message };
     }
 
@@ -457,6 +467,11 @@ export const AuthProvider = ({ children }) => {
 
   // CLOCK OUT
   const clockOut = async (employeeId) => {
+    // IP Check
+    if (checkAccess('attendance') && !ipValidation.allowed) {
+      return { success: false, message: ipValidation.message };
+    }
+
     const today = new Date().toISOString().split('T')[0];
     const now = new Date();
     const clockOutTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
@@ -975,8 +990,23 @@ export const AuthProvider = ({ children }) => {
         console.error("Seeding Error:", error);
         return { success: false, message: "Seeding failed: " + error.message };
       }
-    }
+    },
+    checkModuleAccess: checkAccess, // Shorthand for use in components
+    updateIPSettings: async (newSettings) => {
+      try {
+        await setDoc(doc(db, 'settings', 'ipRestrictions'), newSettings);
+        return { success: true };
+      } catch (error) {
+        console.error("Failed to update IP settings:", error);
+        return { success: false, message: error.message };
+      }
+    },
+    ipSettings
   };
 
-  return <AuthContext.Provider value={value}>{loading ? <div className="h-screen w-full flex items-center justify-center">Loading Firebase...</div> : children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      {loading ? <div className="h-screen w-full flex items-center justify-center">Loading Firebase...</div> : children}
+    </AuthContext.Provider>
+  );
 };
