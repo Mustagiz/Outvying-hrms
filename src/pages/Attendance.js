@@ -12,14 +12,33 @@ const Attendance = () => {
   const { currentUser, attendance, rosters, clockIn, clockOut, syncBiometric, allUsers } = useAuth();
   const [alert, setAlert] = useState(null);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  const [selectedEmployee, setSelectedEmployee] = useState(currentUser.role === 'employee' ? String(currentUser.id) : 'all');
-  const [selectedStatus, setSelectedStatus] = useState('all');
-  const [startDateFilter, setStartDateFilter] = useState('');
-  const [endDateFilter, setEndDateFilter] = useState('');
+  // Applied Filters (used for data fetching)
+  const [appliedFilters, setAppliedFilters] = useState({
+    month: new Date().getMonth(),
+    year: new Date().getFullYear(),
+    startDate: '',
+    endDate: '',
+    employee: currentUser.role === 'employee' ? String(currentUser.id) : 'all',
+    status: 'all'
+  });
+
+  // UI State (inputs)
+  const [localFilters, setLocalFilters] = useState({
+    month: new Date().getMonth(),
+    year: new Date().getFullYear(),
+    startDate: '',
+    endDate: '',
+    employee: currentUser.role === 'employee' ? String(currentUser.id) : 'all',
+    status: 'all'
+  });
+
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+
+  const handleApplyFilters = () => {
+    setAppliedFilters(localFilters);
+    setCurrentPage(1); // Reset to first page
+  };
 
   // Manual Attendance State
   const [showManualModal, setShowManualModal] = useState(false);
@@ -219,26 +238,26 @@ const Attendance = () => {
       const date = new Date(a.date);
 
       // Date range filter (takes precedence over month/year if set)
-      if (startDateFilter && endDateFilter) {
+      if (appliedFilters.startDate && appliedFilters.endDate) {
         const recordDate = new Date(a.date);
-        const startDate = new Date(startDateFilter);
-        const endDate = new Date(endDateFilter);
+        const startDate = new Date(appliedFilters.startDate);
+        const endDate = new Date(appliedFilters.endDate);
         if (recordDate < startDate || recordDate > endDate) {
           return false;
         }
-      } else if (startDateFilter || endDateFilter) {
+      } else if (appliedFilters.startDate || appliedFilters.endDate) {
         // If only one date is set, filter accordingly
         const recordDate = new Date(a.date);
-        if (startDateFilter && recordDate < new Date(startDateFilter)) {
+        if (appliedFilters.startDate && recordDate < new Date(appliedFilters.startDate)) {
           return false;
         }
-        if (endDateFilter && recordDate > new Date(endDateFilter)) {
+        if (appliedFilters.endDate && recordDate > new Date(appliedFilters.endDate)) {
           return false;
         }
       } else {
         // Use month/year filters only if date range is not set
-        const matchesMonth = date.getMonth() === selectedMonth;
-        const matchesYear = date.getFullYear() === selectedYear;
+        const matchesMonth = date.getMonth() === appliedFilters.month;
+        const matchesYear = date.getFullYear() === appliedFilters.year;
         if (!matchesMonth || !matchesYear) {
           return false;
         }
@@ -246,14 +265,14 @@ const Attendance = () => {
 
       const matchesEmployee = currentUser.role === 'employee'
         ? String(a.employeeId) === String(currentUser.id)
-        : selectedEmployee === 'all' ? true : String(a.employeeId) === String(selectedEmployee);
-      const matchesStatus = selectedStatus === 'all' ? true : a.status === selectedStatus;
+        : appliedFilters.employee === 'all' ? true : String(a.employeeId) === String(appliedFilters.employee);
+      const matchesStatus = appliedFilters.status === 'all' ? true : a.status === appliedFilters.status;
 
       return matchesEmployee && matchesStatus;
     });
 
     return filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
-  }, [attendance, allUsers, selectedMonth, selectedYear, selectedEmployee, selectedStatus, startDateFilter, endDateFilter, currentUser]);
+  }, [attendance, allUsers, appliedFilters, currentUser]);
 
   const paginatedAttendance = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
@@ -264,9 +283,7 @@ const Attendance = () => {
     };
   }, [filteredAttendance, currentPage, itemsPerPage]);
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [selectedMonth, selectedYear, selectedEmployee, selectedStatus, startDateFilter, endDateFilter]);
+
 
   const attendanceStats = useMemo(() => {
     const present = filteredAttendance.filter(a => (a.status === 'Present' || a.status === 'Late' || !a.clockOut) && a.status !== 'Absent' && a.status !== 'LWP').length;
@@ -415,13 +432,13 @@ const Attendance = () => {
 
       <Card title="Attendance History">
         <div className="mb-4">
-          <div className="flex flex-wrap gap-4 mb-4">
+          <div className="flex flex-wrap gap-4 mb-4 items-end">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Start Date</label>
               <input
                 type="date"
-                value={startDateFilter}
-                onChange={(e) => setStartDateFilter(e.target.value)}
+                value={localFilters.startDate}
+                onChange={(e) => setLocalFilters({ ...localFilters, startDate: e.target.value })}
                 className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               />
             </div>
@@ -429,39 +446,46 @@ const Attendance = () => {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">End Date</label>
               <input
                 type="date"
-                value={endDateFilter}
-                onChange={(e) => setEndDateFilter(e.target.value)}
+                value={localFilters.endDate}
+                onChange={(e) => setLocalFilters({ ...localFilters, endDate: e.target.value })}
                 className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               />
             </div>
             <Select
               label="Month"
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
+              value={localFilters.month}
+              onChange={(e) => setLocalFilters({ ...localFilters, month: parseInt(e.target.value) })}
               options={monthOptions}
             />
             <Select
               label="Year"
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+              value={localFilters.year}
+              onChange={(e) => setLocalFilters({ ...localFilters, year: parseInt(e.target.value) })}
               options={yearOptions}
             />
             {currentUser.role !== 'employee' && (
               <>
                 <Select
                   label="Employee"
-                  value={selectedEmployee}
-                  onChange={(e) => setSelectedEmployee(e.target.value)}
+                  value={localFilters.employee}
+                  onChange={(e) => setLocalFilters({ ...localFilters, employee: e.target.value })}
                   options={employeeOptions}
                 />
                 <Select
                   label="Status"
-                  value={selectedStatus}
-                  onChange={(e) => setSelectedStatus(e.target.value)}
+                  value={localFilters.status}
+                  onChange={(e) => setLocalFilters({ ...localFilters, status: e.target.value })}
                   options={statusOptions}
                 />
               </>
             )}
+            <Button
+              onClick={handleApplyFilters}
+              variant="primary"
+              className="mb-[2px]" // align with inputs
+            >
+              Apply Filters
+            </Button>
           </div>
           <div className="flex flex-wrap gap-4">
             <Button
