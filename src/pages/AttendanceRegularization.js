@@ -29,6 +29,7 @@ const AttendanceRegularization = () => {
     inTime: '',
     outTime: '',
     type: 'Missed Punch',
+    regularizationType: 'Both',
     reason: '',
     attachment: ''
   });
@@ -63,6 +64,7 @@ const AttendanceRegularization = () => {
       inTime: request.inTime || '',
       outTime: request.outTime || '',
       type: request.type || 'Missed Punch',
+      regularizationType: request.regularizationType || 'Both',
       reason: request.reason || '',
       attachment: request.attachment || ''
     });
@@ -191,7 +193,7 @@ const AttendanceRegularization = () => {
 
       setShowModal(false);
       setEditingRequest(null);
-      setFormData({ date: '', inTime: '', outTime: '', type: 'Missed Punch', reason: '', attachment: '' });
+      setFormData({ date: '', inTime: '', outTime: '', type: 'Missed Punch', regularizationType: 'Both', reason: '', attachment: '' });
     } catch (error) {
       setAlert({ type: 'error', message: error.message });
     }
@@ -219,53 +221,10 @@ const AttendanceRegularization = () => {
 
       // If Approved, update the actual Attendance Record in Firestore
       if (status === 'Approved') {
-        const { employeeId, date, inTime, outTime } = request;
+        const { employeeId, date, inTime, outTime, regularizationType } = request;
         const roster = rosters.find(r => r.employeeId === employeeId && r.date === date);
 
-        // 1. Calculate robust attendance data using central logic
-        // Only use biometricSync logic if we have both In and Out
-        let attendanceUpdate = {};
-
-        if (inTime && outTime) {
-          // We'll treat the user input "date" as the Work Date (Business Day)
-          // But we need to infer the clockOutDate for cross-midnight duration call
-          let clockOutDate = date;
-          const [inH] = inTime.split(':').map(Number);
-          const [outH] = outTime.split(':').map(Number);
-
-          if (outH < inH) {
-            // Crossed midnight logic
-            const nextDay = new Date(date);
-            nextDay.setDate(nextDay.getDate() + 1);
-            clockOutDate = nextDay.toISOString().split('T')[0];
-          }
-
-          // Assuming manual entry follows roster rules, but we recalculate status to be safe
-          const result = calculateAttendanceStatus(inTime, outTime, date, roster);
-
-          attendanceUpdate = {
-            clockIn: inTime,
-            clockOut: outTime,
-            status: result.status, // Use calculated status (e.g., Present, Half Day)
-            workHours: result.workHours,
-            workingDays: result.workingDays,
-            overtime: result.overtime,
-            regularizedBy: currentUser.id,
-            regularizedAt: serverTimestamp(),
-            isRegularized: true
-          };
-        } else {
-          attendanceUpdate = {
-            clockIn: inTime || null,
-            clockOut: outTime || null,
-            status: 'Present', // Default to Present for manual non-time entries
-            workingDays: 1.0,  // Assume full day for manual entries without time
-            regularizedBy: currentUser.id,
-            isRegularized: true
-          };
-        }
-
-        // 2. Find and Update existing records (handling duplicates)
+        // Find existing attendance record first
         const q = query(
           collection(db, 'attendance'),
           where('employeeId', '==', employeeId),
@@ -273,8 +232,102 @@ const AttendanceRegularization = () => {
         );
         const querySnapshot = await getDocs(q);
 
+        let existingData = {};
         if (!querySnapshot.empty) {
-          // Update the FIRST record found
+          existingData = querySnapshot.docs[0].data();
+        }
+
+        // Determine which fields to update based on regularizationType
+        let attendanceUpdate = {};
+
+        if (regularizationType === 'Login Only') {
+          // Only update clock-in, keep existing clock-out
+          const finalClockOut = existingData.clockOut || null;
+
+          if (inTime && finalClockOut) {
+            const result = calculateAttendanceStatus(inTime, finalClockOut, date, roster);
+            attendanceUpdate = {
+              clockIn: inTime,
+              status: result.status,
+              workHours: result.workHours,
+              workingDays: result.workingDays,
+              overtime: result.overtime,
+              regularizedBy: currentUser.id,
+              regularizedAt: serverTimestamp(),
+              isRegularized: true
+            };
+          } else {
+            attendanceUpdate = {
+              clockIn: inTime,
+              regularizedBy: currentUser.id,
+              regularizedAt: serverTimestamp(),
+              isRegularized: true
+            };
+          }
+        } else if (regularizationType === 'Logout Only') {
+          // Only update clock-out, keep existing clock-in
+          const finalClockIn = existingData.clockIn || null;
+
+          if (finalClockIn && outTime) {
+            const result = calculateAttendanceStatus(finalClockIn, outTime, date, roster);
+            attendanceUpdate = {
+              clockOut: outTime,
+              status: result.status,
+              workHours: result.workHours,
+              workingDays: result.workingDays,
+              overtime: result.overtime,
+              regularizedBy: currentUser.id,
+              regularizedAt: serverTimestamp(),
+              isRegularized: true
+            };
+          } else {
+            attendanceUpdate = {
+              clockOut: outTime,
+              regularizedBy: currentUser.id,
+              regularizedAt: serverTimestamp(),
+              isRegularized: true
+            };
+          }
+        } else {
+          // Both - update both times (existing behavior)
+          if (inTime && outTime) {
+            let clockOutDate = date;
+            const [inH] = inTime.split(':').map(Number);
+            const [outH] = outTime.split(':').map(Number);
+
+            if (outH < inH) {
+              const nextDay = new Date(date);
+              nextDay.setDate(nextDay.getDate() + 1);
+              clockOutDate = nextDay.toISOString().split('T')[0];
+            }
+
+            const result = calculateAttendanceStatus(inTime, outTime, date, roster);
+
+            attendanceUpdate = {
+              clockIn: inTime,
+              clockOut: outTime,
+              status: result.status,
+              workHours: result.workHours,
+              workingDays: result.workingDays,
+              overtime: result.overtime,
+              regularizedBy: currentUser.id,
+              regularizedAt: serverTimestamp(),
+              isRegularized: true
+            };
+          } else {
+            attendanceUpdate = {
+              clockIn: inTime || null,
+              clockOut: outTime || null,
+              status: 'Present',
+              workingDays: 1.0,
+              regularizedBy: currentUser.id,
+              isRegularized: true
+            };
+          }
+        }
+
+        // Update or create attendance record
+        if (!querySnapshot.empty) {
           const firstDoc = querySnapshot.docs[0];
           await updateDoc(firstDoc.ref, attendanceUpdate);
 
@@ -309,6 +362,14 @@ const AttendanceRegularization = () => {
     { header: 'Date', accessor: 'date' },
     { header: 'Type', accessor: 'type' },
     {
+      header: 'Regularization For',
+      render: (row) => (
+        <span className="text-xs px-2 py-1 rounded bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200">
+          {row.regularizationType || 'Both'}
+        </span>
+      )
+    },
+    {
       header: 'Reason',
       render: (row) => (
         <div className="max-w-xs truncate" title={row.reason}>
@@ -316,8 +377,8 @@ const AttendanceRegularization = () => {
         </div>
       )
     },
-    { header: 'In Time', accessor: 'inTime' },
-    { header: 'Out Time', accessor: 'outTime' },
+    { header: 'In Time', accessor: 'inTime', render: (row) => row.inTime || '-' },
+    { header: 'Out Time', accessor: 'outTime', render: (row) => row.outTime || '-' },
     { header: 'Submitted', accessor: 'submittedDate' },
     {
       header: 'Approver Notes',
@@ -367,7 +428,7 @@ const AttendanceRegularization = () => {
         {currentUser.role === 'employee' && (
           <Button onClick={() => {
             setEditingRequest(null);
-            setFormData({ date: '', inTime: '', outTime: '', type: 'Missed Punch', reason: '', attachment: '' });
+            setFormData({ date: '', inTime: '', outTime: '', type: 'Missed Punch', regularizationType: 'Both', reason: '', attachment: '' });
             setShowModal(true);
           }}>
             <FileText size={18} className="inline mr-2" />
@@ -447,25 +508,42 @@ const AttendanceRegularization = () => {
             </select>
           </div>
 
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Regularization For</label>
+            <select
+              value={formData.regularizationType}
+              onChange={(e) => setFormData({ ...formData, regularizationType: e.target.value })}
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            >
+              <option value="Both">Both Login & Logout</option>
+              <option value="Login Only">Login Only</option>
+              <option value="Logout Only">Logout Only</option>
+            </select>
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">In Time</label>
-              <input
-                type="time"
-                value={formData.inTime}
-                onChange={(e) => setFormData({ ...formData, inTime: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Out Time</label>
-              <input
-                type="time"
-                value={formData.outTime}
-                onChange={(e) => setFormData({ ...formData, outTime: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              />
-            </div>
+            {(formData.regularizationType === 'Both' || formData.regularizationType === 'Login Only') && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">In Time</label>
+                <input
+                  type="time"
+                  value={formData.inTime}
+                  onChange={(e) => setFormData({ ...formData, inTime: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                />
+              </div>
+            )}
+            {(formData.regularizationType === 'Both' || formData.regularizationType === 'Logout Only') && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Out Time</label>
+                <input
+                  type="time"
+                  value={formData.outTime}
+                  onChange={(e) => setFormData({ ...formData, outTime: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                />
+              </div>
+            )}
           </div>
 
           <div>
@@ -495,7 +573,17 @@ const AttendanceRegularization = () => {
             Note: Regularization allowed only for last {maxDaysBack} days
           </p>
 
-          <Button onClick={handleSubmit} className="w-full" disabled={!formData.date || !formData.reason}>
+          <Button
+            onClick={handleSubmit}
+            className="w-full"
+            disabled={
+              !formData.date ||
+              !formData.reason ||
+              (formData.regularizationType === 'Both' && (!formData.inTime || !formData.outTime)) ||
+              (formData.regularizationType === 'Login Only' && !formData.inTime) ||
+              (formData.regularizationType === 'Logout Only' && !formData.outTime)
+            }
+          >
             {editingRequest ? 'Update Request' : 'Submit Request'}
           </Button>
         </div>
