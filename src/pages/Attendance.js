@@ -139,7 +139,7 @@ const Attendance = () => {
               clockIn,
               clockOut: clockOut || null,
               clockOutDate: clockOut ? clockOutDate : null,
-              status: result.status,
+              status: manualData.status || result.status,
               workHours: result.workHours,
               workingDays: result.workingDays,
               overtime: result.overtime,
@@ -148,8 +148,22 @@ const Attendance = () => {
               updatedBy: currentUser.id,
               updatedAt: serverTimestamp()
             };
+          } else if (manualData.status) {
+            // Manual status only (Leaves etc)
+            attendanceUpdate = {
+              clockIn: null,
+              clockOut: null,
+              status: manualData.status,
+              workHours: 0,
+              workingDays: manualData.status === 'Present' ? 1 : (manualData.status === 'Half Day' ? 0.5 : 0),
+              overtime: 0,
+              ruleApplied: 'Manual Override',
+              manualEntry: true,
+              updatedBy: currentUser.id,
+              updatedAt: serverTimestamp()
+            };
           } else {
-            if (!clockIn && !clockOut) continue;
+            continue;
           }
 
           // Update Firestore
