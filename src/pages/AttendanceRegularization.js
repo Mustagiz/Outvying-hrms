@@ -304,7 +304,6 @@ return (
   <div>
     <div className="flex justify-between items-center mb-6">
       <h1 className="text-3xl font-bold text-gray-800 dark:text-white">Attendance Regularization</h1>
-      <h1 className="text-3xl font-bold text-gray-800 dark:text-white">Attendance Regularization</h1>
       {currentUser.role === 'employee' && (
         <Button onClick={() => {
           setEditingRequest(null);
