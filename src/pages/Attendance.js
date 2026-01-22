@@ -334,39 +334,43 @@ const Attendance = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         <Card title="Today's Attendance">
           <div className="space-y-4">
-            <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-              <div className="flex items-center space-x-3">
-                <Clock className="text-primary-600" size={24} />
-                <div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Clock In</p>
-                  <p className="text-lg font-semibold text-gray-800 dark:text-white">
-                    {todayAttendance?.clockIn || 'Not clocked in'}
-                  </p>
+            {currentUser.role !== 'employee' && (
+              <>
+                <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                  <div className="flex items-center space-x-3">
+                    <Clock className="text-primary-600" size={24} />
+                    <div>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Clock In</p>
+                      <p className="text-lg font-semibold text-gray-800 dark:text-white">
+                        {todayAttendance?.clockIn || 'Not clocked in'}
+                      </p>
+                    </div>
+                  </div>
+                  <Button onClick={handleClockIn} disabled={todayAttendance?.clockIn}>
+                    Clock In
+                  </Button>
                 </div>
-              </div>
-              <Button onClick={handleClockIn} disabled={todayAttendance?.clockIn}>
-                Clock In
-              </Button>
-            </div>
 
-            <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-              <div className="flex items-center space-x-3">
-                <Clock className="text-primary-600" size={24} />
-                <div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Clock Out</p>
-                  <p className="text-lg font-semibold text-gray-800 dark:text-white">
-                    {todayAttendance?.clockOut || 'Not clocked out'}
-                  </p>
+                <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                  <div className="flex items-center space-x-3">
+                    <Clock className="text-primary-600" size={24} />
+                    <div>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Clock Out</p>
+                      <p className="text-lg font-semibold text-gray-800 dark:text-white">
+                        {todayAttendance?.clockOut || 'Not clocked out'}
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    onClick={handleClockOut}
+                    disabled={!todayAttendance?.clockIn || todayAttendance?.clockOut}
+                    variant="secondary"
+                  >
+                    Clock Out
+                  </Button>
                 </div>
-              </div>
-              <Button
-                onClick={handleClockOut}
-                disabled={!todayAttendance?.clockIn || todayAttendance?.clockOut}
-                variant="secondary"
-              >
-                Clock Out
-              </Button>
-            </div>
+              </>
+            )}
 
             {todayAttendance && (
               <div className="p-4 bg-primary-50 dark:bg-primary-900/20 rounded-lg">
