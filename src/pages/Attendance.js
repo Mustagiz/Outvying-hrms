@@ -16,6 +16,8 @@ const Attendance = () => {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedEmployee, setSelectedEmployee] = useState(currentUser.role === 'employee' ? String(currentUser.id) : 'all');
   const [selectedStatus, setSelectedStatus] = useState('all');
+  const [startDateFilter, setStartDateFilter] = useState('');
+  const [endDateFilter, setEndDateFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
@@ -188,18 +190,43 @@ const Attendance = () => {
     // 2. Apply filters
     filtered = filtered.filter(a => {
       const date = new Date(a.date);
-      const matchesMonth = date.getMonth() === selectedMonth;
-      const matchesYear = date.getFullYear() === selectedYear;
+
+      // Date range filter (takes precedence over month/year if set)
+      if (startDateFilter && endDateFilter) {
+        const recordDate = new Date(a.date);
+        const startDate = new Date(startDateFilter);
+        const endDate = new Date(endDateFilter);
+        if (recordDate < startDate || recordDate > endDate) {
+          return false;
+        }
+      } else if (startDateFilter || endDateFilter) {
+        // If only one date is set, filter accordingly
+        const recordDate = new Date(a.date);
+        if (startDateFilter && recordDate < new Date(startDateFilter)) {
+          return false;
+        }
+        if (endDateFilter && recordDate > new Date(endDateFilter)) {
+          return false;
+        }
+      } else {
+        // Use month/year filters only if date range is not set
+        const matchesMonth = date.getMonth() === selectedMonth;
+        const matchesYear = date.getFullYear() === selectedYear;
+        if (!matchesMonth || !matchesYear) {
+          return false;
+        }
+      }
+
       const matchesEmployee = currentUser.role === 'employee'
         ? String(a.employeeId) === String(currentUser.id)
         : selectedEmployee === 'all' ? true : String(a.employeeId) === String(selectedEmployee);
       const matchesStatus = selectedStatus === 'all' ? true : a.status === selectedStatus;
 
-      return matchesMonth && matchesYear && matchesEmployee && matchesStatus;
+      return matchesEmployee && matchesStatus;
     });
 
     return filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
-  }, [attendance, allUsers, selectedMonth, selectedYear, selectedEmployee, selectedStatus, currentUser]);
+  }, [attendance, allUsers, selectedMonth, selectedYear, selectedEmployee, selectedStatus, startDateFilter, endDateFilter, currentUser]);
 
   const paginatedAttendance = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
@@ -212,7 +239,7 @@ const Attendance = () => {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedMonth, selectedYear, selectedEmployee, selectedStatus]);
+  }, [selectedMonth, selectedYear, selectedEmployee, selectedStatus, startDateFilter, endDateFilter]);
 
   const attendanceStats = useMemo(() => {
     const present = filteredAttendance.filter(a => (a.status === 'Present' || a.status === 'Late' || !a.clockOut) && a.status !== 'Absent' && a.status !== 'LWP').length;
@@ -358,6 +385,24 @@ const Attendance = () => {
       <Card title="Attendance History">
         <div className="mb-4">
           <div className="flex flex-wrap gap-4 mb-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Start Date</label>
+              <input
+                type="date"
+                value={startDateFilter}
+                onChange={(e) => setStartDateFilter(e.target.value)}
+                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">End Date</label>
+              <input
+                type="date"
+                value={endDateFilter}
+                onChange={(e) => setEndDateFilter(e.target.value)}
+                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              />
+            </div>
             <Select
               label="Month"
               value={selectedMonth}
