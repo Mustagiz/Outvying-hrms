@@ -3,10 +3,10 @@ import { useAuth } from '../context/AuthContext';
 import { Card, Table, Input, Select, Modal, Button } from '../components/UI';
 import { departments } from '../data/mockData';
 import { filterData } from '../utils/helpers';
-import { Mail, Phone, MapPin, Briefcase, Edit2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Mail, Phone, MapPin, Briefcase, Edit2, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
 
 const EmployeeDirectory = () => {
-  const { allUsers, currentUser, updateUser } = useAuth();
+  const { allUsers, currentUser, updateUser, deleteUser } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState('all');
   const [selectedEmployee, setSelectedEmployee] = useState(null);
@@ -15,6 +15,7 @@ const EmployeeDirectory = () => {
   const [editForm, setEditForm] = useState({});
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+  const [isDeleting, setIsDeleting] = useState(null);
 
   const employees = allUsers.filter(u => u.role === 'employee' || u.role === 'hr');
 
@@ -93,6 +94,27 @@ const EmployeeDirectory = () => {
               className="text-xs py-1 px-3"
             >
               <Edit2 size={14} className="inline mr-1" />Edit
+            </Button>
+          )}
+          {(currentUser.role === 'Admin' || currentUser.role === 'admin') && (
+            <Button
+              onClick={async () => {
+                if (window.confirm(`Are you sure you want to delete ${row.name}? This action cannot be undone.`)) {
+                  setIsDeleting(row.id || row.uid);
+                  const result = await deleteUser(row.id || row.uid);
+                  setIsDeleting(null);
+                  if (result.success) {
+                    alert('Employee deleted successfully');
+                  } else {
+                    alert('Failed to delete employee: ' + result.message);
+                  }
+                }
+              }}
+              variant="danger"
+              className="text-xs py-1 px-3 bg-red-600 hover:bg-red-700 text-white"
+              loading={isDeleting === (row.id || row.uid)}
+            >
+              <Trash2 size={14} className="inline mr-1" />Delete
             </Button>
           )}
         </div>
@@ -176,8 +198,8 @@ const EmployeeDirectory = () => {
                     key={i + 1}
                     onClick={() => setCurrentPage(i + 1)}
                     className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${currentPage === i + 1
-                        ? 'bg-primary-600 text-white'
-                        : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                      ? 'bg-primary-600 text-white'
+                      : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
                       }`}
                   >
                     {i + 1}
