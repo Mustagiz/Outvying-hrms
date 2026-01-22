@@ -22,6 +22,7 @@ import {
   doc,
   where,
   getDoc,
+  getDocs,
   setDoc,
   serverTimestamp
 } from 'firebase/firestore';
