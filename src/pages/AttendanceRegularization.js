@@ -141,8 +141,10 @@ const AttendanceRegularization = () => {
           attendanceUpdate = {
             clockIn: inTime || null,
             clockOut: outTime || null,
-            status: 'Regularized',
-            regularizedBy: currentUser.id
+            status: 'Present', // Default to Present for manual non-time entries
+            workingDays: 1.0,  // Assume full day for manual entries without time
+            regularizedBy: currentUser.id,
+            isRegularized: true
           };
         }
 
