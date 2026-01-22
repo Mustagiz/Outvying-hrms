@@ -165,6 +165,13 @@ const Layout = ({ children }) => {
             </div>
             <div className="flex items-center space-x-2 md:space-x-4">
               <button
+                onClick={handleLogout}
+                className="p-1.5 md:p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 lg:hidden"
+                title="Logout"
+              >
+                <LogOut size={18} />
+              </button>
+              <button
                 onClick={toggleTheme}
                 className="p-1.5 md:p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
               >
