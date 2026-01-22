@@ -98,6 +98,47 @@ const Roster = () => {
         timezone: 'Asia/Kolkata'
     });
 
+    // Holiday Modal State
+    const [showHolidayModal, setShowHolidayModal] = useState(false);
+    const [holidayFormData, setHolidayFormData] = useState({
+        selectedEmployees: [],
+        date: '',
+        type: 'Holiday' // 'Holiday' or 'Weekly Off'
+    });
+
+    const handleHolidaySubmit = async (e) => {
+        e.preventDefault();
+        if (holidayFormData.selectedEmployees.length === 0 || !holidayFormData.date) {
+            setAlert({ type: 'error', message: 'Please select employees and a date' });
+            return;
+        }
+
+        const shiftConfig = holidayFormData.type === 'Holiday'
+            ? { shiftName: 'Holiday', startTime: '00:00', endTime: '00:00', fullDayHours: 0, halfDayHours: 0 }
+            : { shiftName: 'Weekly Off', startTime: '00:00', endTime: '00:00', fullDayHours: 0, halfDayHours: 0 };
+
+        try {
+            const result = await assignRoster({
+                ...shiftConfig,
+                employeeIds: holidayFormData.selectedEmployees,
+                startDate: holidayFormData.date,
+                endDate: holidayFormData.date, // Single day
+                gracePeriod: 0,
+                timezone: 'Asia/Kolkata'
+            });
+
+            setAlert({ type: result.success ? 'success' : 'error', message: result.message });
+            if (result.success) {
+                setShowHolidayModal(false);
+                setHolidayFormData({ selectedEmployees: [], date: '', type: 'Holiday' });
+            }
+        } catch (error) {
+            console.error("Holiday Assign Error:", error);
+            setAlert({ type: 'error', message: 'Failed to assign holiday' });
+        }
+        setTimeout(() => setAlert(null), 3000);
+    };
+
     const shifts = [
         { name: 'Morning Shift', startTime: '09:00', endTime: '18:00', fullDayHours: 8.0, halfDayHours: 4.0, timezone: 'Asia/Kolkata', color: 'bg-blue-100 text-blue-800 border-blue-200' },
         { name: 'Evening Shift', startTime: '14:00', endTime: '23:00', fullDayHours: 8.0, halfDayHours: 4.0, timezone: 'Asia/Kolkata', color: 'bg-purple-100 text-purple-800 border-purple-200' },
@@ -573,13 +614,22 @@ const Roster = () => {
                         </div>
                     )}
                     {(currentUser.role === 'admin' || currentUser.role === 'hr') && (
-                        <button
-                            onClick={() => setShowModal(true)}
-                            className="flex items-center gap-2 bg-gradient-to-r from-primary-600 to-indigo-600 dark:from-primary-500 dark:to-indigo-500 text-white font-bold py-2.5 px-6 rounded-xl shadow-lg shadow-primary-500/25 dark:shadow-none hover:scale-105 hover:shadow-xl active:scale-95 transition-all duration-300 border border-white/10 group"
-                        >
-                            <UserPlus size={18} className="group-hover:rotate-12 transition-transform" />
-                            <span className="uppercase tracking-wider text-sm">Assign Shift</span>
-                        </button>
+                        <>
+                            <button
+                                onClick={() => setShowHolidayModal(true)}
+                                className="flex items-center gap-2 bg-gradient-to-r from-green-600 to-teal-600 dark:from-green-500 dark:to-teal-500 text-white font-bold py-2.5 px-6 rounded-xl shadow-lg shadow-green-500/25 dark:shadow-none hover:scale-105 hover:shadow-xl active:scale-95 transition-all duration-300 border border-white/10 group"
+                            >
+                                <CalendarIcon size={18} className="group-hover:rotate-12 transition-transform" />
+                                <span className="uppercase tracking-wider text-sm">Mark Holiday</span>
+                            </button>
+                            <button
+                                onClick={() => setShowModal(true)}
+                                className="flex items-center gap-2 bg-gradient-to-r from-primary-600 to-indigo-600 dark:from-primary-500 dark:to-indigo-500 text-white font-bold py-2.5 px-6 rounded-xl shadow-lg shadow-primary-500/25 dark:shadow-none hover:scale-105 hover:shadow-xl active:scale-95 transition-all duration-300 border border-white/10 group"
+                            >
+                                <UserPlus size={18} className="group-hover:rotate-12 transition-transform" />
+                                <span className="uppercase tracking-wider text-sm">Assign Shift</span>
+                            </button>
+                        </>
                     )}
                 </div>
             </div>
@@ -1156,6 +1206,93 @@ const Roster = () => {
                     </div>
                 </div>
             </Modal>
+
+            {/* Holiday / Weekly Off Modal */}
+            <Modal isOpen={showHolidayModal} onClose={() => setShowHolidayModal(false)} title="Mark Holiday / Weekly Off">
+                <form onSubmit={handleHolidaySubmit} className="space-y-4">
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                        Quickly mark days as Holiday or Weekly Off for employees. This will set a 0-hour shift for the selected date.
+                    </p>
+
+                    <div className="mb-4">
+                        <div className="flex justify-between items-center mb-2">
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                Select Employees
+                            </label>
+                            <label className="flex items-center space-x-2 text-sm text-primary-600 cursor-pointer hover:text-primary-700">
+                                <input
+                                    type="checkbox"
+                                    className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                                    onChange={(e) => {
+                                        if (e.target.checked) {
+                                            const allEmpIds = allUsers.filter(u => u.role === 'employee').map(u => u.id);
+                                            setHolidayFormData(prev => ({ ...prev, selectedEmployees: allEmpIds }));
+                                        } else {
+                                            setHolidayFormData(prev => ({ ...prev, selectedEmployees: [] }));
+                                        }
+                                    }}
+                                    checked={allUsers.filter(u => u.role === 'employee').length > 0 && holidayFormData.selectedEmployees.length === allUsers.filter(u => u.role === 'employee').length}
+                                />
+                                <span>Select All</span>
+                            </label>
+                        </div>
+                        <div className="border border-gray-300 dark:border-gray-600 rounded-lg max-h-48 overflow-y-auto p-2 bg-white dark:bg-gray-700">
+                            {allUsers.filter(u => u.role === 'employee').map(u => (
+                                <label key={u.id} className="flex items-center space-x-3 p-2 hover:bg-gray-50 dark:hover:bg-gray-600 rounded cursor-pointer transition-colors border-b border-gray-100 dark:border-gray-600 last:border-0">
+                                    <input
+                                        type="checkbox"
+                                        checked={holidayFormData.selectedEmployees.includes(u.id)}
+                                        onChange={() => {
+                                            setHolidayFormData(prev => {
+                                                const currentSelected = prev.selectedEmployees;
+                                                if (currentSelected.includes(u.id)) {
+                                                    return { ...prev, selectedEmployees: currentSelected.filter(id => id !== u.id) };
+                                                } else {
+                                                    return { ...prev, selectedEmployees: [...currentSelected, u.id] };
+                                                }
+                                            });
+                                        }}
+                                        className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                                    />
+                                    <span className="text-sm text-gray-700 dark:text-gray-200 font-medium">{u.name} <span className="text-xs text-gray-500 dark:text-gray-400 font-normal">({u.employeeId})</span></span>
+                                </label>
+                            ))}
+                        </div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 text-right">
+                            {holidayFormData.selectedEmployees.length} selected
+                        </p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <Input
+                            label="Date"
+                            type="date"
+                            value={holidayFormData.date}
+                            onChange={(e) => setHolidayFormData({ ...holidayFormData, date: e.target.value })}
+                            required
+                        />
+                        <Select
+                            label="Type"
+                            value={holidayFormData.type}
+                            onChange={(e) => setHolidayFormData({ ...holidayFormData, type: e.target.value })}
+                            options={[
+                                { value: 'Holiday', label: 'Holiday' },
+                                { value: 'Weekly Off', label: 'Weekly Off' }
+                            ]}
+                        />
+                    </div>
+
+                    <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+                        <Button type="button" variant="secondary" onClick={() => setShowHolidayModal(false)}>
+                            Cancel
+                        </Button>
+                        <Button type="submit">
+                            Assign {holidayFormData.type}
+                        </Button>
+                    </div>
+                </form>
+            </Modal>
+
 
             {/* Bulk Modify Modal */}
             <Modal isOpen={showBulkModifyModal} onClose={() => setShowBulkModifyModal(false)} title="Bulk Modify Rosters">
