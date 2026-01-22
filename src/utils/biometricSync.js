@@ -222,7 +222,12 @@ export const processBiometricImport = (importedRows, users, rosters, currentAtte
   importedRows.forEach((row, index) => {
     const empId = row['EmployeeID'] || row['Employee ID'] || row['EmpID'];
     const date = row['Date']; // YYYY-MM-DD
-    const time = row['Time']; // HH:MM
+    let time = row['Time']; // HH:MM
+
+    // Normalize time to HH:MM if it has seconds
+    if (time && time.split(':').length > 2) {
+      time = time.split(':').slice(0, 2).join(':');
+    }
 
     if (!empId || !date || !time) {
       // Skip invalid rows or log error
