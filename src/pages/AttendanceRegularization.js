@@ -10,7 +10,7 @@ import {
 import { db } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
 import { Card, Button, Modal, Table, Alert } from '../components/UI';
-import { FileText, CheckCircle, XCircle } from 'lucide-react';
+import { FileText, CheckCircle, XCircle, Edit2 } from 'lucide-react';
 import { getEffectiveWorkDate, calculateAbsDuration } from '../utils/helpers';
 import { calculateAttendanceStatus } from '../utils/biometricSync';
 
@@ -18,6 +18,7 @@ const AttendanceRegularization = () => {
   const { currentUser, attendance, allUsers, regularizationRequests, rosters } = useAuth();
   const [showModal, setShowModal] = useState(false);
   const [alert, setAlert] = useState(null);
+  const [editingRequest, setEditingRequest] = useState(null);
   const [formData, setFormData] = useState({
     date: '',
     inTime: '',
@@ -36,6 +37,19 @@ const AttendanceRegularization = () => {
         currentUser.role === 'hr' || currentUser.role === 'admin' ? true : false
     ).sort((a, b) => new Date(b.submittedDate) - new Date(a.submittedDate));
   }, [regularizationRequests, currentUser]);
+
+  const handleEdit = (request) => {
+    setEditingRequest(request);
+    setFormData({
+      date: request.date || '',
+      inTime: request.inTime || '',
+      outTime: request.outTime || '',
+      type: request.type || 'Missed Punch',
+      reason: request.reason || '',
+      attachment: request.attachment || ''
+    });
+    setShowModal(true);
+  };
 
   const handleSubmit = async () => {
     try {
@@ -58,22 +72,33 @@ const AttendanceRegularization = () => {
         throw new Error('A pending request already exists for this date');
       }
 
-      // Create Request Payload
-      const newRequest = {
-        employeeId: currentUser.id,
-        employeeName: currentUser.name,
-        managerId: allUsers.find(u => u.name === currentUser.reportingTo)?.id || 'admin',
-        ...formData,
-        status: 'Pending',
-        submittedDate: new Date().toISOString().split('T')[0],
-        createdAt: serverTimestamp(),
-        auditLog: [{ action: 'Submitted', by: currentUser.name, date: new Date().toISOString() }]
-      };
+      if (editingRequest) {
+        // Update Existing Request
+        const requestRef = doc(db, 'regularizationRequests', editingRequest.id);
+        await updateDoc(requestRef, {
+          ...formData,
+          auditLog: [...(editingRequest.auditLog || []), { action: 'Modified', by: currentUser.name, date: new Date().toISOString() }]
+        });
+        setAlert({ type: 'success', message: 'Regularization request updated successfully' });
+      } else {
+        // Create Request Payload
+        const newRequest = {
+          employeeId: currentUser.id,
+          employeeName: currentUser.name,
+          managerId: allUsers.find(u => u.name === currentUser.reportingTo)?.id || 'admin',
+          ...formData,
+          status: 'Pending',
+          submittedDate: new Date().toISOString().split('T')[0],
+          createdAt: serverTimestamp(),
+          auditLog: [{ action: 'Submitted', by: currentUser.name, date: new Date().toISOString() }]
+        };
 
-      await addDoc(collection(db, 'regularizationRequests'), newRequest);
+        await addDoc(collection(db, 'regularizationRequests'), newRequest);
+        setAlert({ type: 'success', message: 'Regularization request submitted successfully' });
+      }
 
-      setAlert({ type: 'success', message: 'Regularization request submitted successfully' });
       setShowModal(false);
+      setEditingRequest(null);
       setFormData({ date: '', inTime: '', outTime: '', type: 'Missed Punch', reason: '', attachment: '' });
     } catch (error) {
       setAlert({ type: 'error', message: error.message });
@@ -198,6 +223,9 @@ const AttendanceRegularization = () => {
       header: 'Actions',
       render: (row) => row.status === 'Pending' && (currentUser.role === 'hr' || currentUser.role === 'admin') ? (
         <div className="flex gap-2">
+          <Button onClick={() => handleEdit(row)} variant="secondary" className="text-xs py-1 px-2">
+            <Edit2 size={14} className="inline mr-1" /> Edit
+          </Button>
           <Button onClick={() => handleApproval(row.id, 'Approved', '')} variant="success" className="text-xs py-1 px-2">
             <CheckCircle size={14} className="inline mr-1" /> Approve
           </Button>
@@ -213,8 +241,13 @@ const AttendanceRegularization = () => {
     <div>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-gray-800 dark:text-white">Attendance Regularization</h1>
+        <h1 className="text-3xl font-bold text-gray-800 dark:text-white">Attendance Regularization</h1>
         {currentUser.role === 'employee' && (
-          <Button onClick={() => setShowModal(true)}>
+          <Button onClick={() => {
+            setEditingRequest(null);
+            setFormData({ date: '', inTime: '', outTime: '', type: 'Missed Punch', reason: '', attachment: '' });
+            setShowModal(true);
+          }}>
             <FileText size={18} className="inline mr-2" />
             Request Regularization
           </Button>
@@ -227,7 +260,7 @@ const AttendanceRegularization = () => {
         <Table columns={columns} data={myRequests} />
       </Card>
 
-      <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="Attendance Regularization Request">
+      <Modal isOpen={showModal} onClose={() => setShowModal(false)} title={editingRequest ? "Modify Regularization Request" : "Attendance Regularization Request"}>
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Select Date</label>
@@ -303,7 +336,7 @@ const AttendanceRegularization = () => {
           </p>
 
           <Button onClick={handleSubmit} className="w-full" disabled={!formData.date || !formData.reason}>
-            Submit Request
+            {editingRequest ? 'Update Request' : 'Submit Request'}
           </Button>
         </div>
       </Modal>
