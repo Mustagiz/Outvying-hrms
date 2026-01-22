@@ -623,13 +623,37 @@ export const AuthProvider = ({ children }) => {
   // ROSTER - ASSIGN
   const assignRoster = async (rosterData) => {
     const { employeeIds, startDate, endDate, ...rest } = rosterData;
-    // Batch writes recommended for efficiency, but simple loop for now
     try {
       const promises = [];
-      employeeIds.forEach(empId => {
-        // We need name for display. Find in allUsers
+      for (const empId of employeeIds) {
         const employee = allUsers.find(u => u.id === empId || u.uid === empId);
         const employeeName = employee?.name || 'Unknown';
+
+        const processDate = async (dateStr) => {
+          // 1. Add/Assign Roster
+          const rosterRef = await addDoc(collection(db, 'rosters'), {
+            ...rest,
+            employeeId: empId,
+            employeeName,
+            date: dateStr,
+            assignedAt: serverTimestamp()
+          });
+
+          // 2. Sync existing attendance for this date
+          const attRecord = attendance.find(a => String(a.employeeId) === String(empId) && a.date === dateStr);
+          if (attRecord && attRecord.clockIn) {
+            console.log("AuthContext: Retro-syncing attendance for:", empId, dateStr);
+            const rosterData = { ...rest, employeeId: empId, date: dateStr };
+            const result = calculateAttendanceStatus(attRecord.clockIn, attRecord.clockOut, attRecord.istDate, rosterData);
+            await updateDoc(doc(db, 'attendance', attRecord.id), {
+              status: result.status,
+              workHours: result.workHours,
+              workingDays: result.workingDays,
+              overtime: result.overtime,
+              ruleApplied: result.ruleApplied
+            });
+          }
+        };
 
         if (startDate && endDate) {
           const start = new Date(startDate);
@@ -637,28 +661,16 @@ export const AuthProvider = ({ children }) => {
 
           for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
             const dateStr = d.toISOString().split('T')[0];
-            promises.push(addDoc(collection(db, 'rosters'), {
-              ...rest,
-              employeeId: empId,
-              employeeName,
-              date: dateStr,
-              assignedAt: serverTimestamp()
-            }));
+            promises.push(processDate(dateStr));
           }
         } else {
-          // Single Date logic if applicable (UI mostly sends ranges)
-          promises.push(addDoc(collection(db, 'rosters'), {
-            ...rest,
-            employeeId: empId,
-            employeeName,
-            date: rosterData.date || startDate, // fallback
-            assignedAt: serverTimestamp()
-          }));
+          const dateStr = rosterData.date || startDate;
+          promises.push(processDate(dateStr));
         }
-      });
+      }
 
       await Promise.all(promises);
-      return { success: true, message: `Roster assigned successfully` };
+      return { success: true, message: `Roster assigned and attendance synchronized` };
 
     } catch (error) {
       console.error("Roster Assign Error", error);
@@ -679,10 +691,36 @@ export const AuthProvider = ({ children }) => {
   // ROSTER - UPDATE
   const updateRoster = async (id, updatedData) => {
     try {
-      await updateDoc(doc(db, 'rosters', id), updatedData);
-      return { success: true, message: 'Roster updated successfully' };
+      const rosterRef = doc(db, 'rosters', id);
+      const rosterSnap = await getDoc(rosterRef);
+      if (!rosterSnap.exists()) throw new Error("Roster not found");
+      const oldRoster = rosterSnap.data();
+
+      await updateDoc(rosterRef, updatedData);
+
+      const newRoster = { ...oldRoster, ...updatedData };
+
+      // Sync attendance if it already exists for this roster's employee and date
+      const attRecord = attendance.find(a =>
+        String(a.employeeId) === String(newRoster.employeeId) && a.date === newRoster.date
+      );
+
+      if (attRecord && attRecord.clockIn) {
+        console.log("AuthContext: Syncing attendance after roster update for:", attRecord.id);
+        const result = calculateAttendanceStatus(attRecord.clockIn, attRecord.clockOut, attRecord.istDate, newRoster);
+        await updateDoc(doc(db, 'attendance', attRecord.id), {
+          status: result.status,
+          workHours: result.workHours,
+          workingDays: result.workingDays,
+          overtime: result.overtime,
+          ruleApplied: result.ruleApplied
+        });
+      }
+
+      return { success: true, message: 'Roster updated and attendance synchronized' };
     } catch (error) {
-      return { success: false, message: 'Update failed' };
+      console.error("Update Roster Error:", error);
+      return { success: false, message: 'Update failed: ' + error.message };
     }
   };
 
