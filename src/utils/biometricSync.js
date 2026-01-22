@@ -3,7 +3,17 @@ import { calculateAbsDuration, getEffectiveWorkDate } from './helpers';
 // Biometric attendance calculation utilities
 
 export const calculateAttendanceStatus = (clockIn, clockOut, date = null, roster = null) => {
+  const istDate = date || new Date().toISOString().split('T')[0];
+
   if (!clockIn) {
+    // Default Weekend Logic: Sat (6) and Sun (0) are Weekly Offs if no roster
+    // If roster exists, we assume roster handles off days (e.g. shift name 'Weekly Off')
+    // But if roster is purely shift timing, we might need check roster.isOff
+    // For now, if no roster is provided (Standard Office), Sat/Sun are OFF.
+    const day = new Date(istDate).getDay();
+    if (!roster && (day === 0 || day === 6)) {
+      return { status: 'Weekly Off', workHours: 0, workingDays: 0, ruleApplied: 'Default Weekend' };
+    }
     return { status: 'Absent', workHours: 0, workingDays: 0 };
   }
 
