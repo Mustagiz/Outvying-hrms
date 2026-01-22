@@ -65,6 +65,7 @@ export const AuthProvider = ({ children }) => {
   const [rosters, setRosters] = useState([]);
   const [manualLeaveAllocations, setManualLeaveAllocations] = useState([]);
   const [regularizationRequests, setRegularizationRequests] = useState([]);
+  const [notifications, setNotifications] = useState([]);
 
   // Local State
   const [theme, setTheme] = useState('light');
@@ -237,6 +238,21 @@ export const AuthProvider = ({ children }) => {
       setRegularizationRequests(regData);
     });
 
+    // Subscribe to Notifications (filtered by current user)
+    const notificationsQuery = query(
+      collection(db, 'notifications'),
+      where('userId', '==', currentUser.id)
+    );
+    const unsubNotifications = onSnapshot(notificationsQuery, (snapshot) => {
+      const notifData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      // Sort by createdAt descending (newest first)
+      setNotifications(notifData.sort((a, b) => {
+        const aTime = a.createdAt?.toMillis?.() || 0;
+        const bTime = b.createdAt?.toMillis?.() || 0;
+        return bTime - aTime;
+      }));
+    });
+
     // Subscribe to IP Restrictions Settings
     const unsubIPSettings = onSnapshot(doc(db, 'settings', 'ipRestrictions'), (docSnap) => {
       if (docSnap.exists()) {
@@ -272,6 +288,7 @@ export const AuthProvider = ({ children }) => {
       unsubManualLeaves();
       unsubIPSettings();
       unsubRegularization();
+      unsubNotifications();
     };
 
   }, [currentUser]);
@@ -989,6 +1006,53 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // --- NOTIFICATION FUNCTIONS ---
+  const createNotification = async (notificationData) => {
+    try {
+      const { userId, type, title, message, relatedId, actionUrl } = notificationData;
+      await addDoc(collection(db, 'notifications'), {
+        userId,
+        type,
+        title,
+        message,
+        relatedId: relatedId || null,
+        actionUrl: actionUrl || null,
+        read: false,
+        createdAt: serverTimestamp()
+      });
+      return { success: true };
+    } catch (error) {
+      console.error('Failed to create notification:', error);
+      return { success: false, message: error.message };
+    }
+  };
+
+  const markNotificationAsRead = async (notificationId) => {
+    try {
+      await updateDoc(doc(db, 'notifications', notificationId), {
+        read: true
+      });
+      return { success: true };
+    } catch (error) {
+      console.error('Failed to mark notification as read:', error);
+      return { success: false, message: error.message };
+    }
+  };
+
+  const markAllNotificationsAsRead = async () => {
+    try {
+      const unreadNotifications = notifications.filter(n => !n.read);
+      const promises = unreadNotifications.map(n =>
+        updateDoc(doc(db, 'notifications', n.id), { read: true })
+      );
+      await Promise.all(promises);
+      return { success: true };
+    } catch (error) {
+      console.error('Failed to mark all notifications as read:', error);
+      return { success: false, message: error.message };
+    }
+  };
+
   const value = {
     currentUser,
     allUsers,
@@ -1096,7 +1160,12 @@ export const AuthProvider = ({ children }) => {
         return { success: false, message: error.message };
       }
     },
-    ipSettings
+    ipSettings,
+    // Notifications
+    notifications,
+    createNotification,
+    markNotificationAsRead,
+    markAllNotificationsAsRead
   };
 
   return (

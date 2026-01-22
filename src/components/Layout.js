@@ -6,6 +6,7 @@ import {
   Briefcase, DollarSign, CheckSquare, BarChart2, Settings,
   LogOut, Menu, X, Sun, Moon, BookOpen, Fingerprint, Megaphone, UserCog, Wallet, CreditCard, Building, Shield
 } from 'lucide-react';
+import NotificationBell from './NotificationBell';
 
 const Layout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -177,6 +178,7 @@ const Layout = ({ children }) => {
               >
                 {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
               </button>
+              <NotificationBell />
               <div className="w-7 h-7 md:w-10 md:h-10 rounded-full bg-primary-600 flex items-center justify-center text-white font-semibold text-xs md:text-base">
                 {currentUser?.name?.charAt(0)}
               </div>
