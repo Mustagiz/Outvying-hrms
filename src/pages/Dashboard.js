@@ -107,17 +107,17 @@ const Dashboard = () => {
       {alert && <Alert type={alert.type} message={alert.message} onClose={() => setAlert(null)} />}
 
       {/* IP Status Banner */}
-      <div className={`mb-6 p-4 rounded-lg flex items-center justify-between ${ipValidation.allowed
+      <div className={`mb-6 p-4 rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 ${ipValidation.allowed
         ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800'
         : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800'
         }`}>
         <div>
-          <p className={`text-sm font-medium ${ipValidation.allowed ? 'text-green-800 dark:text-green-200' : 'text-red-800 dark:text-red-200'
+          <p className={`text-xs sm:text-sm font-medium ${ipValidation.allowed ? 'text-green-800 dark:text-green-200' : 'text-red-800 dark:text-red-200'
             }`}>
             {ipValidation.allowed ? '✓' : '⚠'} Connected from {currentIP} {ipValidation.allowed ? `(${ipValidation.location})` : '(Unauthorized)'}
           </p>
           {!ipValidation.allowed && (
-            <p className="text-xs text-red-700 dark:text-red-300 mt-1">
+            <p className="text-[10px] sm:text-xs text-red-700 dark:text-red-300 mt-1">
               Some features may be restricted. Connect from office network or approved VPN.
             </p>
           )}

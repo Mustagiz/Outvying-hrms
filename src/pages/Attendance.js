@@ -362,7 +362,7 @@ const Attendance = () => {
           </>
         )}
 
-        <Table columns={columns} data={filteredAttendance} />
+        <Table columns={columns} data={filteredAttendance} responsive={true} />
       </Card>
     </div>
   );

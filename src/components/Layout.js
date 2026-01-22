@@ -143,22 +143,22 @@ const Layout = ({ children }) => {
       </aside>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden pb-16 lg:pb-0">
         {/* Header */}
-        <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3">
+        <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-3 md:px-4 py-2 md:py-3">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 md:gap-3">
               <button
                 onClick={() => setSidebarOpen(true)}
-                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 lg:hidden"
+                className="p-1.5 md:p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 lg:hidden"
               >
                 <Menu size={20} />
               </button>
               <div>
-                <h2 className="text-lg md:text-2xl font-semibold text-gray-800 dark:text-white">
+                <h2 className="text-base md:text-2xl font-semibold text-gray-800 dark:text-white leading-tight">
                   Welcome, {currentUser?.name?.split(' ')[0]}
                 </h2>
-                <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400">
+                <p className="text-[10px] md:text-sm text-gray-600 dark:text-gray-400">
                   {currentUser?.designation}
                 </p>
               </div>
@@ -166,11 +166,11 @@ const Layout = ({ children }) => {
             <div className="flex items-center space-x-2 md:space-x-4">
               <button
                 onClick={toggleTheme}
-                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+                className="p-1.5 md:p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
               >
-                {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
+                {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
               </button>
-              <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-primary-600 flex items-center justify-center text-white font-semibold text-sm md:text-base">
+              <div className="w-7 h-7 md:w-10 md:h-10 rounded-full bg-primary-600 flex items-center justify-center text-white font-semibold text-xs md:text-base">
                 {currentUser?.name?.charAt(0)}
               </div>
             </div>
@@ -181,6 +181,35 @@ const Layout = ({ children }) => {
         <main className="flex-1 overflow-y-auto p-3 md:p-6">
           {children}
         </main>
+
+        {/* Mobile Bottom Navigation */}
+        <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 z-50 px-2 py-1">
+          <div className="flex justify-around items-center">
+            {[
+              { path: '/dashboard', icon: Home, label: 'Home' },
+              { path: '/attendance', icon: Calendar, label: 'Attend' },
+              { path: '/leave', icon: FileText, label: 'Leave' },
+              { path: '/roster', icon: Calendar, label: 'Roster' },
+              { path: '/profile', icon: Users, label: 'Profile' }
+            ].map((item) => {
+              const Icon = item.icon;
+              const isActive = location.pathname === item.path;
+              return (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  className={`flex flex-col items-center p-2 rounded-lg transition-colors ${isActive
+                    ? 'text-primary-600 dark:text-primary-400'
+                    : 'text-gray-500 dark:text-gray-400'
+                    }`}
+                >
+                  <Icon size={20} />
+                  <span className="text-[10px] mt-1 font-medium">{item.label}</span>
+                </Link>
+              );
+            })}
+          </div>
+        </nav>
       </div>
     </div>
   );

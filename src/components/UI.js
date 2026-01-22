@@ -23,7 +23,7 @@ export const Button = ({ children, onClick, variant = 'primary', type = 'button'
 
 export const Card = ({ children, title, className = '' }) => {
   return (
-    <div className={`bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 ${className}`}>
+    <div className={`bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 md:p-6 ${className}`}>
       {title && <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">{title}</h3>}
       {children}
     </div>
@@ -44,8 +44,8 @@ export const Modal = ({ isOpen, onClose, title, children, size = 'md' }) => {
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
         <div className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" onClick={onClose}></div>
-        
-        <div className={`inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle w-full ${sizes[size]}`}>
+
+        <div className={`inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle w-[95%] sm:w-full ${sizes[size]}`}>
           <div className="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{title}</h3>
@@ -63,46 +63,77 @@ export const Modal = ({ isOpen, onClose, title, children, size = 'md' }) => {
   );
 };
 
-export const Table = ({ columns, data, onRowClick }) => {
+export const Table = ({ columns, data, onRowClick, responsive = true }) => {
   return (
-    <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
-      <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-        <thead className="bg-gray-50 dark:bg-gray-700">
-          <tr>
-            {columns.map((column, idx) => (
-              <th
-                key={idx}
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"
-              >
-                {column.header}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-          {data.length === 0 ? (
+    <div className="w-full">
+      {/* Table view for md and up */}
+      <div className={`${responsive ? 'hidden md:block' : 'block'} overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700`}>
+        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+          <thead className="bg-gray-50 dark:bg-gray-700">
             <tr>
-              <td colSpan={columns.length} className="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
-                No data available
-              </td>
+              {columns.map((column, idx) => (
+                <th
+                  key={idx}
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"
+                >
+                  {column.header}
+                </th>
+              ))}
             </tr>
+          </thead>
+          <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+            {data.length === 0 ? (
+              <tr>
+                <td colSpan={columns.length} className="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
+                  No data available
+                </td>
+              </tr>
+            ) : (
+              data.map((row, rowIdx) => (
+                <tr
+                  key={rowIdx}
+                  onClick={() => onRowClick && onRowClick(row)}
+                  className={onRowClick ? 'cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700' : ''}
+                >
+                  {columns.map((column, colIdx) => (
+                    <td key={colIdx} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-300">
+                      {column.render ? column.render(row) : row[column.accessor]}
+                    </td>
+                  ))}
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Card view for mobile */}
+      {responsive && (
+        <div className="md:hidden space-y-4">
+          {data.length === 0 ? (
+            <div className="bg-white dark:bg-gray-800 p-4 text-center rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500">
+              No data available
+            </div>
           ) : (
             data.map((row, rowIdx) => (
-              <tr
+              <div
                 key={rowIdx}
                 onClick={() => onRowClick && onRowClick(row)}
-                className={onRowClick ? 'cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700' : ''}
+                className={`bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 ${onRowClick ? 'active:bg-gray-50' : ''}`}
               >
                 {columns.map((column, colIdx) => (
-                  <td key={colIdx} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-300">
-                    {column.render ? column.render(row) : row[column.accessor]}
-                  </td>
+                  <div key={colIdx} className="flex justify-between py-1 border-b last:border-0 border-gray-100 dark:border-gray-700">
+                    <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">{column.header}</span>
+                    <span className="text-sm font-semibold text-gray-900 dark:text-gray-200">
+                      {column.render ? column.render(row) : row[column.accessor]}
+                    </span>
+                  </div>
                 ))}
-              </tr>
+              </div>
             ))
           )}
-        </tbody>
-      </table>
+        </div>
+      )}
     </div>
   );
 };
