@@ -59,30 +59,35 @@ export const calculateAttendanceStatus = (clockIn, clockOut, date = null, roster
     workHours = calculateAbsDuration(clockIn, istDate, clockOut, clockOutDate);
 
     // Standard business day accounting
-    // Standard business day accounting
-    // Rules: < 5 hours = LWP, 5-8 hours = Half Day, >= 8 hours = Full Day
-    if (workHours < 5) {
+    // Rules: < halfDayHours = LWP, halfDayHours to fullDayHours = Half Day, >= fullDayHours = Full Day
+    const fullDayThreshold = roster?.fullDayHours || defaultRule.fullDayHours;
+    const halfDayThreshold = roster?.halfDayHours || defaultRule.halfDayHours;
+    const minPresentThreshold = roster?.minPresentHours || defaultRule.minPresentHours;
+
+    if (workHours < halfDayThreshold) {
       status = 'LWP';
       workingDays = 0;
-    } else if (workHours < 8) {
+    } else if (workHours < fullDayThreshold) {
       status = 'Half Day';
       workingDays = 0.5;
-    } else {
-      // >= 8 hours
+    } else if (workHours >= fullDayThreshold) {
       workingDays = 1.0;
       // Status remains 'Present' or 'Late' as determined by clock-in time (lines 43)
-      // Unless it was somehow set to something else, we ensure it's at least Present-like
       if (status !== 'Late') {
         status = 'Present';
       }
     }
   }
 
+  const overtimeThreshold = roster?.overtimeThreshold || (fullDayThreshold + 1);
+  const overtime = workHours > overtimeThreshold ? Math.round((workHours - overtimeThreshold) * 100) / 100 : 0;
+
   return {
     status,
     workHours: Math.round(workHours * 100) / 100,
     workingDays,
     workDate,
+    overtime,
     ruleApplied: roster ? `Roster: ${roster.shiftName}` : (defaultRule.name || 'Standard Office')
   };
 };
@@ -173,7 +178,7 @@ export const processBiometricSync = (rosters = [], attendance = []) => {
       workHours: result.workHours,
       workingDays: result.workingDays,
       ruleApplied: result.ruleApplied,
-      overtime: result.workHours > 9 ? (result.workHours - 9).toFixed(2) : 0
+      overtime: result.overtime
     };
 
     if (existingIndex >= 0) {

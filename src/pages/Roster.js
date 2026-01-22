@@ -93,14 +93,16 @@ const Roster = () => {
         startTime: '09:00',
         endTime: '18:00',
         gracePeriod: 15,
+        fullDayHours: 8.0,
+        halfDayHours: 4.0,
         timezone: 'Asia/Kolkata'
     });
 
     const shifts = [
-        { name: 'Morning Shift', startTime: '09:00', endTime: '18:00', timezone: 'Asia/Kolkata', color: 'bg-blue-100 text-blue-800 border-blue-200' },
-        { name: 'Evening Shift', startTime: '14:00', endTime: '23:00', timezone: 'Asia/Kolkata', color: 'bg-purple-100 text-purple-800 border-purple-200' },
-        { name: 'Night Shift', startTime: '22:00', endTime: '07:00', timezone: 'America/New_York', color: 'bg-indigo-100 text-indigo-800 border-indigo-200' },
-        { name: 'Late Shift', startTime: '11:00', endTime: '20:00', timezone: 'America/Los_Angeles', color: 'bg-orange-100 text-orange-800 border-orange-200' }
+        { name: 'Morning Shift', startTime: '09:00', endTime: '18:00', fullDayHours: 8.0, halfDayHours: 4.0, timezone: 'Asia/Kolkata', color: 'bg-blue-100 text-blue-800 border-blue-200' },
+        { name: 'Evening Shift', startTime: '14:00', endTime: '23:00', fullDayHours: 8.0, halfDayHours: 4.0, timezone: 'Asia/Kolkata', color: 'bg-purple-100 text-purple-800 border-purple-200' },
+        { name: 'Night Shift', startTime: '22:00', endTime: '07:00', fullDayHours: 8.0, halfDayHours: 4.0, timezone: 'America/New_York', color: 'bg-indigo-100 text-indigo-800 border-indigo-200' },
+        { name: 'Late Shift', startTime: '11:00', endTime: '20:00', fullDayHours: 8.0, halfDayHours: 4.0, timezone: 'America/Los_Angeles', color: 'bg-orange-100 text-orange-800 border-orange-200' }
     ];
 
     const getShiftColor = (name) => {
@@ -178,6 +180,8 @@ const Roster = () => {
                 shiftName: shift.name,
                 startTime: shift.startTime,
                 endTime: shift.endTime,
+                fullDayHours: shift.fullDayHours || 8.0,
+                halfDayHours: shift.halfDayHours || 4.0,
                 timezone: shift.timezone || 'Asia/Kolkata'
             });
         }
@@ -215,6 +219,8 @@ const Roster = () => {
             startTime: roster.startTime,
             endTime: roster.endTime,
             gracePeriod: roster.gracePeriod,
+            fullDayHours: roster.fullDayHours || 8.0,
+            halfDayHours: roster.halfDayHours || 4.0,
             timezone: roster.timezone || 'Asia/Kolkata'
         });
         setShowModal(true);
@@ -232,6 +238,8 @@ const Roster = () => {
             startTime: '09:00',
             endTime: '18:00',
             gracePeriod: 15,
+            fullDayHours: 8.0,
+            halfDayHours: 4.0,
             timezone: 'Asia/Kolkata'
         });
     };
@@ -1095,6 +1103,25 @@ const Roster = () => {
                         onChange={(e) => setFormData({ ...formData, gracePeriod: parseInt(e.target.value) })}
                         required
                     />
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <Input
+                            label="Full Day (hours)"
+                            type="number"
+                            step="0.1"
+                            value={formData.fullDayHours}
+                            onChange={(e) => setFormData({ ...formData, fullDayHours: parseFloat(e.target.value) })}
+                            required
+                        />
+                        <Input
+                            label="Half Day (hours)"
+                            type="number"
+                            step="0.1"
+                            value={formData.halfDayHours}
+                            onChange={(e) => setFormData({ ...formData, halfDayHours: parseFloat(e.target.value) })}
+                            required
+                        />
+                    </div>
 
                     <div className="flex justify-end space-x-3 pt-4">
                         <Button type="button" variant="secondary" onClick={handleCloseModal}>

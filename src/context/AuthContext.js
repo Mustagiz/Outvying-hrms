@@ -492,7 +492,7 @@ export const AuthProvider = ({ children }) => {
         status: result.status,
         workingDays: result.workingDays,
         ruleApplied: result.ruleApplied || null,
-        overtime: result.workHours > 9 ? parseFloat((result.workHours - 9).toFixed(2)) : 0
+        overtime: result.overtime
       };
 
       console.log("Attempting Clock Out - Doc ID:", record.id, "updates:", updates);

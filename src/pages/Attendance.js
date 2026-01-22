@@ -3,9 +3,10 @@ import { useAuth } from '../context/AuthContext';
 import { Card, Button, Table, Alert, Select } from '../components/UI';
 import { Clock, Calendar } from 'lucide-react';
 import { formatDate, getStatusColor, exportToCSV, getYearOptions } from '../utils/helpers';
+import { calculateAttendanceStatus } from '../utils/biometricSync';
 
 const Attendance = () => {
-  const { currentUser, attendance, clockIn, clockOut, syncBiometric, allUsers } = useAuth();
+  const { currentUser, attendance, rosters, clockIn, clockOut, syncBiometric, allUsers } = useAuth();
   const [alert, setAlert] = useState(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
@@ -65,34 +66,15 @@ const Attendance = () => {
           const [inH] = record.clockIn.split(':').map(Number);
           const [outH] = record.clockOut.split(':').map(Number);
 
-          if (outH < inH) {
-            const nextDay = new Date(record.date);
-            nextDay.setDate(nextDay.getDate() + 1);
-            clockOutDate = nextDay.toISOString().split('T')[0];
-          }
-
-          const correctHours = calculateAbsDuration(record.clockIn, record.date, record.clockOut, clockOutDate);
-
-          // Update Firestore
-          // Update Firestore
-          const ref = doc(db, 'attendance', record.id);
-
-          let newStatus = 'LWP';
-          let workingDays = 0;
-
-          if (correctHours >= 8) {
-            newStatus = 'Present';
-            workingDays = 1.0;
-          } else if (correctHours >= 5) {
-            newStatus = 'Half Day';
-            workingDays = 0.5;
-          }
+          const roster = rosters.find(r => String(r.employeeId) === String(record.employeeId) && r.date === record.date);
+          const result = calculateAttendanceStatus(record.clockIn, record.clockOut, record.date, roster);
 
           await updateDoc(ref, {
-            workHours: correctHours,
-            workingDays: workingDays,
-            overtime: correctHours > 9 ? parseFloat((correctHours - 9).toFixed(2)) : 0,
-            status: newStatus
+            workHours: result.workHours,
+            workingDays: result.workingDays,
+            overtime: result.overtime,
+            status: result.status,
+            ruleApplied: result.ruleApplied
           });
           count++;
         }
