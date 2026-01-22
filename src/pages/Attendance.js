@@ -633,6 +633,8 @@ const Attendance = () => {
               <option value="Half Day">Half Day</option>
               <option value="Absent">Absent</option>
               <option value="LWP">LWP (Leave Without Pay)</option>
+              <option value="PL">PL (Paid Leave)</option>
+              <option value="UPL">UPL (Unpaid Leave)</option>
             </select>
           </div>
 
