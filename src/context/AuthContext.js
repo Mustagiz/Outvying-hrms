@@ -67,7 +67,12 @@ export const AuthProvider = ({ children }) => {
   // Local State
   const [theme, setTheme] = useState('light');
   const [currentIP, setCurrentIP] = useState('127.0.0.1');
-  const [ipSettings, setIpSettings] = useState({ enabled: false, ipList: [], modules: {}, blockMessage: '' });
+  const [ipSettings, setIpSettings] = useState({
+    enabled: false,
+    ipList: [],
+    modules: { employeePortal: false, attendance: true, leaveRequests: true, payslip: false },
+    blockMessage: 'Access denied. Please connect from office network or approved VPN.'
+  });
   const [ipValidation, setIpValidation] = useState({ allowed: true, location: 'Unrestricted' });
 
   // --- 1. Initialization & Auth Listener ---
@@ -227,10 +232,21 @@ export const AuthProvider = ({ children }) => {
     // Subscribe to IP Restrictions Settings
     const unsubIPSettings = onSnapshot(doc(db, 'settings', 'ipRestrictions'), (docSnap) => {
       if (docSnap.exists()) {
-        setIpSettings(docSnap.data());
+        const data = docSnap.data();
+        const defaultModules = { employeePortal: false, attendance: true, leaveRequests: true, payslip: false };
+        setIpSettings({
+          enabled: data.enabled || false,
+          ipList: data.ipList || [],
+          modules: (data.modules && Object.keys(data.modules).length > 0) ? data.modules : defaultModules,
+          blockMessage: data.blockMessage || 'Access denied. Please connect from office network or approved VPN.'
+        });
       } else {
-        // Default if doc doesn't exist
-        setIpSettings({ enabled: false, ipList: [], modules: {}, blockMessage: 'Access denied.' });
+        setIpSettings({
+          enabled: false,
+          ipList: [],
+          modules: { employeePortal: false, attendance: true, leaveRequests: true, payslip: false },
+          blockMessage: 'Access denied. Please connect from office network or approved VPN.'
+        });
       }
     });
 
