@@ -1,11 +1,25 @@
+// ... (imports remain similar, adding Papa and firebase deps)
 import React, { useState } from 'react';
+import { useAuth } from '../context/AuthContext';
 import { Card, Button, Input, Alert, Table, Modal } from '../components/UI';
-import { Fingerprint, Plus, Wifi, CheckCircle, XCircle } from 'lucide-react';
+import { Fingerprint, Plus, Wifi, CheckCircle, XCircle, Upload, FileText } from 'lucide-react';
+import Papa from 'papaparse';
+import { processBiometricImport } from '../utils/biometricSync';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '../config/firebase';
 
 const BiometricConfig = () => {
+  const { allUsers, rosters, attendance } = useAuth();
   const [alert, setAlert] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [testingDevice, setTestingDevice] = useState(null);
+
+  // Import State
+  const [importFile, setImportFile] = useState(null);
+  const [previewData, setPreviewData] = useState([]);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [importStats, setImportStats] = useState(null);
+
   const [devices, setDevices] = useState([
     { id: 1, name: 'Main Entrance', ipAddress: '192.168.1.100', location: 'Building A', status: 'Active', lastSync: '2024-01-15 10:30 AM' },
     { id: 2, name: 'Office Floor 2', ipAddress: '192.168.1.101', location: 'Building A - Floor 2', status: 'Active', lastSync: '2024-01-15 10:25 AM' }
@@ -42,7 +56,7 @@ const BiometricConfig = () => {
   };
 
   const syncDevice = (device) => {
-    const updatedDevices = devices.map(d => 
+    const updatedDevices = devices.map(d =>
       d.id === device.id ? { ...d, lastSync: new Date().toLocaleString() } : d
     );
     setDevices(updatedDevices);
@@ -50,16 +64,95 @@ const BiometricConfig = () => {
     setTimeout(() => setAlert(null), 3000);
   };
 
+  // --- CSV Import Handlers ---
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setImportFile(file);
+      setImportStats(null);
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        preview: 5, // Only preview first 5 rows
+        complete: (results) => {
+          setPreviewData(results.data);
+        },
+        error: (error) => {
+          setAlert({ type: 'error', message: `Parse Error: ${error.message}` });
+        }
+      });
+    }
+  };
+
+  const processImport = () => {
+    if (!importFile) return;
+
+    setIsProcessing(true);
+    Papa.parse(importFile, {
+      header: true,
+      skipEmptyLines: true,
+      complete: async (results) => {
+        try {
+          // 1. Process Data
+          const { processedData, errors } = processBiometricImport(results.data, allUsers, rosters, attendance);
+
+          if (errors.length > 0) {
+            console.warn("Import warning:", errors);
+            // Optional: Show some errors to user
+          }
+
+          if (processedData.length === 0) {
+            setAlert({ type: 'warning', message: 'No valid attendance records found to import.' });
+            setIsProcessing(false);
+            return;
+          }
+
+          // 2. Save to Firestore
+          let successCount = 0;
+          const promises = processedData.map(async (record) => {
+            // We use setDoc with merge: true to avoid overwriting existing non-attendance fields if any,
+            // but here we are writing specific attendance docs.
+            // Ensure ID format matches what Attendance.js expects: `${employeeId}-${date}`
+            const docRef = doc(db, 'attendance', record.id);
+            // Add global metadata
+            return setDoc(docRef, {
+              ...record,
+              importedAt: serverTimestamp()
+            }, { merge: true }).then(() => successCount++);
+          });
+
+          await Promise.all(promises);
+
+          setImportStats({
+            total: results.data.length,
+            processed: processedData.length,
+            errors: errors.length
+          });
+
+          setAlert({ type: 'success', message: `Successfully imported ${successCount} attendance records.` });
+          setImportFile(null);
+          setPreviewData([]);
+
+        } catch (error) {
+          console.error("Import execution error:", error);
+          setAlert({ type: 'error', message: `Import failed: ${error.message}` });
+        } finally {
+          setIsProcessing(false);
+        }
+      }
+    });
+  };
+
+
   const columns = [
     { header: 'Device Name', accessor: 'name' },
     { header: 'IP Address', accessor: 'ipAddress' },
     { header: 'Location', accessor: 'location' },
-    { 
-      header: 'Status', 
+    {
+      header: 'Status',
       render: (row) => (
-        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-          row.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-        }`}>
+        <span className={`px-2 py-1 rounded-full text-xs font-medium ${row.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+          }`}>
           {row.status}
         </span>
       )
@@ -101,6 +194,76 @@ const BiometricConfig = () => {
 
       {alert && <Alert type={alert.type} message={alert.message} onClose={() => setAlert(null)} />}
 
+      {/* --- Import Section --- */}
+      <Card title="Import Attendance Logs" className="mb-6">
+        <div className="space-y-4">
+          <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-100 dark:border-blue-800">
+            <div className="flex items-start gap-3">
+              <FileText className="text-blue-600 mt-1" size={20} />
+              <div>
+                <h3 className="font-semibold text-gray-800 dark:text-white">CSV File Import</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
+                  Upload a CSV file containing attendance logs. Required columns:
+                  <span className="font-mono bg-gray-100 dark:bg-gray-800 px-1 mx-1 rounded">EmployeeID</span>,
+                  <span className="font-mono bg-gray-100 dark:bg-gray-800 px-1 mx-1 rounded">Date</span> (YYYY-MM-DD),
+                  <span className="font-mono bg-gray-100 dark:bg-gray-800 px-1 mx-1 rounded">Time</span> (HH:MM)
+                </p>
+                <input
+                  type="file"
+                  accept=".csv"
+                  onChange={handleFileChange}
+                  className="block w-full text-sm text-gray-500
+                      file:mr-4 file:py-2 file:px-4
+                      file:rounded-full file:border-0
+                      file:text-sm file:font-semibold
+                      file:bg-blue-50 file:text-blue-700
+                      hover:file:bg-blue-100"
+                />
+              </div>
+            </div>
+          </div>
+
+          {previewData.length > 0 && (
+            <div className="mt-4">
+              <h4 className="text-sm font-semibold mb-2">File Preview (First 5 rows)</h4>
+              <div className="overflow-x-auto border rounded-lg">
+                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 text-xs">
+                  <thead className="bg-gray-50 dark:bg-gray-800">
+                    <tr>
+                      {Object.keys(previewData[0]).map(header => (
+                        <th key={header} className="px-3 py-2 text-left font-medium text-gray-500 uppercase">{header}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
+                    {previewData.map((row, idx) => (
+                      <tr key={idx}>
+                        {Object.values(row).map((val, i) => (
+                          <td key={i} className="px-3 py-2 text-gray-700 dark:text-gray-300">{val}</td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="mt-4 flex items-center gap-4">
+                <Button onClick={processImport} loading={isProcessing} variant="primary">
+                  <Upload size={16} className="inline mr-2" />
+                  Process Import
+                </Button>
+                {importStats && (
+                  <span className="text-sm text-gray-600">
+                    Processed: {importStats.processed} / {importStats.total} rows. Errors: {importStats.errors}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </Card>
+
+      {/* ... Existing Stats ... */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <Card>
           <div className="flex items-center justify-between">
@@ -197,3 +360,4 @@ const BiometricConfig = () => {
 };
 
 export default BiometricConfig;
+

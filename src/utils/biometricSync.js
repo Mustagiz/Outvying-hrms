@@ -199,3 +199,79 @@ export const processBiometricSync = (rosters = [], attendance = []) => {
 
   return { success: true, processed: biometricData.length, updatedAttendance };
 };
+
+export const processBiometricImport = (importedRows, users, rosters, currentAttendance) => {
+  // importedRows expected format: { EmployeeID, Date, Time, Status? } or similar
+
+  const processedData = [];
+  const errors = [];
+
+  // 1. Group by Employee and Date
+  const grouped = {};
+
+  importedRows.forEach((row, index) => {
+    const empId = row['EmployeeID'] || row['Employee ID'] || row['EmpID'];
+    const date = row['Date']; // YYYY-MM-DD
+    const time = row['Time']; // HH:MM
+
+    if (!empId || !date || !time) {
+      // Skip invalid rows or log error
+      return;
+    }
+
+    const key = `${empId}_${date}`;
+    if (!grouped[key]) {
+      grouped[key] = {
+        employeeId: empId,
+        date: date,
+        punches: []
+      };
+    }
+    grouped[key].punches.push(time);
+  });
+
+  // 2. Process each group
+  Object.values(grouped).forEach(group => {
+    // Find User
+    // Flexible matching: check EmployeeID field in users
+    const user = users.find(u => u.employeeId === group.employeeId || u.id === group.employeeId);
+
+    if (!user) {
+      errors.push(`User not found for Employee ID: ${group.employeeId}`);
+      return;
+    }
+
+    // Sort punches
+    const sortedPunches = group.punches.sort();
+    const firstIn = sortedPunches[0];
+    const lastOut = sortedPunches.length > 1 ? sortedPunches[sortedPunches.length - 1] : null;
+
+    // Use existing calculation logic
+    // Find Roster
+    const targetRoster = rosters.find(r => r.employeeId === user.employeeId && r.date === group.date);
+
+    const result = calculateAttendanceStatus(firstIn, lastOut, group.date, targetRoster);
+
+    // Create Attendance Record
+    const record = {
+      id: `${user.employeeId}-${group.date}`,
+      employeeId: user.employeeId, // Keep string/number consistent
+      uid: user.id || user.uid, // Store Firestore UID if available
+      name: user.name || user.displayName,
+      date: group.date,
+      clockIn: firstIn,
+      clockOut: lastOut,
+      status: result.status,
+      workHours: result.workHours,
+      workingDays: result.workingDays,
+      ruleApplied: result.ruleApplied,
+      overtime: result.overtime,
+      isManualImport: true,
+      lastUpdated: new Date().toISOString()
+    };
+
+    processedData.push(record);
+  });
+
+  return { processedData, errors };
+};
