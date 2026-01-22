@@ -1262,38 +1262,51 @@ const Roster = () => {
                                     className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                                     onChange={(e) => {
                                         if (e.target.checked) {
-                                            const allEmpIds = allUsers.filter(u => u.role === 'employee').map(u => u.id);
-                                            setHolidayFormData(prev => ({ ...prev, selectedEmployees: allEmpIds }));
+                                            const visibleUsers = allUsers.filter(u => {
+                                                if (currentUser.role === 'manager') return u.reportingTo === currentUser.name;
+                                                return u.role === 'employee' || u.role === 'hr' || u.role === 'manager';
+                                            });
+                                            setHolidayFormData(prev => ({ ...prev, selectedEmployees: visibleUsers.map(u => u.id) }));
                                         } else {
                                             setHolidayFormData(prev => ({ ...prev, selectedEmployees: [] }));
                                         }
                                     }}
-                                    checked={allUsers.filter(u => u.role === 'employee').length > 0 && holidayFormData.selectedEmployees.length === allUsers.filter(u => u.role === 'employee').length}
+                                    checked={holidayFormData.selectedEmployees.length > 0 && holidayFormData.selectedEmployees.length === allUsers.filter(u => {
+                                        if (currentUser.role === 'manager') return u.reportingTo === currentUser.name;
+                                        return u.role === 'employee' || u.role === 'hr' || u.role === 'manager';
+                                    }).length}
                                 />
                                 <span>Select All</span>
                             </label>
                         </div>
                         <div className="border border-gray-300 dark:border-gray-600 rounded-lg max-h-48 overflow-y-auto p-2 bg-white dark:bg-gray-700">
-                            {allUsers.filter(u => u.role === 'employee').map(u => (
-                                <label key={u.id} className="flex items-center space-x-3 p-2 hover:bg-gray-50 dark:hover:bg-gray-600 rounded cursor-pointer transition-colors border-b border-gray-100 dark:border-gray-600 last:border-0">
-                                    <input
-                                        type="checkbox"
-                                        checked={holidayFormData.selectedEmployees.includes(u.id)}
-                                        onChange={() => {
-                                            setHolidayFormData(prev => {
-                                                const currentSelected = prev.selectedEmployees;
-                                                if (currentSelected.includes(u.id)) {
-                                                    return { ...prev, selectedEmployees: currentSelected.filter(id => id !== u.id) };
-                                                } else {
-                                                    return { ...prev, selectedEmployees: [...currentSelected, u.id] };
-                                                }
-                                            });
-                                        }}
-                                        className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                                    />
-                                    <span className="text-sm text-gray-700 dark:text-gray-200 font-medium">{u.name} <span className="text-xs text-gray-500 dark:text-gray-400 font-normal">({u.employeeId})</span></span>
-                                </label>
-                            ))}
+                            {allUsers
+                                .filter(u => {
+                                    if (currentUser.role === 'manager') {
+                                        return u.reportingTo === currentUser.name;
+                                    }
+                                    return u.role === 'employee' || u.role === 'hr' || u.role === 'manager'; // HR/Admin see all valid staff
+                                })
+                                .map(u => (
+                                    <label key={u.id} className="flex items-center space-x-3 p-2 hover:bg-gray-50 dark:hover:bg-gray-600 rounded cursor-pointer transition-colors border-b border-gray-100 dark:border-gray-600 last:border-0">
+                                        <input
+                                            type="checkbox"
+                                            checked={holidayFormData.selectedEmployees.includes(u.id)}
+                                            onChange={() => {
+                                                setHolidayFormData(prev => {
+                                                    const currentSelected = prev.selectedEmployees;
+                                                    if (currentSelected.includes(u.id)) {
+                                                        return { ...prev, selectedEmployees: currentSelected.filter(id => id !== u.id) };
+                                                    } else {
+                                                        return { ...prev, selectedEmployees: [...currentSelected, u.id] };
+                                                    }
+                                                });
+                                            }}
+                                            className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                                        />
+                                        <span className="text-sm text-gray-700 dark:text-gray-200 font-medium">{u.name} <span className="text-xs text-gray-500 dark:text-gray-400 font-normal">({u.employeeId})</span></span>
+                                    </label>
+                                ))}
                         </div>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 text-right">
                             {holidayFormData.selectedEmployees.length} selected

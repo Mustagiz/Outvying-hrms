@@ -116,6 +116,18 @@ const LeaveManagement = () => {
     } else {
       filtered = filtered.filter(l => l.status !== 'Pending');
     }
+
+    // Manager Filter: Only show leaves from direct reports
+    if (currentUser.role === 'manager') {
+      const myTeamIds = allUsers.filter(u => u.reportingTo === currentUser.name).map(u => u.id); // Assuming ID match
+      // Fallback to name match if IDs don't align, but safe to assume we filter by employeeId if we had it.
+      // Since leaves store employeeId, let's match that.
+      const team = allUsers.filter(u => u.reportingTo === currentUser.name);
+      const teamIds = new Set(team.map(t => String(t.id)).concat(team.map(t => String(t.uid))));
+
+      filtered = filtered.filter(l => teamIds.has(String(l.employeeId)));
+    }
+
     return filtered.sort((a, b) => new Date(b.appliedDate) - new Date(a.appliedDate));
   }, [leaves, adminSubTab]);
 

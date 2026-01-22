@@ -17,7 +17,12 @@ const EmployeeDirectory = () => {
   const itemsPerPage = 10;
   const [isDeleting, setIsDeleting] = useState(null);
 
-  const employees = allUsers.filter(u => u.role === 'employee' || u.role === 'hr');
+  const employees = useMemo(() => {
+    if (currentUser.role === 'manager') {
+      return allUsers.filter(u => u.reportingTo === currentUser.name);
+    }
+    return allUsers.filter(u => u.role === 'employee' || u.role === 'hr' || u.role === 'manager');
+  }, [allUsers, currentUser]);
 
   const filteredEmployees = useMemo(() => {
     let filtered = employees;

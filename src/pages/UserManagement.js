@@ -11,7 +11,7 @@ const UserManagement = () => {
   const [selectedUser, setSelectedUser] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [formData, setFormData] = useState({
-    name: '', email: '', employeeId: '', designation: '', department: '', role: 'employee', userId: '', password: ''
+    name: '', email: '', employeeId: '', designation: '', department: '', role: 'employee', userId: '', password: '', reportingTo: ''
   });
 
   const filteredUsers = allUsers.filter(u =>
@@ -24,7 +24,7 @@ const UserManagement = () => {
     setAlert({ type: result.success ? 'success' : 'error', message: result.message });
     if (result.success) {
       setShowAddModal(false);
-      setFormData({ name: '', email: '', employeeId: '', designation: '', department: '', role: 'employee', userId: '', password: '' });
+      setFormData({ name: '', email: '', employeeId: '', designation: '', department: '', role: 'employee', userId: '', password: '', reportingTo: '' });
     }
     setTimeout(() => setAlert(null), 3000);
   };
@@ -177,9 +177,20 @@ const UserManagement = () => {
             className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
           >
             <option value="employee">Employee</option>
+            <option value="manager">Manager</option>
             <option value="hr">HR Manager</option>
             <option value="admin">Admin</option>
             <option value="super_admin">Super Admin</option>
+          </select>
+          <select
+            value={formData.reportingTo}
+            onChange={(e) => setFormData({ ...formData, reportingTo: e.target.value })}
+            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+          >
+            <option value="">Select Reporting Manager (Optional)</option>
+            {[...allUsers].sort((a, b) => a.name.localeCompare(b.name)).map(u => (
+              <option key={u.id} value={u.name}>{u.name} ({u.role})</option>
+            ))}
           </select>
           <input
             type="text"

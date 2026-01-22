@@ -78,6 +78,16 @@ const Layout = ({ children }) => {
       { path: '/salary-slip-template', icon: FileText, label: 'Salary Slip Template' },
       { path: '/settings', icon: Settings, label: 'Settings' },
       { path: '/user-management', icon: UserCog, label: 'User Management' }
+    ],
+    manager: [
+      { path: '/dashboard', icon: Home, label: 'Dashboard' },
+      { path: '/attendance', icon: Calendar, label: 'My Team Attendance' },
+      { path: '/leave', icon: FileText, label: 'Leave Requests' },
+      { path: '/roster', icon: Calendar, label: 'Team Roster' },
+      { path: '/employees', icon: Users, label: 'My Team' },
+      { path: '/profile', icon: Users, label: 'My Profile' },
+      { path: '/payslips', icon: DollarSign, label: 'My Payslips' },
+      { path: '/attendance-regularization', icon: CheckSquare, label: 'Regularization' }
     ]
   };
 
