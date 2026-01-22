@@ -526,6 +526,17 @@ const Payslips = () => {
     ? [{ value: currentUser.id, label: currentUser.name }]
     : allUsers.filter(u => u.role === 'employee' || u.role === 'hr').map(u => ({ value: u.id, label: `${u.name} (${u.employeeId})` }));
 
+  // Effect to set default selected employee for Admin/HR if not already set or invalid
+  React.useEffect(() => {
+    if (currentUser.role !== 'employee' && employeeOptions.length > 0) {
+      // If current selection is not in the options (e.g. initally set to Admin's own ID), pick the first one
+      const isSelectedValid = employeeOptions.some(opt => opt.value === selectedEmployee);
+      if (!isSelectedValid) {
+        setSelectedEmployee(employeeOptions[0].value);
+      }
+    }
+  }, [currentUser, employeeOptions, selectedEmployee]);
+
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
