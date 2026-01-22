@@ -42,6 +42,56 @@ const Attendance = () => {
     setTimeout(() => setAlert(null), 3000);
   };
 
+  const handleFixRecords = async () => {
+    if (!window.confirm("This will recalculate work hours for all records with negative hours. Proceed?")) return;
+    setIsSyncing(true);
+    let count = 0;
+    try {
+      // Import needed functions dynamically or assume they are available from imports if I add them
+      // But I can't add imports inside function. I need to add them at top.
+      // Minimal logic here: Iterate filteredAttendance (or full attendance in context) 
+      // check for negative hours, recalculate using calculateAbsDuration, and updateDoc.
+
+      const { doc, updateDoc } = await import('firebase/firestore');
+      const { db } = await import('../config/firebase');
+      const { calculateAbsDuration } = await import('../utils/helpers');
+
+      const badRecords = attendance.filter(a => parseFloat(a.workHours) < 0 || a.workHours === "-14.80");
+
+      for (const record of badRecords) {
+        if (record.clockIn && record.clockOut) {
+          let clockOutDate = record.date;
+          // Infer date like biometricSync does
+          const [inH] = record.clockIn.split(':').map(Number);
+          const [outH] = record.clockOut.split(':').map(Number);
+
+          if (outH < inH) {
+            const nextDay = new Date(record.date);
+            nextDay.setDate(nextDay.getDate() + 1);
+            clockOutDate = nextDay.toISOString().split('T')[0];
+          }
+
+          const correctHours = calculateAbsDuration(record.clockIn, record.date, record.clockOut, clockOutDate);
+
+          // Update Firestore
+          const ref = doc(db, 'attendance', record.id);
+          await updateDoc(ref, {
+            workHours: correctHours,
+            overtime: correctHours > 9 ? parseFloat((correctHours - 9).toFixed(2)) : 0,
+            status: correctHours >= 5 ? 'Present' : (correctHours >= 4 ? 'Half Day' : 'LWP')
+          });
+          count++;
+        }
+      }
+      setAlert({ type: 'success', message: `Fixed ${count} invalid records successfully.` });
+    } catch (err) {
+      console.error(err);
+      setAlert({ type: 'error', message: 'Fix failed: ' + err.message });
+    }
+    setIsSyncing(false);
+    setTimeout(() => setAlert(null), 3000);
+  };
+
   const filteredAttendance = useMemo(() => {
     // 1. Sanity Check: Remove orphaned records
     const activeUserIds = new Set(allUsers.map(u => String(u.id)));
@@ -244,13 +294,23 @@ const Attendance = () => {
               Export to CSV
             </Button>
             {currentUser.role !== 'employee' && (
-              <Button
-                onClick={handleSyncBiometric}
-                loading={isSyncing}
-                variant="primary"
-              >
-                Sync Biometric Data
-              </Button>
+              <>
+                <Button
+                  onClick={handleFixRecords}
+                  loading={isSyncing}
+                  variant="danger"
+                  className="bg-red-600 hover:bg-red-700 text-white"
+                >
+                  Fix Invalid Records
+                </Button>
+                <Button
+                  onClick={handleSyncBiometric}
+                  loading={isSyncing}
+                  variant="primary"
+                >
+                  Sync Biometric Data
+                </Button>
+              </>
             )}
           </div>
         </div>
