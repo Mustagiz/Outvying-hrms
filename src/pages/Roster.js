@@ -105,7 +105,10 @@ const Roster = () => {
         date: '',
         endDate: '',
         type: 'Holiday', // 'Holiday', 'Weekly Off', or 'Custom'
-        customName: ''
+        endDate: '',
+        type: 'Holiday', // 'Holiday', 'Weekly Off', or 'Custom'
+        customName: '',
+        applyToWeekendsOnly: false
     });
 
     const handleHolidaySubmit = async (e) => {
@@ -140,7 +143,11 @@ const Roster = () => {
             const end = holidayFormData.endDate ? new Date(holidayFormData.endDate) : new Date(holidayFormData.date);
 
             while (currentDate <= end) {
-                dates.push(new Date(currentDate).toISOString().split('T')[0]);
+                const isWeekend = currentDate.getDay() === 0 || currentDate.getDay() === 6; // 0=Sun, 6=Sat
+
+                if (!holidayFormData.applyToWeekendsOnly || isWeekend) {
+                    dates.push(new Date(currentDate).toISOString().split('T')[0]);
+                }
                 currentDate.setDate(currentDate.getDate() + 1);
             }
 
@@ -159,7 +166,9 @@ const Roster = () => {
 
             setAlert({ type: 'success', message: `Marked ${shiftName} for ${successCount} day(s)` });
             setShowHolidayModal(false);
-            setHolidayFormData({ selectedEmployees: [], date: '', endDate: '', type: 'Holiday', customName: '' });
+            setAlert({ type: 'success', message: `Marked ${shiftName} for ${successCount} day(s)` });
+            setShowHolidayModal(false);
+            setHolidayFormData({ selectedEmployees: [], date: '', endDate: '', type: 'Holiday', customName: '', applyToWeekendsOnly: false });
         } catch (error) {
             console.error("Holiday Assign Error:", error);
             setAlert({ type: 'error', message: 'Failed to assign holiday' });
@@ -1327,6 +1336,19 @@ const Roster = () => {
                                 required
                             />
                         )}
+
+                    </div>
+                    <div className="flex items-center space-x-2 my-2">
+                        <input
+                            type="checkbox"
+                            id="weekendOnly"
+                            checked={holidayFormData.applyToWeekendsOnly}
+                            onChange={(e) => setHolidayFormData({ ...holidayFormData, applyToWeekendsOnly: e.target.checked })}
+                            className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                        />
+                        <label htmlFor="weekendOnly" className="text-sm text-gray-700 dark:text-gray-300">
+                            Apply to Weekends Only (Saturday & Sunday)
+                        </label>
                     </div>
 
                     <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200 dark:border-gray-700">
