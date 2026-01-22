@@ -6,7 +6,11 @@ import {
   doc,
   serverTimestamp,
   getDoc,
-  setDoc
+  setDoc,
+  query,
+  where,
+  getDocs,
+  deleteDoc
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
@@ -123,14 +127,30 @@ const AttendanceRegularization = () => {
             };
           }
 
-          const docId = `${employeeId}-${date}`;
-          const attendanceRef = doc(db, 'attendance', docId);
-          const docSnap = await getDoc(attendanceRef);
+          // 2. Find and Update existing records (handling duplicates)
+          const q = query(
+            collection(db, 'attendance'),
+            where('employeeId', '==', employeeId),
+            where('date', '==', date)
+          );
+          const querySnapshot = await getDocs(q);
 
-          if (docSnap.exists()) {
-            await updateDoc(attendanceRef, attendanceUpdate);
+          if (!querySnapshot.empty) {
+            // Update the first record found
+            const firstDoc = querySnapshot.docs[0];
+            await updateDoc(firstDoc.ref, attendanceUpdate);
+
+            // DELETE any duplicates (self-healing)
+            if (querySnapshot.docs.length > 1) {
+              for (let i = 1; i < querySnapshot.docs.length; i++) {
+                await deleteDoc(querySnapshot.docs[i].ref);
+                console.log(`Deleted duplicate attendance record: ${querySnapshot.docs[i].id}`);
+              }
+            }
           } else {
-            await setDoc(attendanceRef, {
+            // No record exists, creating new with standard ID
+            const docId = `${employeeId}-${date}`;
+            await setDoc(doc(db, 'attendance', docId), {
               employeeId,
               date,
               ...attendanceUpdate
@@ -232,22 +252,34 @@ const AttendanceRegularization = () => {
           };
         }
 
-        // 2. Find and Update (or Create) the attendance document
-        // We construct the ID based on our standard: userId-date
-        const docId = `${employeeId}-${date}`;
-        const attendanceRef = doc(db, 'attendance', docId);
+        // 2. Find and Update existing records (handling duplicates)
+        const q = query(
+          collection(db, 'attendance'),
+          where('employeeId', '==', employeeId),
+          where('date', '==', date)
+        );
+        const querySnapshot = await getDocs(q);
 
-        // check if doc exists to determine set vs update
-        const docSnap = await getDoc(attendanceRef);
+        if (!querySnapshot.empty) {
+          // Update the FIRST record found
+          const firstDoc = querySnapshot.docs[0];
+          await updateDoc(firstDoc.ref, attendanceUpdate);
 
-        if (docSnap.exists()) {
-          await updateDoc(attendanceRef, attendanceUpdate);
+          // DELETE any duplicates (self-healing)
+          if (querySnapshot.docs.length > 1) {
+            for (let i = 1; i < querySnapshot.docs.length; i++) {
+              await deleteDoc(querySnapshot.docs[i].ref);
+              console.log(`Deleted duplicate attendance record: ${querySnapshot.docs[i].id}`);
+            }
+          }
         } else {
-          await setDoc(attendanceRef, {
+          // No record exists, creating new with standard ID
+          const docId = `${employeeId}-${date}`;
+          await setDoc(doc(db, 'attendance', docId), {
             employeeId,
             date,
             ...attendanceUpdate
-          }); // Using setDoc to prevent duplicates
+          });
         }
       }
 
