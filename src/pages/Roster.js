@@ -918,66 +918,70 @@ const Roster = () => {
                     </div>
 
                     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-                        <div className="grid grid-cols-7 border-b border-gray-200 dark:border-gray-700">
-                            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                                <div key={day} className="py-3 text-center text-sm font-bold text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/50">
-                                    {day}
-                                </div>
-                            ))}
-                        </div>
-                        <div className="grid grid-cols-7">
-                            {calendarData.map((item, index) => (
-                                <div
-                                    key={index}
-                                    className={`min-h-[120px] p-1 border-r border-b border-gray-100 dark:border-gray-700 last:border-r-0 transition-colors ${!item ? 'bg-gray-50/30 dark:bg-gray-900/10' : 'hover:bg-gray-50/50 dark:hover:bg-gray-800/50 cursor-pointer'}`}
-                                    onClick={() => handleDayClick(item)}
-                                >
-                                    {item && (
-                                        <div className="h-full flex flex-col">
-                                            <span className={`text-sm font-bold self-end mr-1 ${new Date(currentDate.getFullYear(), currentDate.getMonth(), item.day).toDateString() === new Date().toDateString()
-                                                ? 'bg-primary-600 text-white w-7 h-7 flex items-center justify-center rounded-full mb-1'
-                                                : 'text-gray-700 dark:text-gray-300 mb-1'
-                                                }`}>
-                                                {item.day}
-                                            </span>
-
-                                            <div className="flex flex-col gap-1 mt-1">
-                                                {item.rosters.slice(0, 3).map((roster, idx) => {
-                                                    const isNotIST = roster.timezone && roster.timezone !== 'Asia/Kolkata';
-                                                    const tzLabel = TIMEZONES.find(t => t.value === roster.timezone)?.label.split(' ')[0] || '';
-                                                    const istTime = isNotIST ? getISTEquivalent(roster.startTime, roster.date, roster.timezone) : null;
-
-                                                    return (
-                                                        <div key={idx} className={`px-2 py-1 rounded text-[10px] truncate border-l-4 ${getShiftColor(roster.shiftName)} border-l-current shadow-sm ${filters.employees.includes(roster.employeeId) ? 'ring-2 ring-primary-400 dark:ring-primary-600 transform scale-[1.02] z-10' : ''}`}>
-                                                            <div className="flex justify-between items-center mb-0.5">
-                                                                <span className="font-bold truncate">
-                                                                    {currentUser.role !== 'employee' ? roster.employeeName?.split(' ')[0] : roster.shiftName}
-                                                                </span>
-                                                                {isNotIST && <span className="text-[8px] font-black opacity-60 bg-black/10 px-1 rounded-sm">{tzLabel}</span>}
-                                                            </div>
-                                                            <div className="flex flex-col leading-none">
-                                                                <span className="opacity-90 font-medium">
-                                                                    {roster.startTime}
-                                                                </span>
-                                                                {istTime && (
-                                                                    <span className="text-[8px] opacity-60 font-bold italic">
-                                                                        ({istTime} IST)
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                })}
-                                                {item.rosters.length > 3 && (
-                                                    <div className="text-[10px] text-center text-gray-500 font-medium bg-gray-100 dark:bg-gray-700 rounded py-0.5">
-                                                        +{item.rosters.length - 3} More
-                                                    </div>
-                                                )}
-                                            </div>
+                        <div className="overflow-x-auto">
+                            <div className="min-w-[800px]">
+                                <div className="grid grid-cols-7 border-b border-gray-200 dark:border-gray-700">
+                                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                                        <div key={day} className="py-3 text-center text-sm font-bold text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/50">
+                                            {day}
                                         </div>
-                                    )}
+                                    ))}
                                 </div>
-                            ))}
+                                <div className="grid grid-cols-7">
+                                    {calendarData.map((item, index) => (
+                                        <div
+                                            key={index}
+                                            className={`min-h-[120px] p-1 border-r border-b border-gray-100 dark:border-gray-700 last:border-r-0 transition-colors ${!item ? 'bg-gray-50/30 dark:bg-gray-900/10' : 'hover:bg-gray-50/50 dark:hover:bg-gray-800/50 cursor-pointer'}`}
+                                            onClick={() => handleDayClick(item)}
+                                        >
+                                            {item && (
+                                                <div className="h-full flex flex-col">
+                                                    <span className={`text-sm font-bold self-end mr-1 ${new Date(currentDate.getFullYear(), currentDate.getMonth(), item.day).toDateString() === new Date().toDateString()
+                                                        ? 'bg-primary-600 text-white w-7 h-7 flex items-center justify-center rounded-full mb-1'
+                                                        : 'text-gray-700 dark:text-gray-300 mb-1'
+                                                        }`}>
+                                                        {item.day}
+                                                    </span>
+
+                                                    <div className="flex flex-col gap-1 mt-1">
+                                                        {item.rosters.slice(0, 3).map((roster, idx) => {
+                                                            const isNotIST = roster.timezone && roster.timezone !== 'Asia/Kolkata';
+                                                            const tzLabel = TIMEZONES.find(t => t.value === roster.timezone)?.label.split(' ')[0] || '';
+                                                            const istTime = isNotIST ? getISTEquivalent(roster.startTime, roster.date, roster.timezone) : null;
+
+                                                            return (
+                                                                <div key={idx} className={`px-2 py-1 rounded text-[10px] truncate border-l-4 ${getShiftColor(roster.shiftName)} border-l-current shadow-sm ${filters.employees.includes(roster.employeeId) ? 'ring-2 ring-primary-400 dark:ring-primary-600 transform scale-[1.02] z-10' : ''}`}>
+                                                                    <div className="flex justify-between items-center mb-0.5">
+                                                                        <span className="font-bold truncate">
+                                                                            {currentUser.role !== 'employee' ? roster.employeeName?.split(' ')[0] : roster.shiftName}
+                                                                        </span>
+                                                                        {isNotIST && <span className="text-[8px] font-black opacity-60 bg-black/10 px-1 rounded-sm">{tzLabel}</span>}
+                                                                    </div>
+                                                                    <div className="flex flex-col leading-none">
+                                                                        <span className="opacity-90 font-medium">
+                                                                            {roster.startTime}
+                                                                        </span>
+                                                                        {istTime && (
+                                                                            <span className="text-[8px] opacity-60 font-bold italic">
+                                                                                ({istTime} IST)
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                        {item.rosters.length > 3 && (
+                                                            <div className="text-[10px] text-center text-gray-500 font-medium bg-gray-100 dark:bg-gray-700 rounded py-0.5">
+                                                                +{item.rosters.length - 3} More
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
