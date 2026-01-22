@@ -20,7 +20,7 @@ import { getEffectiveWorkDate, calculateAbsDuration } from '../utils/helpers';
 import { calculateAttendanceStatus } from '../utils/biometricSync';
 
 const AttendanceRegularization = () => {
-  const { currentUser, attendance, allUsers, regularizationRequests, rosters } = useAuth();
+  const { currentUser, attendance, allUsers, regularizationRequests, rosters, createNotification } = useAuth();
   const [showModal, setShowModal] = useState(false);
   const [alert, setAlert] = useState(null);
   const [editingRequest, setEditingRequest] = useState(null);
@@ -188,6 +188,20 @@ const AttendanceRegularization = () => {
         };
 
         await addDoc(collection(db, 'regularizationRequests'), newRequest);
+
+        // Create notification for admin/HR
+        const admin = allUsers.find(u => u.role === 'admin' || u.role === 'hr');
+        if (admin) {
+          await createNotification({
+            userId: admin.id,
+            type: 'regularization_request',
+            title: 'New Regularization Request',
+            message: `${currentUser.name} requested ${formData.regularizationType} regularization for ${formData.date}`,
+            relatedId: null,
+            actionUrl: '/attendance-regularization'
+          });
+        }
+
         setAlert({ type: 'success', message: 'Regularization request submitted successfully' });
       }
 
@@ -348,6 +362,16 @@ const AttendanceRegularization = () => {
           });
         }
       }
+
+      // Create notification for employee
+      await createNotification({
+        userId: request.employeeId,
+        type: status === 'Approved' ? 'regularization_approved' : 'regularization_rejected',
+        title: `Regularization ${status}`,
+        message: `Your regularization request for ${request.date} has been ${status.toLowerCase()}`,
+        relatedId: requestId,
+        actionUrl: '/attendance-regularization'
+      });
 
       setAlert({ type: 'success', message: `Request ${status.toLowerCase()} successfully` });
     } catch (error) {

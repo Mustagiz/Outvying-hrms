@@ -25,7 +25,7 @@ const calculateBusinessDays = (startDate, endDate) => {
 };
 
 const LeaveManagement = () => {
-  const { currentUser, leaves, leaveBalances, applyLeave, updateLeaveStatus, allLeaveTypes, attendance, allocateLeave, allUsers } = useAuth();
+  const { currentUser, leaves, leaveBalances, applyLeave, updateLeaveStatus, allLeaveTypes, attendance, allocateLeave, allUsers, createNotification } = useAuth();
   const [showModal, setShowModal] = useState(false);
   const [showAllocateModal, setShowAllocateModal] = useState(false);
   const [allocationData, setAllocationData] = useState({
@@ -189,6 +189,19 @@ const LeaveManagement = () => {
     const result = await applyLeave(formData);
     setAlert({ type: result.success ? 'success' : 'error', message: result.message });
     if (result.success) {
+      // Create notification for admin/manager
+      const manager = allUsers.find(u => u.role === 'admin' || u.role === 'hr');
+      if (manager) {
+        await createNotification({
+          userId: manager.id,
+          type: 'leave_request',
+          title: 'New Leave Request',
+          message: `${currentUser.name} requested ${formData.leaveType} from ${formData.startDate} to ${formData.endDate} (${formData.days} days)`,
+          relatedId: result.leaveId,
+          actionUrl: '/leave'
+        });
+      }
+
       setShowModal(false);
       setFormData({
         leaveType: allLeaveTypes[0]?.name || '',
@@ -201,9 +214,26 @@ const LeaveManagement = () => {
     setTimeout(() => setAlert(null), 3000);
   };
 
-  const handleApproval = (leaveId, status) => {
+  const handleApproval = async (leaveId, status) => {
     const result = updateLeaveStatus(leaveId, status, currentUser.name);
     setAlert({ type: result.success ? 'success' : 'error', message: result.message });
+
+    if (result.success) {
+      // Find the leave request to get employee details
+      const leaveRequest = leaves.find(l => l.id === leaveId);
+      if (leaveRequest) {
+        // Create notification for employee
+        await createNotification({
+          userId: leaveRequest.employeeId,
+          type: status === 'Approved' ? 'leave_approved' : 'leave_rejected',
+          title: `Leave ${status}`,
+          message: `Your ${leaveRequest.leaveType} request from ${leaveRequest.startDate} to ${leaveRequest.endDate} has been ${status.toLowerCase()}`,
+          relatedId: leaveId,
+          actionUrl: '/leave'
+        });
+      }
+    }
+
     setTimeout(() => setAlert(null), 3000);
   };
 
