@@ -1302,7 +1302,7 @@ const Roster = () => {
 
                     <div className="grid grid-cols-2 gap-4">
                         <Input
-                            label="Date"
+                            label="From Date"
                             type="date"
                             value={holidayFormData.date}
                             onChange={(e) => setHolidayFormData({ ...holidayFormData, date: e.target.value })}
@@ -1347,7 +1347,7 @@ const Roster = () => {
                             className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                         />
                         <label htmlFor="weekendOnly" className="text-sm text-gray-700 dark:text-gray-300">
-                            Apply to Weekends Only (Saturday & Sunday)
+                            Apply to Weekends Only (Saturday & Sunday) within the selected date range
                         </label>
                     </div>
 
