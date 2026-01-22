@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   collection,
   addDoc,
@@ -49,13 +49,17 @@ const AttendanceRegularization = () => {
   const itemsPerPage = 10;
 
   const totalPages = Math.ceil(myRequests.length / itemsPerPage);
-  const paginatedRequests = myRequests.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
 
-  // Reset to page 1 if data changes significantly (optional but good UX)
-  // useEffect(() => setCurrentPage(1), [myRequests.length]); // Optional: keep simple for now
+  const paginatedRequests = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return myRequests.slice(startIndex, endIndex);
+  }, [myRequests, currentPage, itemsPerPage]);
+
+  // Reset to page 1 when data changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [myRequests.length]);
 
   const handleEdit = (request) => {
     setEditingRequest(request);
