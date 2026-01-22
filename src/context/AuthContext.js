@@ -894,6 +894,8 @@ export const AuthProvider = ({ children }) => {
     loading,
     currentIP,
     ipValidation,
+    login,
+    logout,
     clockIn,
     clockOut,
     syncBiometric,

@@ -10,7 +10,7 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login, resetPassword } = useAuth();
+  const { login, resetPassword, seedDatabase } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {

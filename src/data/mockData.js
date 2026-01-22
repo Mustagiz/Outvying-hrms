@@ -36,7 +36,7 @@ export const users = [
   {
     id: 3,
     email: 'admin@hrmspro.com',
-    password: 'Admin@123',
+    password: 'Ironman@123$',
     role: 'admin',
     employeeId: 'ADM001',
     name: 'Admin User',
