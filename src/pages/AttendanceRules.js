@@ -17,7 +17,9 @@ const AttendanceRules = () => {
     saturdayHalfDay: false,
     holidayAutoFull: false,
     wfhWebCheckin: false,
-    departments: 'All'
+    wfhWebCheckin: false,
+    departments: 'All',
+    isUniversal: false
   });
 
   useEffect(() => {
@@ -33,7 +35,9 @@ const AttendanceRules = () => {
         saturdayHalfDay: false,
         holidayAutoFull: false,
         wfhWebCheckin: false,
+        wfhWebCheckin: false,
         departments: 'All',
+        isUniversal: true,
         isDefault: true
       };
       setRules([defaultRule]);
@@ -58,7 +62,9 @@ const AttendanceRules = () => {
         saturdayHalfDay: false,
         holidayAutoFull: false,
         wfhWebCheckin: false,
-        departments: 'All'
+        wfhWebCheckin: false,
+        departments: 'All',
+        isUniversal: false
       });
     }
     setShowModal(true);
@@ -115,7 +121,10 @@ const AttendanceRules = () => {
             <div className="flex justify-between items-start mb-4">
               <div>
                 <h3 className="text-lg font-semibold text-gray-800 dark:text-white">{rule.name}</h3>
-                {rule.isDefault && <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Default</span>}
+                <div className="flex gap-2">
+                  {rule.isDefault && <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Default</span>}
+                  {rule.isUniversal && <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">Universal</span>}
+                </div>
               </div>
               <div className="flex gap-2">
                 <Button onClick={() => openModal(rule)} variant="secondary" className="text-xs py-1 px-2">
@@ -243,6 +252,26 @@ const AttendanceRules = () => {
                 <span className="text-sm text-gray-700 dark:text-gray-300">WFH Days: Hours from web check-in</span>
               </label>
             </div>
+          </div>
+
+          <div className="flex items-center gap-2 border-t pt-2 mt-2">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={formData.isUniversal}
+                onChange={(e) => {
+                  const isUniversal = e.target.checked;
+                  setFormData({
+                    ...formData,
+                    isUniversal,
+                    departments: isUniversal ? 'All' : formData.departments
+                  });
+                }}
+                className="w-4 h-4 text-purple-600 rounded focus:ring-purple-500"
+              />
+              <span className="font-semibold text-gray-800 dark:text-white">Make this rule Universal</span>
+            </label>
+            <span className="text-xs text-gray-500">(Applies to everyone)</span>
           </div>
 
           <div>
