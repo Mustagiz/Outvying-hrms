@@ -63,7 +63,6 @@ export const calculateAttendanceStatus = (clockIn, clockOut, date = null, roster
     // Rules: < halfDayHours = LWP, halfDayHours to fullDayHours = Half Day, >= fullDayHours = Full Day
     const fullDayThreshold = roster?.fullDayHours || defaultRule.fullDayHours;
     const halfDayThreshold = roster?.halfDayHours || defaultRule.halfDayHours;
-    const minPresentThreshold = roster?.minPresentHours || defaultRule.minPresentHours;
 
     if (workHours < halfDayThreshold) {
       status = 'LWP';

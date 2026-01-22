@@ -62,10 +62,6 @@ const Attendance = () => {
       for (const record of recordsToScan) {
         if (record.clockIn && record.clockOut) {
           let clockOutDate = record.date;
-          // Infer date like biometricSync does
-          const [inH] = record.clockIn.split(':').map(Number);
-          const [outH] = record.clockOut.split(':').map(Number);
-
           const roster = rosters.find(r => String(r.employeeId) === String(record.employeeId) && r.date === record.date);
           const result = calculateAttendanceStatus(record.clockIn, record.clockOut, record.date, roster);
 
