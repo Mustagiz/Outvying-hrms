@@ -1343,7 +1343,13 @@ const Roster = () => {
                             type="checkbox"
                             id="weekendOnly"
                             checked={holidayFormData.applyToWeekendsOnly}
-                            onChange={(e) => setHolidayFormData({ ...holidayFormData, applyToWeekendsOnly: e.target.checked })}
+                            onChange={(e) => {
+                                setHolidayFormData({
+                                    ...holidayFormData,
+                                    applyToWeekendsOnly: e.target.checked,
+                                    type: e.target.checked ? 'Weekly Off' : holidayFormData.type
+                                });
+                            }}
                             className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                         />
                         <label htmlFor="weekendOnly" className="text-sm text-gray-700 dark:text-gray-300">
