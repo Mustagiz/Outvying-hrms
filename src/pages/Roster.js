@@ -103,35 +103,63 @@ const Roster = () => {
     const [holidayFormData, setHolidayFormData] = useState({
         selectedEmployees: [],
         date: '',
-        type: 'Holiday' // 'Holiday' or 'Weekly Off'
+        endDate: '',
+        type: 'Holiday', // 'Holiday', 'Weekly Off', or 'Custom'
+        customName: ''
     });
 
     const handleHolidaySubmit = async (e) => {
         e.preventDefault();
         if (holidayFormData.selectedEmployees.length === 0 || !holidayFormData.date) {
-            setAlert({ type: 'error', message: 'Please select employees and a date' });
+            setAlert({ type: 'error', message: 'Please select employees and a start date' });
             return;
         }
 
-        const shiftConfig = holidayFormData.type === 'Holiday'
-            ? { shiftName: 'Holiday', startTime: '00:00', endTime: '00:00', fullDayHours: 0, halfDayHours: 0 }
-            : { shiftName: 'Weekly Off', startTime: '00:00', endTime: '00:00', fullDayHours: 0, halfDayHours: 0 };
+        if (holidayFormData.type === 'Custom' && !holidayFormData.customName.trim()) {
+            setAlert({ type: 'error', message: 'Please enter a name for the custom holiday' });
+            return;
+        }
+
+        let shiftName = holidayFormData.type;
+        if (holidayFormData.type === 'Custom') {
+            shiftName = holidayFormData.customName.trim();
+        }
+
+        const shiftConfig = {
+            shiftName: shiftName,
+            startTime: '00:00',
+            endTime: '00:00',
+            fullDayHours: 0,
+            halfDayHours: 0
+        };
 
         try {
-            const result = await assignRoster({
-                ...shiftConfig,
-                employeeIds: holidayFormData.selectedEmployees,
-                startDate: holidayFormData.date,
-                endDate: holidayFormData.date, // Single day
-                gracePeriod: 0,
-                timezone: 'Asia/Kolkata'
-            });
+            // Calculate dates in range
+            const dates = [];
+            let currentDate = new Date(holidayFormData.date);
+            const end = holidayFormData.endDate ? new Date(holidayFormData.endDate) : new Date(holidayFormData.date);
 
-            setAlert({ type: result.success ? 'success' : 'error', message: result.message });
-            if (result.success) {
-                setShowHolidayModal(false);
-                setHolidayFormData({ selectedEmployees: [], date: '', type: 'Holiday' });
+            while (currentDate <= end) {
+                dates.push(new Date(currentDate).toISOString().split('T')[0]);
+                currentDate.setDate(currentDate.getDate() + 1);
             }
+
+            let successCount = 0;
+            for (const date of dates) {
+                const result = await assignRoster({
+                    ...shiftConfig,
+                    employeeIds: holidayFormData.selectedEmployees,
+                    startDate: date,
+                    endDate: date,
+                    gracePeriod: 0,
+                    timezone: 'Asia/Kolkata'
+                });
+                if (result.success) successCount++;
+            }
+
+            setAlert({ type: 'success', message: `Marked ${shiftName} for ${successCount} day(s)` });
+            setShowHolidayModal(false);
+            setHolidayFormData({ selectedEmployees: [], date: '', endDate: '', type: 'Holiday', customName: '' });
         } catch (error) {
             console.error("Holiday Assign Error:", error);
             setAlert({ type: 'error', message: 'Failed to assign holiday' });
@@ -1271,15 +1299,34 @@ const Roster = () => {
                             onChange={(e) => setHolidayFormData({ ...holidayFormData, date: e.target.value })}
                             required
                         />
+                        <Input
+                            label="To Date (Optional)"
+                            type="date"
+                            value={holidayFormData.endDate}
+                            onChange={(e) => setHolidayFormData({ ...holidayFormData, endDate: e.target.value })}
+                            min={holidayFormData.date}
+                        />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
                         <Select
                             label="Type"
                             value={holidayFormData.type}
                             onChange={(e) => setHolidayFormData({ ...holidayFormData, type: e.target.value })}
                             options={[
                                 { value: 'Holiday', label: 'Holiday' },
-                                { value: 'Weekly Off', label: 'Weekly Off' }
+                                { value: 'Weekly Off', label: 'Weekly Off' },
+                                { value: 'Custom', label: 'Custom (e.g. Festival)' }
                             ]}
                         />
+                        {holidayFormData.type === 'Custom' && (
+                            <Input
+                                label="Custom Name"
+                                placeholder="e.g. Diwali"
+                                value={holidayFormData.customName}
+                                onChange={(e) => setHolidayFormData({ ...holidayFormData, customName: e.target.value })}
+                                required
+                            />
+                        )}
                     </div>
 
                     <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200 dark:border-gray-700">

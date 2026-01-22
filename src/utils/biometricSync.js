@@ -6,8 +6,8 @@ export const calculateAttendanceStatus = (clockIn, clockOut, date = null, roster
   const istDate = date || new Date().toISOString().split('T')[0];
 
   if (!clockIn) {
-    // Check Roster for Holiday/Weekly Off
-    if (roster && (roster.shiftName === 'Holiday' || roster.shiftName === 'Weekly Off')) {
+    // Check Roster for Holiday/Weekly Off or Zero Hours (Custom Holiday)
+    if (roster && (roster.shiftName === 'Holiday' || roster.shiftName === 'Weekly Off' || roster.fullDayHours === 0)) {
       return {
         status: roster.shiftName,
         workHours: 0,
