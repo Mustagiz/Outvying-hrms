@@ -1,9 +1,9 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Card, Table, Input, Select, Modal, Button } from '../components/UI';
 import { departments } from '../data/mockData';
 import { filterData } from '../utils/helpers';
-import { Mail, Phone, MapPin, Briefcase, Edit2 } from 'lucide-react';
+import { Mail, Phone, MapPin, Briefcase, Edit2, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const EmployeeDirectory = () => {
   const { allUsers, currentUser, updateUser } = useAuth();
@@ -13,6 +13,8 @@ const EmployeeDirectory = () => {
   const [showModal, setShowModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({});
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   const employees = allUsers.filter(u => u.role === 'employee' || u.role === 'hr');
 
@@ -30,6 +32,19 @@ const EmployeeDirectory = () => {
     return filtered;
   }, [employees, searchTerm, selectedDepartment]);
 
+  const paginatedEmployees = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return {
+      data: filteredEmployees.slice(startIndex, startIndex + itemsPerPage),
+      totalPages: Math.ceil(filteredEmployees.length / itemsPerPage),
+      totalItems: filteredEmployees.length
+    };
+  }, [filteredEmployees, currentPage, itemsPerPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedDepartment]);
+
   const departmentOptions = [
     { value: 'all', label: 'All Departments' },
     ...departments.map(d => ({ value: d, label: d }))
@@ -40,8 +55,8 @@ const EmployeeDirectory = () => {
     { header: 'Name', accessor: 'name' },
     { header: 'Department', accessor: 'department' },
     { header: 'Designation', accessor: 'designation' },
-    { 
-      header: 'Status', 
+    {
+      header: 'Status',
       render: (row) => (
         <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
           Active
@@ -139,7 +154,47 @@ const EmployeeDirectory = () => {
           />
         </div>
 
-        <Table columns={columns} data={filteredEmployees} />
+        <Table columns={columns} data={paginatedEmployees.data} />
+
+        {paginatedEmployees.totalPages > 1 && (
+          <div className="flex items-center justify-between mt-4 px-2">
+            <div className="text-sm text-gray-600 dark:text-gray-400">
+              Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, paginatedEmployees.totalItems)} of {paginatedEmployees.totalItems} entries
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="secondary"
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                className="p-2"
+              >
+                <ChevronLeft size={20} />
+              </Button>
+              <div className="flex items-center gap-1">
+                {[...Array(paginatedEmployees.totalPages)].map((_, i) => (
+                  <button
+                    key={i + 1}
+                    onClick={() => setCurrentPage(i + 1)}
+                    className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${currentPage === i + 1
+                        ? 'bg-primary-600 text-white'
+                        : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                      }`}
+                  >
+                    {i + 1}
+                  </button>
+                ))}
+              </div>
+              <Button
+                variant="secondary"
+                onClick={() => setCurrentPage(prev => Math.min(paginatedEmployees.totalPages, prev + 1))}
+                disabled={currentPage === paginatedEmployees.totalPages}
+                className="p-2"
+              >
+                <ChevronRight size={20} />
+              </Button>
+            </div>
+          </div>
+        )}
       </Card>
 
       <div className="mt-6">
@@ -329,13 +384,13 @@ const EmployeeDirectory = () => {
 
                 <div className="flex justify-end gap-2 pt-4 border-t">
                   <Button onClick={() => setIsEditing(false)} variant="secondary">Cancel</Button>
-                  <Button 
+                  <Button
                     onClick={() => {
                       updateUser(selectedEmployee.id, editForm);
                       setSelectedEmployee(editForm);
                       setIsEditing(false);
                       alert('Employee information updated successfully');
-                    }} 
+                    }}
                     variant="primary"
                   >
                     Save Changes

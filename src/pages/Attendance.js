@@ -1,7 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Card, Button, Table, Alert, Select } from '../components/UI';
-import { Clock, Calendar } from 'lucide-react';
+import { Clock, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 import { formatDate, getStatusColor, exportToCSV, getYearOptions } from '../utils/helpers';
 import { calculateAttendanceStatus } from '../utils/biometricSync';
 
@@ -13,6 +13,8 @@ const Attendance = () => {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedEmployee, setSelectedEmployee] = useState(currentUser.role === 'employee' ? String(currentUser.id) : 'all');
   const [selectedStatus, setSelectedStatus] = useState('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   const today = new Date().toISOString().split('T')[0];
   const todayAttendance = attendance.find(a =>
@@ -105,6 +107,19 @@ const Attendance = () => {
 
     return filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
   }, [attendance, allUsers, selectedMonth, selectedYear, selectedEmployee, selectedStatus, currentUser]);
+
+  const paginatedAttendance = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return {
+      data: filteredAttendance.slice(startIndex, startIndex + itemsPerPage),
+      totalPages: Math.ceil(filteredAttendance.length / itemsPerPage),
+      totalItems: filteredAttendance.length
+    };
+  }, [filteredAttendance, currentPage, itemsPerPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedMonth, selectedYear, selectedEmployee, selectedStatus]);
 
   const attendanceStats = useMemo(() => {
     const present = filteredAttendance.filter(a => (a.status === 'Present' || a.status === 'Late' || !a.clockOut) && a.status !== 'Absent' && a.status !== 'LWP').length;
@@ -341,7 +356,47 @@ const Attendance = () => {
           </>
         )}
 
-        <Table columns={columns} data={filteredAttendance} responsive={true} />
+        <Table columns={columns} data={paginatedAttendance.data} responsive={true} />
+
+        {paginatedAttendance.totalPages > 1 && (
+          <div className="flex items-center justify-between mt-4 px-2">
+            <div className="text-sm text-gray-600 dark:text-gray-400">
+              Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, paginatedAttendance.totalItems)} of {paginatedAttendance.totalItems} entries
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="secondary"
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                className="p-2"
+              >
+                <ChevronLeft size={20} />
+              </Button>
+              <div className="flex items-center gap-1">
+                {[...Array(paginatedAttendance.totalPages)].map((_, i) => (
+                  <button
+                    key={i + 1}
+                    onClick={() => setCurrentPage(i + 1)}
+                    className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${currentPage === i + 1
+                      ? 'bg-primary-600 text-white'
+                      : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                      }`}
+                  >
+                    {i + 1}
+                  </button>
+                ))}
+              </div>
+              <Button
+                variant="secondary"
+                onClick={() => setCurrentPage(prev => Math.min(paginatedAttendance.totalPages, prev + 1))}
+                disabled={currentPage === paginatedAttendance.totalPages}
+                className="p-2"
+              >
+                <ChevronRight size={20} />
+              </Button>
+            </div>
+          </div>
+        )}
       </Card>
     </div>
   );
