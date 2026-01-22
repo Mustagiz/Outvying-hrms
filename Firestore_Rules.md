@@ -52,7 +52,8 @@ service cloud.firestore {
     match /regularizationRequests/{requestId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn() && request.resource.data.employeeId == request.auth.uid;
-      allow update: if isAdmin(); // Only admins can approve/reject keys like 'status'
+      // Allow owners to update their own PENDING requests (for overwrite logic), or Admins to update any
+      allow update: if isAdmin() || (resource.data.employeeId == request.auth.uid && resource.data.status == 'Pending');
     }
 
     // NEW: Allow employees to manage their own bank accounts

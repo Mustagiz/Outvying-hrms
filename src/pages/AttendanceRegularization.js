@@ -263,9 +263,25 @@ const AttendanceRegularization = () => {
     ...(currentUser.role !== 'employee' ? [{ header: 'Employee', accessor: 'employeeName' }] : []),
     { header: 'Date', accessor: 'date' },
     { header: 'Type', accessor: 'type' },
+    {
+      header: 'Reason',
+      render: (row) => (
+        <div className="max-w-xs truncate" title={row.reason}>
+          {row.reason}
+        </div>
+      )
+    },
     { header: 'In Time', accessor: 'inTime' },
     { header: 'Out Time', accessor: 'outTime' },
     { header: 'Submitted', accessor: 'submittedDate' },
+    {
+      header: 'Approver Notes',
+      render: (row) => row.approverComments ? (
+        <div className="max-w-xs truncate text-gray-600 dark:text-gray-400 italic" title={row.approverComments}>
+          {row.approverComments}
+        </div>
+      ) : '-'
+    },
     {
       header: 'Status',
       render: (row) => (
