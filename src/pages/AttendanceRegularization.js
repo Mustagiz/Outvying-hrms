@@ -5,7 +5,8 @@ import {
   updateDoc,
   doc,
   serverTimestamp,
-  getDoc
+  getDoc,
+  setDoc
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
@@ -129,7 +130,7 @@ const AttendanceRegularization = () => {
           if (docSnap.exists()) {
             await updateDoc(attendanceRef, attendanceUpdate);
           } else {
-            await addDoc(collection(db, 'attendance'), {
+            await setDoc(attendanceRef, {
               employeeId,
               date,
               ...attendanceUpdate
@@ -242,12 +243,11 @@ const AttendanceRegularization = () => {
         if (docSnap.exists()) {
           await updateDoc(attendanceRef, attendanceUpdate);
         } else {
-          await addDoc(collection(db, 'attendance'), {
+          await setDoc(attendanceRef, {
             employeeId,
             date,
             ...attendanceUpdate
-          }); // Note: using addDoc might create random ID, better to use setDoc with specific ID logic if strict
-          // For now, let's stick to updateDoc as regularizing implies fixing a record suitable for today/past
+          }); // Using setDoc to prevent duplicates
         }
       }
 
