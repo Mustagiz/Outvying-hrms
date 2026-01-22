@@ -62,24 +62,25 @@ const AttendanceRegularization = () => {
         throw new Error(`Regularization allowed only for last ${maxDaysBack} days`);
       }
 
-      const hasPending = regularizationRequests.some(r =>
+      const existingPending = regularizationRequests.find(r =>
         r.date === formData.date &&
         r.employeeId === currentUser.id &&
         r.status === 'Pending'
       );
 
-      if (hasPending) {
-        throw new Error('A pending request already exists for this date');
-      }
+      // Removed duplicate check error throw
 
-      if (editingRequest) {
-        // Update Existing Request
-        const requestRef = doc(db, 'regularizationRequests', editingRequest.id);
+      if (editingRequest || existingPending) {
+        // Update Existing Request (Admin Edit OR Employee Overwrite)
+        const targetId = editingRequest ? editingRequest.id : existingPending.id;
+        const actionType = editingRequest ? 'Modified' : 'Overwritten';
+
+        const requestRef = doc(db, 'regularizationRequests', targetId);
         await updateDoc(requestRef, {
           ...formData,
-          auditLog: [...(editingRequest.auditLog || []), { action: 'Modified', by: currentUser.name, date: new Date().toISOString() }]
+          auditLog: [...((editingRequest || existingPending).auditLog || []), { action: actionType, by: currentUser.name, date: new Date().toISOString() }]
         });
-        setAlert({ type: 'success', message: 'Regularization request updated successfully' });
+        setAlert({ type: 'success', message: editingRequest ? 'Regularization request updated successfully' : 'Attributes updated for existing request' });
       } else {
         // Create Request Payload
         const newRequest = {
