@@ -189,6 +189,12 @@ const Payslips = () => {
 
     let extraDeduction = releaseInfo?.customDeduction || (employeeId === selectedEmployee ? customDeduction : 0);
 
+    // Calculate LWP and UPL days based on attendance status
+    const lwpDays = monthAttendance.filter(a => a.status === 'LWP').length;
+    const uplDays = monthAttendance.filter(a => a.status === 'UPL').length; // Assuming 'UPL' is a valid status
+    const totalUnpaidDays = lwpDays + uplDays;
+    const unpaidLeaveDeduction = totalUnpaidDays * dailyRate;
+
     // Calculate Custom Deductions
     let totalCustomDeductions = 0;
     const computedCustomDeductions = payslipConfig.customComponents.deductions
@@ -206,6 +212,17 @@ const Payslips = () => {
         totalCustomDeductions += amount;
         return { ...d, amount: amount.toFixed(2) };
       });
+
+    // Add LWP/UPL as an automatic deduction if applicable
+    if (unpaidLeaveDeduction > 0) {
+      computedCustomDeductions.push({
+        id: 'auto_lwp_upl',
+        name: `LWP / UPL (${totalUnpaidDays} Days)`,
+        type: 'fixed',
+        amount: unpaidLeaveDeduction.toFixed(2)
+      });
+      totalCustomDeductions += unpaidLeaveDeduction;
+    }
 
     const extraDeductionTotal = parseFloat(extraDeduction || 0) + totalCustomDeductions;
 
@@ -607,15 +624,18 @@ const Payslips = () => {
                   </div>
 
                   {currentPayslip.computedCustomDeductions.map(cd => (
-                    <div key={cd.name} className="flex justify-between w-full gap-4">
+                    <div key={cd.name} className="flex justify-between w-full gap-4 text-gray-600 dark:text-gray-300">
                       <span>{cd.name}:</span>
                       <span>₹{cd.amount}</span>
                     </div>
                   ))}
-                  <div className="flex justify-between w-full gap-4 text-red-500 font-medium">
-                    <span>{currentPayslip.deductionReason || 'Other'}:</span>
-                    <span>₹{currentPayslip.customDeduction}</span>
-                  </div>
+
+                  {parseFloat(currentPayslip.customDeduction) > 0 && (
+                    <div className="flex justify-between w-full gap-4 text-red-500 font-medium">
+                      <span>{currentPayslip.deductionReason || 'Manual Deduction'}:</span>
+                      <span>₹{currentPayslip.customDeduction}</span>
+                    </div>
+                  )}
 
                 </div>
               </div>
@@ -655,7 +675,7 @@ const Payslips = () => {
             <Select
               label="Employee"
               value={selectedEmployee}
-              onChange={(e) => setSelectedEmployee(parseInt(e.target.value))}
+              onChange={(e) => setSelectedEmployee(e.target.value)}
               options={employeeOptions}
             />
           )}

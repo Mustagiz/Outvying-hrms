@@ -133,7 +133,7 @@ export const generateAttendanceData = () => {
           date: d.toISOString().split('T')[0],
           clockIn,
           clockOut,
-          status: isPresent ? (clockIn > '09:15' ? 'Late' : 'Present') : 'LWP',
+          status: isPresent ? (clockIn > '09:15' ? 'Late' : 'Present') : (Math.random() > 0.5 ? 'LWP' : 'UPL'), // Randomly assign LWP or UPL for absent days
           workHours: isPresent ? (Math.random() * 2 + 8).toFixed(2) : 0,
           overtime: isPresent && Math.random() > 0.8 ? (Math.random() * 2).toFixed(2) : 0
         });
