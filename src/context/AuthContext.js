@@ -63,6 +63,7 @@ export const AuthProvider = ({ children }) => {
   const [announcements, setAnnouncements] = useState([]);
   const [rosters, setRosters] = useState([]);
   const [manualLeaveAllocations, setManualLeaveAllocations] = useState([]);
+  const [regularizationRequests, setRegularizationRequests] = useState([]);
 
   // Local State
   const [theme, setTheme] = useState('light');
@@ -229,6 +230,12 @@ export const AuthProvider = ({ children }) => {
       setManualLeaveAllocations(manualData);
     });
 
+    // Subscribe to Regularization Requests
+    const unsubRegularization = onSnapshot(collection(db, 'regularizationRequests'), (snapshot) => {
+      const regData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setRegularizationRequests(regData);
+    });
+
     // Subscribe to IP Restrictions Settings
     const unsubIPSettings = onSnapshot(doc(db, 'settings', 'ipRestrictions'), (docSnap) => {
       if (docSnap.exists()) {
@@ -263,6 +270,7 @@ export const AuthProvider = ({ children }) => {
       unsubPolicy();
       unsubManualLeaves();
       unsubIPSettings();
+      unsubRegularization();
     };
 
   }, [currentUser]);
@@ -966,6 +974,7 @@ export const AuthProvider = ({ children }) => {
     deleteLeaveType,
     allLeaveTypes,
     leavePolicy,
+    regularizationRequests,
     // Add Employee wrapper
     addEmployee: addUser,
     repairAdminProfile,
