@@ -14,7 +14,8 @@ export const users = [
     address: '123 Main St, New York, NY 10001',
     emergencyContact: '+1-555-0102',
     bloodGroup: 'O+',
-    profileImage: null
+    profileImage: null,
+    baseSalary: 45000
   },
   {
     id: 2,
@@ -31,7 +32,8 @@ export const users = [
     address: '456 Oak Ave, New York, NY 10002',
     emergencyContact: '+1-555-0202',
     bloodGroup: 'A+',
-    profileImage: null
+    profileImage: null,
+    baseSalary: 60000
   },
   {
     id: 3,
@@ -48,7 +50,8 @@ export const users = [
     address: '789 Pine Rd, New York, NY 10003',
     emergencyContact: '+1-555-0302',
     bloodGroup: 'B+',
-    profileImage: null
+    profileImage: null,
+    baseSalary: 80000
   },
   {
     id: 4,
@@ -65,7 +68,8 @@ export const users = [
     address: '321 Elm St, New York, NY 10004',
     emergencyContact: '+1-555-0402',
     bloodGroup: 'AB+',
-    profileImage: null
+    profileImage: null,
+    baseSalary: 55000
   },
   {
     id: 5,
@@ -82,7 +86,8 @@ export const users = [
     address: '654 Maple Dr, New York, NY 10005',
     emergencyContact: '+1-555-0502',
     bloodGroup: 'O-',
-    profileImage: null
+    profileImage: null,
+    baseSalary: 35000
   },
   {
     id: 6,
@@ -99,7 +104,8 @@ export const users = [
     address: '987 Cedar Ln, New York, NY 10006',
     emergencyContact: '+1-555-0602',
     bloodGroup: 'A-',
-    profileImage: null
+    profileImage: null,
+    baseSalary: 40000
   }
 ];
 

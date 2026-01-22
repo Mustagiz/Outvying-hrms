@@ -522,9 +522,11 @@ const Payslips = () => {
 
   const yearOptions = getYearOptions();
 
-  const employeeOptions = currentUser.role === 'employee'
-    ? [{ value: currentUser.id, label: currentUser.name }]
-    : allUsers.filter(u => u.role === 'employee' || u.role === 'hr').map(u => ({ value: u.id, label: `${u.name} (${u.employeeId})` }));
+  const employeeOptions = useMemo(() => {
+    return currentUser.role === 'employee'
+      ? [{ value: currentUser.id, label: currentUser.name }]
+      : allUsers.filter(u => u.role === 'employee' || u.role === 'hr').map(u => ({ value: u.id, label: `${u.name} (${u.employeeId})` }));
+  }, [currentUser, allUsers]);
 
   // Effect to set default selected employee for Admin/HR if not already set or invalid
   React.useEffect(() => {
@@ -542,10 +544,12 @@ const Payslips = () => {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-gray-800 dark:text-white">Salary Slips</h1>
         <div className="relative">
-          <Button variant="secondary" onClick={openSettings}>
-            <Settings size={18} className="inline mr-2" />
-            Settings
-          </Button>
+          {currentUser.role === 'admin' && (
+            <Button variant="secondary" onClick={openSettings}>
+              <Settings size={18} className="inline mr-2" />
+              Settings
+            </Button>
+          )}
 
           {showViewOptions && (
             <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-10 p-2">
