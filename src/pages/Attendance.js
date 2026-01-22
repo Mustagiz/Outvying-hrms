@@ -65,8 +65,6 @@ const Attendance = () => {
     setIsSyncing(true);
     let count = 0;
     try {
-      const { doc, updateDoc } = await import('firebase/firestore');
-      const { db } = await import('../config/firebase');
       const { calculateAbsDuration } = await import('../utils/helpers');
 
       const recordsToScan = attendance.filter(a => a.clockIn);
@@ -154,9 +152,6 @@ const Attendance = () => {
           }
 
           // Update Firestore
-          const { collection, query, where, getDocs, doc, setDoc, updateDoc, serverTimestamp } = await import('firebase/firestore');
-          const { db } = await import('../config/firebase');
-
           // Add timestamp to update
           attendanceUpdate.updatedAt = serverTimestamp();
 
