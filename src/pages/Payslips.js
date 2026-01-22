@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Card, Button, Select, Table, Modal } from '../components/UI';
+import { Card, Button, Select, Table, Modal, Pagination } from '../components/UI';
 import { Download, FileText, Calendar, DollarSign, Eye, EyeOff, Settings } from 'lucide-react';
 import jsPDF from 'jspdf';
 import { getYearOptions } from '../utils/helpers';
@@ -11,6 +11,8 @@ const Payslips = () => {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedEmployee, setSelectedEmployee] = useState(currentUser.id);
   const [statusFilter, setStatusFilter] = useState('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
   const [releasedPayslips, setReleasedPayslips] = useState(
     JSON.parse(localStorage.getItem('releasedPayslips') || '[]')
   );
@@ -471,7 +473,7 @@ const Payslips = () => {
   const payslipHistory = useMemo(() => {
     const history = [];
     const empId = currentUser.role === 'employee' ? currentUser.id : selectedEmployee;
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < 24; i++) {
       const date = new Date(selectedYear, selectedMonth - i, 1);
       const payslip = calculatePayslip(empId, date.getMonth(), date.getFullYear());
 
@@ -607,7 +609,7 @@ const Payslips = () => {
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Gross Pay</p>
                 <p className="text-3xl font-bold text-green-600">₹{currentPayslip.grossPay}</p>
               </div>
-              <DollarSign className="text-green-600" size={32} />
+              {/* <DollarSign className="text-green-600" size={32} /> Removed per user request */}
             </div>
           </Card>
         )}
@@ -641,7 +643,7 @@ const Payslips = () => {
 
                 </div>
               </div>
-              <DollarSign className="text-red-600" size={32} />
+              {/* <DollarSign className="text-red-600" size={32} /> Removed per user request */}
             </div>
           </Card>
         )}
@@ -653,7 +655,7 @@ const Payslips = () => {
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Net Pay</p>
                 <p className="text-3xl font-bold text-blue-600">₹{currentPayslip.netPay}</p>
               </div>
-              <DollarSign className="text-blue-600" size={32} />
+              {/* <DollarSign className="text-blue-600" size={32} /> Removed per user request */}
             </div>
           </Card>
         )}
@@ -782,8 +784,30 @@ const Payslips = () => {
             ]}
           />
         </div>
-        <Table columns={columns} data={payslipHistory} />
-      </Card>
+
+
+        {/* Pagination Logic */}
+        {
+          (() => {
+            const totalPages = Math.ceil(payslipHistory.length / itemsPerPage);
+            const startIndex = (currentPage - 1) * itemsPerPage;
+            const paginatedHistory = payslipHistory.slice(startIndex, startIndex + itemsPerPage);
+
+            return (
+              <>
+                <Table columns={columns} data={paginatedHistory} />
+                {payslipHistory.length > itemsPerPage && (
+                  <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={setCurrentPage}
+                  />
+                )}
+              </>
+            );
+          })()
+        }
+      </Card >
 
       <Modal isOpen={showPreview} onClose={() => setShowPreview(false)} title="Payslip Preview" size="lg">
         {previewData && (
@@ -1089,7 +1113,7 @@ const Payslips = () => {
           </div>
         )}
       </Modal>
-    </div>
+    </div >
   );
 };
 
