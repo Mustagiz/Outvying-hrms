@@ -35,24 +35,36 @@ const Payslips = () => {
   // Configuration State for Salary Slip Components
   const [payslipConfig, setPayslipConfig] = useState(() => {
     const saved = localStorage.getItem('payslipConfig');
-    return saved ? JSON.parse(saved) : {
+    // Migration: If we have old config structure, we might want to reset or migrate it.
+    // For now, let's assume if it has the new structure we use it, otherwise default.
+    const isNewStructure = saved && JSON.parse(saved).customComponents?.earnings?.some(e => e.name === 'House Rent Allowance (HRA)');
+
+    if (saved && isNewStructure) {
+      return JSON.parse(saved);
+    }
+
+    return {
       visibility: { grossPay: true, deductions: true, netPay: true },
       components: {
         header: {
           employeeId: true, designation: true, department: true, dateOfJoining: true,
           location: true, bankName: true, bankAccount: true, ifscCode: true,
           pfNo: false, uanNo: false, esiNo: true, panNumber: true
-        },
-        earnings: {
-          basic: true, hra: true, medical: true, transport: true, shift: true, attendance: true
-        },
-        deductions: {
-          professionalTax: true, esi: true, pf: false // Defaulted to false as per user request
         }
       },
       customComponents: {
-        earnings: [], // { id, name, active, type: 'fixed' | 'precision' }
-        deductions: [] // { id, name, active, type: 'fixed' | 'percentage', value }
+        earnings: [
+          { id: 'hra', name: 'House Rent Allowance (HRA)', active: true, type: 'fixed', value: 0 },
+          { id: 'medical', name: 'Medical Allowance', active: true, type: 'fixed', value: 0 },
+          { id: 'transport', name: 'Transportation Allowance (TA)', active: true, type: 'fixed', value: 0 },
+          { id: 'shift', name: 'Shift Allowance', active: true, type: 'fixed', value: 0 },
+          { id: 'attendance_allowance', name: 'Attendance Allowance', active: true, type: 'fixed', value: 0 }
+        ],
+        deductions: [
+          { id: 'pt', name: 'Professional TAX', active: true, type: 'fixed', value: 200 },
+          { id: 'pf', name: 'Provident Fund (PF)', active: false, type: 'percentage_basic', value: 12 }, // Defaulting PF to 12% of Basic as per standard
+          { id: 'esi', name: 'ESI', active: true, type: 'fixed', value: 0 }
+        ]
       }
     };
   });
@@ -144,25 +156,60 @@ const Payslips = () => {
 
     const workingDays = monthAttendance.filter(a => a.status === 'Present' || a.status === 'Late').length;
 
-    const grossPay = dailyRate * workingDays;
-    const tax = grossPay * 0.1;
+    // Standard Gross components (simplified for now as basic salary)
+    // In a real scenario, HRA, Medical etc would proceed from CTC structure.
+    // Here we assume Base Salary IS the standard Gross before custom additions.
+    let earnedBasic = dailyRate * workingDays;
 
-    // PF Calculation controlled by config
-    const pf = payslipConfig.components.deductions.pf ? grossPay * 0.12 : 0;
+    // Calculate Custom Earnings
+    let totalCustomEarnings = 0;
+    const computedCustomEarnings = payslipConfig.customComponents.earnings
+      .filter(e => e.active)
+      .map(e => {
+        let amount = 0;
+        const val = parseFloat(e.value || 0);
+        if (e.type === 'percentage_basic') {
+          // Percentage of Base Salary (CTC/12)
+          amount = (val / 100) * empBaseSalary;
+        } else {
+          // Fixed Amount
+          amount = val;
+        }
+        totalCustomEarnings += amount;
+        return { ...e, amount: amount.toFixed(2) };
+      });
 
-    // Calculate Custom Earnings (Placeholder logic - strictly visual for now unless linked to logic)
-    // currently custom earnings are just labels in this basic version, but can be expanded
+    const grossPay = earnedBasic + totalCustomEarnings;
+
+    // Tax is no longer hardcoded. Admin can add it as a custom deduction (% of Gross or Fixed)
+    const tax = 0;
+
+    // PF is now in computedCustomDeductions
+    // const pf = ... (Removed legacy hardcode)
 
     let extraDeduction = releaseInfo?.customDeduction || (employeeId === selectedEmployee ? customDeduction : 0);
 
-    // Add custom fixed deductions from config if active
-    const customConfigDeductions = payslipConfig.customComponents.deductions
-      .filter(d => d.active && d.type === 'fixed')
-      .reduce((sum, d) => sum + parseFloat(d.value || 0), 0);
+    // Calculate Custom Deductions
+    let totalCustomDeductions = 0;
+    const computedCustomDeductions = payslipConfig.customComponents.deductions
+      .filter(d => d.active)
+      .map(d => {
+        let amount = 0;
+        const val = parseFloat(d.value || 0);
+        if (d.type === 'percentage_basic') {
+          amount = (val / 100) * empBaseSalary;
+        } else if (d.type === 'percentage_gross') {
+          amount = (val / 100) * grossPay;
+        } else {
+          amount = val;
+        }
+        totalCustomDeductions += amount;
+        return { ...d, amount: amount.toFixed(2) };
+      });
 
-    const extraDeductionTotal = parseFloat(extraDeduction || 0) + customConfigDeductions;
+    const extraDeductionTotal = parseFloat(extraDeduction || 0) + totalCustomDeductions;
 
-    const totalDeductions = tax + pf + extraDeductionTotal;
+    const totalDeductions = extraDeductionTotal;
     const netPay = grossPay - totalDeductions;
 
     return {
@@ -174,21 +221,24 @@ const Payslips = () => {
       workingDays,
       dailyRate: dailyRate.toFixed(2),
       baseSalary: empBaseSalary,
+      earnedBasic: earnedBasic.toFixed(2),
       grossPay: grossPay.toFixed(2),
-      tax: tax.toFixed(2),
-      pf: pf.toFixed(2),
+      tax: '0.00', // Explicitly zero as it's removed
+      pf: '0.00', // Legacy field, now handled in custom deductions
       customDeduction: parseFloat(extraDeduction || 0).toFixed(2),
       deductionReason: releaseInfo?.deductionReason || (employeeId === selectedEmployee ? deductionReason : ''),
       totalDeductions: totalDeductions.toFixed(2),
       netPay: netPay.toFixed(2),
-      released: !!releaseInfo
+      released: !!releaseInfo,
+      computedCustomEarnings,
+      computedCustomDeductions
     };
   };
 
   const currentPayslip = useMemo(() => {
     const empId = currentUser.role === 'employee' ? currentUser.id : selectedEmployee;
     return calculatePayslip(empId, selectedMonth, selectedYear);
-  }, [selectedEmployee, selectedMonth, selectedYear, attendance, currentUser, releasedPayslips]);
+  }, [selectedEmployee, selectedMonth, selectedYear, attendance, currentUser, releasedPayslips, payslipConfig]);
 
   const downloadPDF = (payslipData) => {
     if (!canViewPayslip(payslipData.month, payslipData.year)) {
@@ -306,47 +356,36 @@ const Payslips = () => {
 
     // Earnings
     const earnings = [
-      { key: 'basic', label: 'Basic Salary (BS)', full: payslipData.baseSalary, arrear: '0.00', actual: payslipData.grossPay },
-      { key: 'hra', label: 'House Rent Allowance (HRA)', full: '0.00', arrear: '0.00', actual: '0.00' },
-      { key: 'medical', label: 'Medical Allowance', full: '0.00', arrear: '0.00', actual: '0.00' },
-      { key: 'transport', label: 'Transportation Allowance (TA)', full: '0.00', arrear: '0.00', actual: '0.00' },
-      { key: 'shift', label: 'Shift Allowance', full: '0.00', arrear: '0.00', actual: '0.00' },
-      { key: 'attendance', label: 'Attendence Allowence', full: '0.00', arrear: '0.00', actual: '0.00' }
+      { key: 'basic', label: 'Basic Salary (BS)', full: payslipData.baseSalary, arrear: '0.00', actual: payslipData.earnedBasic }
     ];
 
     // Add Custom Earnings
-    payslipConfig.customComponents.earnings.forEach(ce => {
-      if (ce.active) {
-        earnings.push({
-          key: `custom_${ce.id}`,
-          label: ce.name,
-          full: '0.00',
-          arrear: '0.00',
-          actual: '0.00'
-        });
-      }
+    payslipData.computedCustomEarnings.forEach(ce => {
+      earnings.push({
+        key: `custom_${ce.id}`,
+        label: ce.name,
+        full: '0.00',
+        arrear: '0.00',
+        actual: ce.amount
+      });
     });
 
-    const activeEarnings = earnings.filter(e => e.key.startsWith('custom_') || payslipConfig.components.earnings[e.key]);
+    const activeEarnings = earnings;
 
     const deductions = [
-      { key: 'professionalTax', label: 'Professional TAX', amount: '200.00' },
-      { key: 'esi', label: 'ESI', amount: '0.00' },
-      { key: 'pf', label: 'PF', amount: payslipData.pf }
+      { key: 'tax', label: 'Tax (TDS)', amount: payslipData.tax },
     ];
 
     // Add Custom Deductions
-    payslipConfig.customComponents.deductions.forEach(cd => {
-      if (cd.active) {
-        deductions.push({
-          key: `custom_${cd.id}`,
-          label: cd.name,
-          amount: cd.value
-        });
-      }
+    payslipData.computedCustomDeductions.forEach(cd => {
+      deductions.push({
+        key: `custom_${cd.id}`,
+        label: cd.name,
+        amount: cd.amount
+      });
     });
 
-    const activeDeductions = deductions.filter(d => d.key.startsWith('custom_') || payslipConfig.components.deductions[d.key]);
+    const activeDeductions = deductions;
 
     if (parseFloat(payslipData.customDeduction) > 0) {
       activeDeductions.push({ key: 'adhoc', label: payslipData.deductionReason || 'Other Deduction', amount: payslipData.customDeduction });
@@ -549,16 +588,20 @@ const Payslips = () => {
                 <p className="text-3xl font-bold text-red-600">₹{currentPayslip.totalDeductions}</p>
                 <div className="text-xs text-gray-500 dark:text-gray-400 mt-2 space-y-0.5">
                   <div className="flex justify-between w-full gap-4">
-                    <span>Tax (10%):</span>
-                    <span>₹{currentPayslip.tax}</span>
+                    {/* Tax Display Removed */}
                   </div>
 
-                  {parseFloat(currentPayslip.customDeduction) > 0 && (
-                    <div className="flex justify-between w-full gap-4 text-red-500 font-medium">
-                      <span>{currentPayslip.deductionReason || 'Other'}:</span>
-                      <span>₹{currentPayslip.customDeduction}</span>
+                  {currentPayslip.computedCustomDeductions.map(cd => (
+                    <div key={cd.name} className="flex justify-between w-full gap-4">
+                      <span>{cd.name}:</span>
+                      <span>₹{cd.amount}</span>
                     </div>
-                  )}
+                  ))}
+                  <div className="flex justify-between w-full gap-4 text-red-500 font-medium">
+                    <span>{currentPayslip.deductionReason || 'Other'}:</span>
+                    <span>₹{currentPayslip.customDeduction}</span>
+                  </div>
+
                 </div>
               </div>
               <DollarSign className="text-red-600" size={32} />
@@ -718,10 +761,10 @@ const Payslips = () => {
             <div className="grid grid-cols-2 gap-4">
               {/* Dynamic Preview Fields */}
               {Object.entries({
-                name: { label: 'Employee Name', value: previewData.employee.name },
-                employeeId: { label: 'Employee ID', value: previewData.employee.employeeId },
-                designation: { label: 'Designation', value: previewData.employee.designation },
-                department: { label: 'Department', value: previewData.employee.department }
+                name: { label: 'Employee Name', value: previewData.employee?.name || 'Unknown' },
+                employeeId: { label: 'Employee ID', value: previewData.employee?.employeeId || 'N/A' },
+                designation: { label: 'Designation', value: previewData.employee?.designation || 'N/A' },
+                department: { label: 'Department', value: previewData.employee?.department || 'N/A' }
               }).map(([key, field]) => (
                 (key === 'name' || payslipConfig.components.header[key] !== false) && (
                   <div key={key}>
@@ -758,19 +801,16 @@ const Payslips = () => {
               <h3 className="font-semibold text-gray-800 dark:text-white mb-3">Earnings</h3>
               <div className="space-y-2 text-sm">
                 {/* Standard Earnings */}
-                {payslipConfig.components.earnings.basic && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-600 dark:text-gray-400">Base Salary</span>
-                    <span className="font-semibold text-gray-800 dark:text-white">₹{previewData.baseSalary}</span>
-                  </div>
-                )}
-                {/* ... other standard earnings if we were calculating them individually ... */}
+                <div className="flex justify-between">
+                  <span className="text-gray-600 dark:text-gray-400">Basic Salary (Earned)</span>
+                  <span className="font-semibold text-gray-800 dark:text-white">₹{previewData.earnedBasic}</span>
+                </div>
 
                 {/* Custom Earnings in Preview */}
-                {payslipConfig.customComponents.earnings.filter(ce => ce.active).map(ce => (
-                  <div key={ce.id} className="flex justify-between">
-                    <span className="text-gray-600 dark:text-gray-400">{ce.name}</span>
-                    <span className="font-semibold text-gray-800 dark:text-white">₹0.00</span>
+                {previewData.computedCustomEarnings?.map((ce, idx) => (
+                  <div key={ce?.id || idx} className="flex justify-between">
+                    <span className="text-gray-600 dark:text-gray-400">{ce?.name || 'Unknown'}</span>
+                    <span className="font-semibold text-gray-800 dark:text-white">₹{ce?.amount || '0.00'}</span>
                   </div>
                 ))}
 
@@ -784,22 +824,13 @@ const Payslips = () => {
             <div className="border-t pt-4">
               <h3 className="font-semibold text-gray-800 dark:text-white mb-3">Deductions</h3>
               <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">Tax (10%)</span>
-                  <span className="font-semibold text-gray-800 dark:text-white">₹{previewData.tax}</span>
-                </div>
+                {/* Deductions */}
+                {/* Tax removed from hardcoded list */}
 
-                {payslipConfig.components.deductions.pf && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-600 dark:text-gray-400">PF (12%)</span>
-                    <span className="font-semibold text-gray-800 dark:text-white">₹{previewData.pf}</span>
-                  </div>
-                )}
-
-                {payslipConfig.customComponents.deductions.filter(d => d.active).map(cd => (
-                  <div key={cd.id} className="flex justify-between">
-                    <span className="text-gray-600 dark:text-gray-400">{cd.name}</span>
-                    <span className="font-semibold text-gray-800 dark:text-white">₹{cd.value}</span>
+                {previewData.computedCustomDeductions?.map((cd, idx) => (
+                  <div key={cd?.id || idx} className="flex justify-between">
+                    <span className="text-gray-600 dark:text-gray-400">{cd?.name || 'Unknown'}</span>
+                    <span className="font-semibold text-gray-800 dark:text-white">₹{cd?.amount || '0.00'}</span>
                   </div>
                 ))}
 
@@ -856,31 +887,11 @@ const Payslips = () => {
             {/* Earnings Section */}
             <div>
               <h3 className="font-semibold text-lg mb-3 border-b pb-2">Earnings</h3>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
-                {Object.entries(tempConfig.components.earnings).map(([key, active]) => (
-                  <label key={key} className="flex items-center gap-2 p-2 border rounded hover:bg-gray-50 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={active}
-                      onChange={(e) => setTempConfig(prev => ({
-                        ...prev,
-                        components: {
-                          ...prev.components,
-                          earnings: { ...prev.components.earnings, [key]: e.target.checked }
-                        }
-                      }))}
-                      className="rounded text-primary-600"
-                    />
-                    <span className="capitalize text-sm">{key}</span>
-                  </label>
-                ))}
-              </div>
 
-              {/* Custom Earnings */}
-              <div className="space-y-2">
-                <p className="text-sm font-medium">Custom Earnings</p>
+              <div className="space-y-4">
+                <p className="text-sm font-medium">Earnings Components</p>
                 {tempConfig.customComponents.earnings.map((ce, idx) => (
-                  <div key={ce.id} className="flex gap-2 items-center">
+                  <div key={ce.id} className="flex gap-2 items-center flex-wrap md:flex-nowrap border p-2 rounded">
                     <input
                       type="text"
                       value={ce.name}
@@ -889,8 +900,31 @@ const Payslips = () => {
                         newEarnings[idx].name = e.target.value;
                         setTempConfig({ ...tempConfig, customComponents: { ...tempConfig.customComponents, earnings: newEarnings } });
                       }}
-                      className="border p-1 rounded text-sm flex-1"
+                      className="border p-1 rounded text-sm flex-1 min-w-[120px]"
                       placeholder="Earning Name"
+                    />
+                    <select
+                      value={ce.type || 'fixed'}
+                      onChange={(e) => {
+                        const newEarnings = [...tempConfig.customComponents.earnings];
+                        newEarnings[idx].type = e.target.value;
+                        setTempConfig({ ...tempConfig, customComponents: { ...tempConfig.customComponents, earnings: newEarnings } });
+                      }}
+                      className="border p-1 rounded text-sm w-32"
+                    >
+                      <option value="fixed">Fixed (₹)</option>
+                      <option value="percentage_basic">% of Basic</option>
+                    </select>
+                    <input
+                      type="number"
+                      value={ce.value || 0}
+                      onChange={(e) => {
+                        const newEarnings = [...tempConfig.customComponents.earnings];
+                        newEarnings[idx].value = e.target.value;
+                        setTempConfig({ ...tempConfig, customComponents: { ...tempConfig.customComponents, earnings: newEarnings } });
+                      }}
+                      className="border p-1 rounded text-sm w-20"
+                      placeholder="Value"
                     />
                     <label className="flex items-center gap-1">
                       <input
@@ -922,7 +956,7 @@ const Payslips = () => {
                       ...tempConfig,
                       customComponents: {
                         ...tempConfig.customComponents,
-                        earnings: [...tempConfig.customComponents.earnings, { id: Date.now(), name: 'New Earning', active: true, type: 'fixed' }]
+                        earnings: [...tempConfig.customComponents.earnings, { id: Date.now(), name: 'New Earning', active: true, type: 'fixed', value: 0 }]
                       }
                     });
                   }}
@@ -933,31 +967,11 @@ const Payslips = () => {
             {/* Deductions Section */}
             <div>
               <h3 className="font-semibold text-lg mb-3 border-b pb-2">Deductions</h3>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
-                {Object.entries(tempConfig.components.deductions).map(([key, active]) => (
-                  <label key={key} className="flex items-center gap-2 p-2 border rounded hover:bg-gray-50 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={active}
-                      onChange={(e) => setTempConfig(prev => ({
-                        ...prev,
-                        components: {
-                          ...prev.components,
-                          deductions: { ...prev.components.deductions, [key]: e.target.checked }
-                        }
-                      }))}
-                      className="rounded text-primary-600"
-                    />
-                    <span className="capitalize text-sm">{key.replace('pf', 'Provident Fund (PF)')}</span>
-                  </label>
-                ))}
-              </div>
 
-              {/* Custom Deductions */}
               <div className="space-y-2">
-                <p className="text-sm font-medium">Custom Deductions (Fixed Amount)</p>
+                <p className="text-sm font-medium">Deductions Components</p>
                 {tempConfig.customComponents.deductions.map((cd, idx) => (
-                  <div key={cd.id} className="flex gap-2 items-center">
+                  <div key={cd.id} className="flex gap-2 items-center flex-wrap md:flex-nowrap border p-2 rounded">
                     <input
                       type="text"
                       value={cd.name}
@@ -966,9 +980,22 @@ const Payslips = () => {
                         newDeductions[idx].name = e.target.value;
                         setTempConfig({ ...tempConfig, customComponents: { ...tempConfig.customComponents, deductions: newDeductions } });
                       }}
-                      className="border p-1 rounded text-sm flex-1"
+                      className="border p-1 rounded text-sm flex-1 min-w-[120px]"
                       placeholder="Deduction Name"
                     />
+                    <select
+                      value={cd.type || 'fixed'}
+                      onChange={(e) => {
+                        const newDeductions = [...tempConfig.customComponents.deductions];
+                        newDeductions[idx].type = e.target.value;
+                        setTempConfig({ ...tempConfig, customComponents: { ...tempConfig.customComponents, deductions: newDeductions } });
+                      }}
+                      className="border p-1 rounded text-sm w-32"
+                    >
+                      <option value="fixed">Fixed (₹)</option>
+                      <option value="percentage_basic">% of Basic</option>
+                      <option value="percentage_gross">% of Gross</option>
+                    </select>
                     <input
                       type="number"
                       value={cd.value || 0}
@@ -978,7 +1005,7 @@ const Payslips = () => {
                         setTempConfig({ ...tempConfig, customComponents: { ...tempConfig.customComponents, deductions: newDeductions } });
                       }}
                       className="border p-1 rounded text-sm w-20"
-                      placeholder="Amount"
+                      placeholder="Value"
                     />
                     <label className="flex items-center gap-1">
                       <input

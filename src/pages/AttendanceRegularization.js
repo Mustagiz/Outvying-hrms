@@ -43,6 +43,19 @@ const AttendanceRegularization = () => {
     ).sort((a, b) => new Date(b.submittedDate) - new Date(a.submittedDate));
   }, [regularizationRequests, currentUser]);
 
+  // Pagination Logic
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
+  const totalPages = Math.ceil(myRequests.length / itemsPerPage);
+  const paginatedRequests = myRequests.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  // Reset to page 1 if data changes significantly (optional but good UX)
+  // useEffect(() => setCurrentPage(1), [myRequests.length]); // Optional: keep simple for now
+
   const handleEdit = (request) => {
     setEditingRequest(request);
     setFormData({
@@ -366,7 +379,45 @@ const AttendanceRegularization = () => {
       {alert && <Alert type={alert.type} message={alert.message} onClose={() => setAlert(null)} />}
 
       <Card title="Regularization Requests">
-        <Table columns={columns} data={myRequests} />
+        <Table columns={columns} data={paginatedRequests} />
+
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="flex justify-between items-center mt-4 px-2">
+            <div className="text-sm text-gray-600 dark:text-gray-400">
+              Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, myRequests.length)} of {myRequests.length} results
+            </div>
+            <div className="flex space-x-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+              >
+                Previous
+              </Button>
+              <div className="flex items-center space-x-1">
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  // Simple logic to show first few pages or sliding window could be better for large datasets
+                  // For now, let's just show up to 5 pages or simple Previous/Next is often enough.
+                  // Let's stick to standard Prev/Next with page indicator for simplicity and robustness.
+                  return null;
+                })}
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300 px-2">
+                  Page {currentPage} of {totalPages}
+                </span>
+              </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        )}
       </Card>
 
       <Modal isOpen={showModal} onClose={() => setShowModal(false)} title={editingRequest ? "Modify Regularization Request" : "Attendance Regularization Request"}>

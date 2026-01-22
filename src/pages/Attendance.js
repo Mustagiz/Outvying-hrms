@@ -1,9 +1,12 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Card, Button, Table, Alert, Select } from '../components/UI';
+import { Card, Button, Table, Alert, Select, Modal } from '../components/UI';
 import { Clock, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 import { formatDate, getStatusColor, exportToCSV, getYearOptions } from '../utils/helpers';
+
 import { calculateAttendanceStatus } from '../utils/biometricSync';
+import { doc, setDoc, updateDoc, deleteDoc, collection, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
+import { db } from '../config/firebase';
 
 const Attendance = () => {
   const { currentUser, attendance, rosters, clockIn, clockOut, syncBiometric, allUsers } = useAuth();
@@ -15,6 +18,15 @@ const Attendance = () => {
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+
+  // Manual Attendance State
+  const [showManualModal, setShowManualModal] = useState(false);
+  const [manualData, setManualData] = useState({
+    employeeId: '',
+    date: '',
+    clockIn: '',
+    clockOut: ''
+  });
 
   const today = new Date().toISOString().split('T')[0];
   const todayAttendance = attendance.find(a =>
@@ -82,6 +94,87 @@ const Attendance = () => {
     } catch (err) {
       console.error(err);
       setAlert({ type: 'error', message: 'Fix failed: ' + err.message });
+    }
+    setIsSyncing(false);
+    setTimeout(() => setAlert(null), 3000);
+  };
+
+  const handleManualSubmit = async () => {
+    if (!manualData.employeeId || !manualData.date) {
+      setAlert({ type: 'error', message: 'Please select Employee and Date' });
+      return;
+    }
+
+    try {
+      setIsSyncing(true);
+      const { employeeId, date, clockIn, clockOut } = manualData;
+      const roster = rosters.find(r => String(r.employeeId) === String(employeeId) && r.date === date);
+
+      // Calculate status
+      let attendanceUpdate = {};
+
+      if (clockIn) {
+        // Check for midnight crossover
+        let clockOutDate = date;
+        if (clockOut) {
+          const [inH] = clockIn.split(':').map(Number);
+          const [outH] = clockOut.split(':').map(Number);
+          if (outH < inH) {
+            // Next day
+          }
+        }
+
+        const result = calculateAttendanceStatus(clockIn, clockOut, date, roster);
+        attendanceUpdate = {
+          clockIn,
+          clockOut: clockOut || null,
+          status: result.status,
+          workHours: result.workHours,
+          workingDays: result.workingDays,
+          overtime: result.overtime,
+          ruleApplied: result.ruleApplied,
+          manualEntry: true,
+          updatedAt: serverTimestamp(),
+          updatedBy: currentUser.id
+        };
+      } else {
+        // Default to Present if just marking attendance? Use dummy time?
+        // Let's enforce time for now to keep logic robust using the calc utility.
+        throw new Error("Please provide Clock In time.");
+      }
+
+      // Logic to update/overwrite
+      const q = query(
+        collection(db, 'attendance'),
+        where('employeeId', '==', employeeId),
+        where('date', '==', date)
+      );
+      const querySnapshot = await getDocs(q);
+
+      if (!querySnapshot.empty) {
+        const firstDoc = querySnapshot.docs[0];
+        await updateDoc(firstDoc.ref, attendanceUpdate);
+        // Delete duplicates
+        if (querySnapshot.docs.length > 1) {
+          for (let i = 1; i < querySnapshot.docs.length; i++) {
+            await deleteDoc(querySnapshot.docs[i].ref);
+          }
+        }
+      } else {
+        const docId = `${employeeId}-${date}`;
+        await setDoc(doc(db, 'attendance', docId), {
+          employeeId,
+          date,
+          ...attendanceUpdate
+        });
+      }
+
+      setAlert({ type: 'success', message: 'Attendance marked successfully' });
+      setShowManualModal(false);
+      setManualData({ employeeId: '', date: '', clockIn: '', clockOut: '' });
+    } catch (err) {
+      console.error(err);
+      setAlert({ type: 'error', message: 'Operation failed: ' + err.message });
     }
     setIsSyncing(false);
     setTimeout(() => setAlert(null), 3000);
@@ -304,6 +397,13 @@ const Attendance = () => {
             {currentUser.role !== 'employee' && (
               <>
                 <Button
+                  onClick={() => setShowManualModal(true)}
+                  variant="secondary"
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  Mark Attendance
+                </Button>
+                <Button
                   onClick={handleFixRecords}
                   loading={isSyncing}
                   variant="danger"
@@ -398,7 +498,62 @@ const Attendance = () => {
           </div>
         )}
       </Card>
-    </div>
+
+      <Modal isOpen={showManualModal} onClose={() => setShowManualModal(false)} title="Mark Manual Attendance">
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Employee</label>
+            <Select
+              value={manualData.employeeId}
+              onChange={(e) => setManualData({ ...manualData, employeeId: e.target.value })}
+              options={[
+                { value: '', label: 'Select Employee' },
+                ...allUsers.filter(u => u.role !== 'admin' && u.role !== 'super_admin').map(u => ({ value: String(u.id), label: `${u.name} (${u.employeeId})` }))
+              ]}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Date</label>
+            <input
+              type="date"
+              value={manualData.date}
+              onChange={(e) => setManualData({ ...manualData, date: e.target.value })}
+              max={today}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Clock In (Required)</label>
+              <input
+                type="time"
+                value={manualData.clockIn}
+                onChange={(e) => setManualData({ ...manualData, clockIn: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Clock Out</label>
+              <input
+                type="time"
+                value={manualData.clockOut}
+                onChange={(e) => setManualData({ ...manualData, clockOut: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              />
+            </div>
+          </div>
+
+          <p className="text-xs text-gray-500 italic">
+            Note: System will automatically calculate status and work hours based on the Shift/Roster assigned for this day.
+            Existing records for this day will be overwritten.
+          </p>
+
+          <Button onClick={handleManualSubmit} className="w-full" disabled={!manualData.employeeId || !manualData.date || !manualData.clockIn || isSyncing}>
+            {isSyncing ? 'Processing...' : 'Save Attendance'}
+          </Button>
+        </div>
+      </Modal>
+    </div >
   );
 };
 
