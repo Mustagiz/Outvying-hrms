@@ -69,6 +69,7 @@ const Attendance = () => {
           const roster = rosters.find(r => String(r.employeeId) === String(record.employeeId) && r.date === record.date);
           const result = calculateAttendanceStatus(record.clockIn, record.clockOut, record.date, roster);
 
+          const ref = doc(db, 'attendance', record.id);
           await updateDoc(ref, {
             workHours: result.workHours,
             workingDays: result.workingDays,

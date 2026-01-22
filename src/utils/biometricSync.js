@@ -43,6 +43,7 @@ export const calculateAttendanceStatus = (clockIn, clockOut, date = null, roster
   let status = clockInInMinutes > (shiftStartInMinutes + gracePeriod) ? 'Late' : 'Present';
   let workingDays = 0;
   let workHours = 0;
+  let overtime = 0;
 
   if (clockOut) {
     let clockOutDate = istDate;
@@ -77,10 +78,10 @@ export const calculateAttendanceStatus = (clockIn, clockOut, date = null, roster
         status = 'Present';
       }
     }
-  }
 
-  const overtimeThreshold = roster?.overtimeThreshold || (fullDayThreshold + 1);
-  const overtime = workHours > overtimeThreshold ? Math.round((workHours - overtimeThreshold) * 100) / 100 : 0;
+    const overtimeThreshold = roster?.overtimeThreshold || (fullDayThreshold + 1);
+    overtime = workHours > overtimeThreshold ? Math.round((workHours - overtimeThreshold) * 100) / 100 : 0;
+  }
 
   return {
     status,
