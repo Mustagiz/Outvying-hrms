@@ -639,19 +639,31 @@ export const AuthProvider = ({ children }) => {
             assignedAt: serverTimestamp()
           });
 
-          // 2. Sync existing attendance for this date
-          const attRecord = attendance.find(a => String(a.employeeId) === String(empId) && a.date === dateStr);
-          if (attRecord && attRecord.clockIn) {
-            console.log("AuthContext: Retro-syncing attendance for:", empId, dateStr);
+          // 2. Sync existing attendance for this date (Direct Firestore Query)
+          const q = query(
+            collection(db, 'attendance'),
+            where('employeeId', '==', empId),
+            where('date', '==', dateStr)
+          );
+          const snap = await getDocs(q);
+
+          if (!snap.empty) {
+            console.log("AuthContext: Robust retro-syncing attendance for:", empId, dateStr);
             const rosterData = { ...rest, employeeId: empId, date: dateStr };
-            const result = calculateAttendanceStatus(attRecord.clockIn, attRecord.clockOut, attRecord.istDate, rosterData);
-            await updateDoc(doc(db, 'attendance', attRecord.id), {
-              status: result.status,
-              workHours: result.workHours,
-              workingDays: result.workingDays,
-              overtime: result.overtime,
-              ruleApplied: result.ruleApplied
-            });
+
+            for (const attDoc of snap.docs) {
+              const attData = attDoc.data();
+              if (attData.clockIn) {
+                const result = calculateAttendanceStatus(attData.clockIn, attData.clockOut, attData.istDate || dateStr, rosterData);
+                await updateDoc(attDoc.ref, {
+                  status: result.status,
+                  workHours: result.workHours,
+                  workingDays: result.workingDays,
+                  overtime: result.overtime,
+                  ruleApplied: result.ruleApplied
+                });
+              }
+            }
           }
         };
 
@@ -700,21 +712,29 @@ export const AuthProvider = ({ children }) => {
 
       const newRoster = { ...oldRoster, ...updatedData };
 
-      // Sync attendance if it already exists for this roster's employee and date
-      const attRecord = attendance.find(a =>
-        String(a.employeeId) === String(newRoster.employeeId) && a.date === newRoster.date
+      // Sync attendance if it already exists (Direct Firestore Query)
+      const q = query(
+        collection(db, 'attendance'),
+        where('employeeId', '==', newRoster.employeeId),
+        where('date', '==', newRoster.date)
       );
+      const snap = await getDocs(q);
 
-      if (attRecord && attRecord.clockIn) {
-        console.log("AuthContext: Syncing attendance after roster update for:", attRecord.id);
-        const result = calculateAttendanceStatus(attRecord.clockIn, attRecord.clockOut, attRecord.istDate, newRoster);
-        await updateDoc(doc(db, 'attendance', attRecord.id), {
-          status: result.status,
-          workHours: result.workHours,
-          workingDays: result.workingDays,
-          overtime: result.overtime,
-          ruleApplied: result.ruleApplied
-        });
+      if (!snap.empty) {
+        console.log("AuthContext: Robust syncing attendance after roster update for employee:", newRoster.employeeId);
+        for (const attDoc of snap.docs) {
+          const attData = attDoc.data();
+          if (attData.clockIn) {
+            const result = calculateAttendanceStatus(attData.clockIn, attData.clockOut, attData.istDate || newRoster.date, newRoster);
+            await updateDoc(attDoc.ref, {
+              status: result.status,
+              workHours: result.workHours,
+              workingDays: result.workingDays,
+              overtime: result.overtime,
+              ruleApplied: result.ruleApplied
+            });
+          }
+        }
       }
 
       return { success: true, message: 'Roster updated and attendance synchronized' };

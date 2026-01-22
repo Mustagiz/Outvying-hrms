@@ -71,10 +71,10 @@ const Attendance = () => {
       const { db } = await import('../config/firebase');
       const { calculateAbsDuration } = await import('../utils/helpers');
 
-      const recordsToScan = attendance.filter(a => a.clockIn && a.clockOut);
+      const recordsToScan = attendance.filter(a => a.clockIn);
 
       for (const record of recordsToScan) {
-        if (record.clockIn && record.clockOut) {
+        if (record.clockIn) {
           let clockOutDate = record.date;
           const roster = rosters.find(r => String(r.employeeId) === String(record.employeeId) && r.date === record.date);
           const result = calculateAttendanceStatus(record.clockIn, record.clockOut, record.date, roster);
