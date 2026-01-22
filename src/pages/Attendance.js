@@ -74,11 +74,25 @@ const Attendance = () => {
           const correctHours = calculateAbsDuration(record.clockIn, record.date, record.clockOut, clockOutDate);
 
           // Update Firestore
+          // Update Firestore
           const ref = doc(db, 'attendance', record.id);
+
+          let newStatus = 'LWP';
+          let workingDays = 0;
+
+          if (correctHours >= 8) {
+            newStatus = 'Present';
+            workingDays = 1.0;
+          } else if (correctHours >= 5) {
+            newStatus = 'Half Day';
+            workingDays = 0.5;
+          }
+
           await updateDoc(ref, {
             workHours: correctHours,
+            workingDays: workingDays,
             overtime: correctHours > 9 ? parseFloat((correctHours - 9).toFixed(2)) : 0,
-            status: correctHours >= 5 ? 'Present' : (correctHours >= 4 ? 'Half Day' : 'LWP')
+            status: newStatus
           });
           count++;
         }

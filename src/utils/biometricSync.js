@@ -59,25 +59,22 @@ export const calculateAttendanceStatus = (clockIn, clockOut, date = null, roster
     workHours = calculateAbsDuration(clockIn, istDate, clockOut, clockOutDate);
 
     // Standard business day accounting
-    if (workHours >= defaultRule.fullDayHours) {
-      workingDays = 1.0;
-    } else if (workHours >= 5) {
-      workingDays = 1.0; // Overriding to 1 day if >= 5 hours as per rule
-    } else if (workHours >= defaultRule.halfDayHours) {
-      status = 'Half Day';
-      workingDays = 0.5;
-    } else {
-      status = 'Absent';
-      workingDays = 0;
-    }
-
+    // Standard business day accounting
+    // Rules: < 5 hours = LWP, 5-8 hours = Half Day, >= 8 hours = Full Day
     if (workHours < 5) {
       status = 'LWP';
       workingDays = 0;
-    }
-
-    if (status === 'Present' && clockInInMinutes > (shiftStartInMinutes + gracePeriod)) {
-      status = 'Late';
+    } else if (workHours < 8) {
+      status = 'Half Day';
+      workingDays = 0.5;
+    } else {
+      // >= 8 hours
+      workingDays = 1.0;
+      // Status remains 'Present' or 'Late' as determined by clock-in time (lines 43)
+      // Unless it was somehow set to something else, we ensure it's at least Present-like
+      if (status !== 'Late') {
+        status = 'Present';
+      }
     }
   }
 
