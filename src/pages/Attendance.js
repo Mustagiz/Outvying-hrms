@@ -56,9 +56,9 @@ const Attendance = () => {
       const { db } = await import('../config/firebase');
       const { calculateAbsDuration } = await import('../utils/helpers');
 
-      const badRecords = attendance.filter(a => parseFloat(a.workHours) < 0 || a.workHours === "-14.80");
+      const recordsToScan = attendance.filter(a => a.clockIn && a.clockOut);
 
-      for (const record of badRecords) {
+      for (const record of recordsToScan) {
         if (record.clockIn && record.clockOut) {
           let clockOutDate = record.date;
           // Infer date like biometricSync does
