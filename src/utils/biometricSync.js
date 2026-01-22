@@ -26,7 +26,6 @@ export const calculateAttendanceStatus = (clockIn, clockOut, date = null, roster
   };
 
   const timezone = roster?.timezone || 'Asia/Kolkata';
-  const istDate = date || new Date().toISOString().split('T')[0];
 
   // Map IST time to the regional Business Day
   // If we have a roster, we use its assigned date. 
