@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Card, Button, Modal, Table } from '../components/UI';
-import { UserPlus, Trash2, Key, RefreshCw, Search } from 'lucide-react';
+import { UserPlus, Trash2, Key, RefreshCw, Search, Shield } from 'lucide-react';
 
 const UserManagement = () => {
-  const { allUsers, addUser, deleteUser, updateUser, resetPassword, updateUserId } = useAuth();
+  const { allUsers, addUser, deleteUser, updateUser, resetPassword, updateUserId, repairAdminProfile } = useAuth();
   const [alert, setAlert] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showResetModal, setShowResetModal] = useState(false);
@@ -22,8 +22,11 @@ const UserManagement = () => {
   const handleAddUser = async () => {
     try {
       // Basic Validation
-      if (!formData.email && !formData.userId) {
-        setAlert({ type: 'error', message: 'Email/User ID is required' });
+      const emailToUse = (formData.email || formData.userId).trim();
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+      if (!emailToUse || !emailRegex.test(emailToUse)) {
+        setAlert({ type: 'error', message: 'A valid email address is required for account creation. Firebase does not support usernames.' });
         return;
       }
 
@@ -80,6 +83,14 @@ const UserManagement = () => {
       setSelectedUser(null);
     }
     setTimeout(() => setAlert(null), 3000);
+  };
+
+  const handleRepairPermissions = async () => {
+    if (window.confirm('This will attempt to restore your Admin permissions in the database. Continue?')) {
+      const result = await repairAdminProfile();
+      setAlert({ type: result.success ? 'success' : 'error', message: result.message });
+      setTimeout(() => setAlert(null), 5000);
+    }
   };
 
   const handleResetPassword = async () => {
@@ -148,10 +159,16 @@ const UserManagement = () => {
               className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
             />
           </div>
-          <Button onClick={() => setShowAddModal(true)}>
-            <UserPlus size={18} className="inline mr-2" />
-            Add User
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={handleRepairPermissions} variant="secondary">
+              <Shield size={18} className="inline mr-2" />
+              Repair Admin Permissions
+            </Button>
+            <Button onClick={() => setShowAddModal(true)}>
+              <UserPlus size={18} className="inline mr-2" />
+              Add User
+            </Button>
+          </div>
         </div>
 
         <Table columns={columns} data={filteredUsers} />
