@@ -48,6 +48,13 @@ service cloud.firestore {
       allow update, delete: if isAdmin() || (isSignedIn() && request.auth.uid == resource.data.employeeId);
     }
 
+    // Allow employees to submit regularization requests
+    match /regularizationRequests/{requestId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.employeeId == request.auth.uid;
+      allow update: if isAdmin(); // Only admins can approve/reject keys like 'status'
+    }
+
     // NEW: Allow employees to manage their own bank accounts
     match /bankAccounts/{employeeId} {
       allow read: if isSignedIn();

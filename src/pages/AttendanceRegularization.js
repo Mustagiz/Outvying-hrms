@@ -126,18 +126,16 @@ const AttendanceRegularization = () => {
           // Assuming manual entry follows roster rules, but we recalculate status to be safe
           const result = calculateAttendanceStatus(inTime, outTime, date, roster);
 
-          // Override duration with absolute calculation to be 100% sure
-          const absDuration = calculateAbsDuration(inTime, date, outTime, clockOutDate);
-
           attendanceUpdate = {
             clockIn: inTime,
             clockOut: outTime,
-            status: 'Regularized', // Explicit status
-            workHours: absDuration, // Use robust helper
-            workingDays: absDuration >= 5 ? 1 : 0.5, // Simple rule fallback
-            overtime: absDuration > 9 ? parseFloat((absDuration - 9).toFixed(2)) : 0,
+            status: result.status, // Use calculated status (e.g., Present, Half Day)
+            workHours: result.workHours,
+            workingDays: result.workingDays,
+            overtime: result.overtime,
             regularizedBy: currentUser.id,
-            regularizedAt: serverTimestamp()
+            regularizedAt: serverTimestamp(),
+            isRegularized: true
           };
         } else {
           attendanceUpdate = {
@@ -187,8 +185,8 @@ const AttendanceRegularization = () => {
       header: 'Status',
       render: (row) => (
         <span className={`px-2 py-1 rounded-full text-xs font-medium ${row.status === 'Approved' ? 'bg-green-100 text-green-800' :
-            row.status === 'Rejected' ? 'bg-red-100 text-red-800' :
-              'bg-yellow-100 text-yellow-800'
+          row.status === 'Rejected' ? 'bg-red-100 text-red-800' :
+            'bg-yellow-100 text-yellow-800'
           }`}>
           {row.status}
         </span>
