@@ -28,7 +28,8 @@ const Attendance = () => {
     startDate: '',
     endDate: '',
     clockIn: '',
-    clockOut: ''
+    clockOut: '',
+    status: ''
   });
 
   const today = new Date().toISOString().split('T')[0];
@@ -185,7 +186,7 @@ const Attendance = () => {
 
       setAlert({ type: 'success', message: `Successfully updated ${successCount} attendance records` });
       setShowManualModal(false);
-      setManualData({ employeeIds: [], startDate: '', endDate: '', clockIn: '', clockOut: '' });
+      setManualData({ employeeIds: [], startDate: '', endDate: '', clockIn: '', clockOut: '', status: '' });
     } catch (error) {
       console.error(error);
       setAlert({ type: 'error', message: 'Manual update failed: ' + error.message });
