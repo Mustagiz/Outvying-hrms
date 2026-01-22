@@ -400,6 +400,17 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // --- 4. Re-calculate IP Validation whenever IP or Settings change ---
+  useEffect(() => {
+    const validation = validateIP(currentIP, ipSettings);
+    setIpValidation(validation);
+  }, [currentIP, ipSettings]);
+
+  // MODULE ACCESS HELPER
+  const checkAccess = (module) => {
+    return checkModuleAccess(module, ipSettings);
+  };
+
   // CLOCK IN
   const clockIn = async (employeeId) => {
     // IP Check

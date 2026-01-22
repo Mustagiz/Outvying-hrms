@@ -5,7 +5,7 @@ import { Card, Button, Alert } from '../components/UI';
 import { Users, Calendar, FileText, CheckCircle, Clock, TrendingUp } from 'lucide-react';
 
 const Dashboard = () => {
-  const { currentUser, allUsers, attendance, leaves, leaveBalances, currentIP, ipValidation, clockIn, clockOut } = useAuth();
+  const { currentUser, allUsers, attendance, leaves, leaveBalances, currentIP, ipValidation, ipSettings, clockIn, clockOut } = useAuth();
   const navigate = useNavigate();
   const [alert, setAlert] = useState(null);
 
