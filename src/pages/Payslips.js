@@ -32,12 +32,46 @@ const Payslips = () => {
     'Advance Recovery', 'Loan EMI', 'Other'
   ];
 
-  const template = useMemo(() => {
-    const saved = localStorage.getItem('salarySlipTemplate');
+  // Configuration State for Salary Slip Components
+  const [payslipConfig, setPayslipConfig] = useState(() => {
+    const saved = localStorage.getItem('payslipConfig');
     return saved ? JSON.parse(saved) : {
-      visibility: { grossPay: true, deductions: true, netPay: true }
+      visibility: { grossPay: true, deductions: true, netPay: true },
+      components: {
+        header: {
+          employeeId: true, designation: true, department: true, dateOfJoining: true,
+          location: true, bankName: true, bankAccount: true, ifscCode: true,
+          pfNo: false, uanNo: false, esiNo: true, panNumber: true
+        },
+        earnings: {
+          basic: true, hra: true, medical: true, transport: true, shift: true, attendance: true
+        },
+        deductions: {
+          professionalTax: true, esi: true, pf: false // Defaulted to false as per user request
+        }
+      },
+      customComponents: {
+        earnings: [], // { id, name, active, type: 'fixed' | 'precision' }
+        deductions: [] // { id, name, active, type: 'fixed' | 'percentage', value }
+      }
     };
-  }, []);
+  });
+
+  const [showSettings, setShowSettings] = useState(false);
+  const [tempConfig, setTempConfig] = useState(null);
+
+  const saveConfig = () => {
+    if (tempConfig) {
+      setPayslipConfig(tempConfig);
+      localStorage.setItem('payslipConfig', JSON.stringify(tempConfig));
+      setShowSettings(false);
+    }
+  };
+
+  const openSettings = () => {
+    setTempConfig(JSON.parse(JSON.stringify(payslipConfig)));
+    setShowSettings(true);
+  };
 
   const isPayslipReleased = (month, year, employeeId) => {
     return releasedPayslips.some(p => p.month === month && p.year === year && (p.employeeId === employeeId || p.allReleased));
@@ -112,9 +146,23 @@ const Payslips = () => {
 
     const grossPay = dailyRate * workingDays;
     const tax = grossPay * 0.1;
-    const pf = grossPay * 0.12;
-    const extraDeduction = releaseInfo?.customDeduction || (employeeId === selectedEmployee ? customDeduction : 0);
-    const totalDeductions = tax + pf + parseFloat(extraDeduction || 0);
+
+    // PF Calculation controlled by config
+    const pf = payslipConfig.components.deductions.pf ? grossPay * 0.12 : 0;
+
+    // Calculate Custom Earnings (Placeholder logic - strictly visual for now unless linked to logic)
+    // currently custom earnings are just labels in this basic version, but can be expanded
+
+    let extraDeduction = releaseInfo?.customDeduction || (employeeId === selectedEmployee ? customDeduction : 0);
+
+    // Add custom fixed deductions from config if active
+    const customConfigDeductions = payslipConfig.customComponents.deductions
+      .filter(d => d.active && d.type === 'fixed')
+      .reduce((sum, d) => sum + parseFloat(d.value || 0), 0);
+
+    const extraDeductionTotal = parseFloat(extraDeduction || 0) + customConfigDeductions;
+
+    const totalDeductions = tax + pf + extraDeductionTotal;
     const netPay = grossPay - totalDeductions;
 
     return {
@@ -148,7 +196,7 @@ const Payslips = () => {
       return;
     }
 
-    const template = JSON.parse(localStorage.getItem('salarySlipTemplate') || '{}');
+
     const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
       'July', 'August', 'September', 'October', 'November', 'December'];
 
@@ -175,80 +223,47 @@ const Payslips = () => {
     // Employee Details Section
     doc.setFontSize(9);
     doc.setFont(undefined, 'normal');
-    let yPos = 45;
+    // Dynamic Header Fields based on Config
+    const headerFields = [
+      { key: 'employeeId', label: 'Employee ID', value: payslipData.employee.employeeId },
+      { key: 'name', label: 'Employee Name', value: payslipData.employee.name, alwaysShow: true },
+      { key: 'designation', label: 'Designation', value: payslipData.employee.designation },
+      { key: 'department', label: 'Business Unit', value: payslipData.employee.department },
+      { key: 'dateOfJoining', label: 'Date Of Joining', value: payslipData.employee.dateOfJoining },
+      { key: 'location', label: 'Location', value: 'Pune' },
+      { key: 'bankName', label: 'Bank Name', value: payslipData.employee.bankName || 'Federal Bank' },
+      { key: 'bankAccount', label: 'Bank Account No.', value: payslipData.employee.bankAccount || 'XXXXXXXXXXXX' },
+      { key: 'ifscCode', label: 'IFSC Code', value: payslipData.employee.ifscCode || '-' },
+      { key: 'pfNo', label: 'PF No.', value: '-' },
+      { key: 'uanNo', label: 'UAN No.', value: '-' },
+      { key: 'esiNo', label: 'ESI No.', value: '-' },
+      { key: 'panNumber', label: 'PAN Number', value: payslipData.employee.panNumber || 'FTZPBXXXXN' },
+    ];
 
-    // Left Column
-    doc.setFont(undefined, 'bold');
-    doc.text('Employee ID', 20, yPos);
-    doc.setFont(undefined, 'normal');
-    doc.text(payslipData.employee.employeeId, 60, yPos);
+    let currentY = 45;
+    let isRightSide = false;
 
-    doc.setFont(undefined, 'bold');
-    doc.text('Employee Name', 110, yPos);
-    doc.setFont(undefined, 'normal');
-    doc.text(payslipData.employee.name, 150, yPos);
+    headerFields.forEach(field => {
+      if (field.alwaysShow || payslipConfig.components.header[field.key] !== false) { // Default true if not found/custom keys
+        if (!isRightSide) {
+          doc.setFont(undefined, 'bold');
+          doc.text(field.label, 20, currentY);
+          doc.setFont(undefined, 'normal');
+          doc.text(field.value || '', 60, currentY);
+        } else {
+          doc.setFont(undefined, 'bold');
+          doc.text(field.label, 110, currentY);
+          doc.setFont(undefined, 'normal');
+          doc.text(field.value || '', 150, currentY);
+          currentY += 6; // Move to next row after right side
+        }
+        isRightSide = !isRightSide;
+      }
+    });
 
-    yPos += 6;
-    doc.setFont(undefined, 'bold');
-    doc.text('Designation', 20, yPos);
-    doc.setFont(undefined, 'normal');
-    doc.text(payslipData.employee.designation, 60, yPos);
-
-    doc.setFont(undefined, 'bold');
-    doc.text('Business Unit', 110, yPos);
-    doc.setFont(undefined, 'normal');
-    doc.text(payslipData.employee.department, 150, yPos);
-
-    yPos += 6;
-    doc.setFont(undefined, 'bold');
-    doc.text('Date Of Joining', 20, yPos);
-    doc.setFont(undefined, 'normal');
-    doc.text(payslipData.employee.dateOfJoining || 'N/A', 60, yPos);
-
-    doc.setFont(undefined, 'bold');
-    doc.text('Location', 110, yPos);
-    doc.setFont(undefined, 'normal');
-    doc.text('Pune', 150, yPos);
-
-    yPos += 6;
-    doc.setFont(undefined, 'bold');
-    doc.text('Bank Name', 20, yPos);
-    doc.setFont(undefined, 'normal');
-    doc.text(payslipData.employee.bankName || 'Federal Bank', 60, yPos);
-
-    doc.setFont(undefined, 'bold');
-    doc.text('Bank Account No.', 110, yPos);
-    doc.setFont(undefined, 'normal');
-    doc.text(payslipData.employee.bankAccount || 'XXXXXXXXXXXX', 150, yPos);
-
-    yPos += 6;
-    doc.setFont(undefined, 'bold');
-    doc.text('IFSC Code', 20, yPos);
-    doc.setFont(undefined, 'normal');
-    doc.text(payslipData.employee.ifscCode || '-', 60, yPos);
-    yPos += 6;
-    doc.setFont(undefined, 'bold');
-    doc.text('PF No.', 20, yPos);
-    doc.setFont(undefined, 'normal');
-    doc.text('-', 60, yPos);
-
-    doc.setFont(undefined, 'bold');
-    doc.text('UAN No.', 110, yPos);
-    doc.setFont(undefined, 'normal');
-    doc.text('-', 150, yPos);
-
-    yPos += 6;
-    doc.setFont(undefined, 'bold');
-    doc.text('ESI No.', 20, yPos);
-    doc.setFont(undefined, 'normal');
-    doc.text('-', 60, yPos);
-
-    doc.setFont(undefined, 'bold');
-    doc.text('PAN Number', 110, yPos);
-    doc.setFont(undefined, 'normal');
-    doc.text(payslipData.employee.panNumber || 'FTZPBXXXXN', 150, yPos);
-
-    yPos += 6;
+    // Ensure yPos is updated if loop ended on left side
+    if (isRightSide) currentY += 6;
+    let yPos = currentY;
     doc.setFont(undefined, 'bold');
     doc.text('Days In Month', 20, yPos);
     doc.setFont(undefined, 'normal');
@@ -291,36 +306,71 @@ const Payslips = () => {
 
     // Earnings
     const earnings = [
-      ['Basic Salary (BS)', payslipData.baseSalary, '0.00', payslipData.grossPay],
-      ['House Rent Allowance (HRA)', '0.00', '0.00', '0.00'],
-      ['Medical Allowance', '0.00', '0.00', '0.00'],
-      ['Transportation Allowance (TA)', '0.00', '0.00', '0.00'],
-      ['Shift Allowance', '0.00', '0.00', '0.00'],
-      ['Attendence Allowence', '0.00', '0.00', '0.00']
+      { key: 'basic', label: 'Basic Salary (BS)', full: payslipData.baseSalary, arrear: '0.00', actual: payslipData.grossPay },
+      { key: 'hra', label: 'House Rent Allowance (HRA)', full: '0.00', arrear: '0.00', actual: '0.00' },
+      { key: 'medical', label: 'Medical Allowance', full: '0.00', arrear: '0.00', actual: '0.00' },
+      { key: 'transport', label: 'Transportation Allowance (TA)', full: '0.00', arrear: '0.00', actual: '0.00' },
+      { key: 'shift', label: 'Shift Allowance', full: '0.00', arrear: '0.00', actual: '0.00' },
+      { key: 'attendance', label: 'Attendence Allowence', full: '0.00', arrear: '0.00', actual: '0.00' }
     ];
+
+    // Add Custom Earnings
+    payslipConfig.customComponents.earnings.forEach(ce => {
+      if (ce.active) {
+        earnings.push({
+          key: `custom_${ce.id}`,
+          label: ce.name,
+          full: '0.00',
+          arrear: '0.00',
+          actual: '0.00'
+        });
+      }
+    });
+
+    const activeEarnings = earnings.filter(e => e.key.startsWith('custom_') || payslipConfig.components.earnings[e.key]);
 
     const deductions = [
-      ['Professional TAX', '200.00'],
-      ['ESI', '0.00'],
-      ['PF', payslipData.pf]
+      { key: 'professionalTax', label: 'Professional TAX', amount: '200.00' },
+      { key: 'esi', label: 'ESI', amount: '0.00' },
+      { key: 'pf', label: 'PF', amount: payslipData.pf }
     ];
 
+    // Add Custom Deductions
+    payslipConfig.customComponents.deductions.forEach(cd => {
+      if (cd.active) {
+        deductions.push({
+          key: `custom_${cd.id}`,
+          label: cd.name,
+          amount: cd.value
+        });
+      }
+    });
+
+    const activeDeductions = deductions.filter(d => d.key.startsWith('custom_') || payslipConfig.components.deductions[d.key]);
+
     if (parseFloat(payslipData.customDeduction) > 0) {
-      deductions.push([payslipData.deductionReason || 'Other Deduction', payslipData.customDeduction]);
+      activeDeductions.push({ key: 'adhoc', label: payslipData.deductionReason || 'Other Deduction', amount: payslipData.customDeduction });
     }
 
-    earnings.forEach((item, idx) => {
-      doc.text(item[0], 20, yPos);
-      doc.text(item[1].toString(), 70, yPos, { align: 'right' });
-      doc.text(item[2], 85, yPos, { align: 'right' });
-      doc.text(item[3].toString(), 100, yPos, { align: 'right' });
+    const maxRows = Math.max(activeEarnings.length, activeDeductions.length);
 
-      if (deductions[idx]) {
-        doc.text(deductions[idx][0], 110, yPos);
-        doc.text(deductions[idx][1], 185, yPos, { align: 'right' });
+    for (let i = 0; i < maxRows; i++) {
+      const earn = activeEarnings[i];
+      const ded = activeDeductions[i];
+
+      if (earn) {
+        doc.text(earn.label, 20, yPos);
+        doc.text(earn.full.toString(), 70, yPos, { align: 'right' });
+        doc.text(earn.arrear, 85, yPos, { align: 'right' });
+        doc.text(earn.actual.toString(), 100, yPos, { align: 'right' });
+      }
+
+      if (ded) {
+        doc.text(ded.label, 110, yPos);
+        doc.text(ded.amount.toString(), 185, yPos, { align: 'right' });
       }
       yPos += 5;
-    });
+    }
 
     yPos += 2;
     doc.line(15, yPos, 195, yPos);
@@ -328,11 +378,11 @@ const Payslips = () => {
     yPos += 6;
     doc.setFont(undefined, 'bold');
     doc.text('Total Earnings', 20, yPos);
-    if (template.visibility?.grossPay !== false) {
+    if (payslipConfig.visibility?.grossPay !== false) {
       doc.text(payslipData.grossPay, 100, yPos, { align: 'right' });
     }
     doc.text('Total Deduction', 110, yPos);
-    if (template.visibility?.deductions !== false) {
+    if (payslipConfig.visibility?.deductions !== false) {
       doc.text(payslipData.totalDeductions, 185, yPos, { align: 'right' });
     }
 
@@ -340,7 +390,7 @@ const Payslips = () => {
     doc.line(15, yPos, 195, yPos);
 
     yPos += 8;
-    if (template.visibility?.netPay !== false) {
+    if (payslipConfig.visibility?.netPay !== false) {
       doc.setFontSize(10);
       doc.text('Net Pay for the month (Total Earnings - Total Dedutions):', 20, yPos);
       doc.text('₹' + payslipData.netPay, 185, yPos, { align: 'right' });
@@ -442,9 +492,9 @@ const Payslips = () => {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-gray-800 dark:text-white">Salary Slips</h1>
         <div className="relative">
-          <Button variant="secondary" onClick={() => setShowViewOptions(!showViewOptions)}>
-            <Eye size={18} className="inline mr-2" />
-            View Options
+          <Button variant="secondary" onClick={openSettings}>
+            <Settings size={18} className="inline mr-2" />
+            Settings
           </Button>
 
           {showViewOptions && (
@@ -479,7 +529,7 @@ const Payslips = () => {
           </div>
         </Card>
 
-        {template.visibility?.grossPay !== false && privacySettings.grossPay && (
+        {payslipConfig.visibility?.grossPay !== false && privacySettings.grossPay && (
           <Card>
             <div className="flex items-center justify-between">
               <div>
@@ -491,19 +541,32 @@ const Payslips = () => {
           </Card>
         )}
 
-        {template.visibility?.deductions !== false && privacySettings.deductions && (
+        {payslipConfig.visibility?.deductions !== false && privacySettings.deductions && (
           <Card>
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Deductions</p>
                 <p className="text-3xl font-bold text-red-600">₹{currentPayslip.totalDeductions}</p>
+                <div className="text-xs text-gray-500 dark:text-gray-400 mt-2 space-y-0.5">
+                  <div className="flex justify-between w-full gap-4">
+                    <span>Tax (10%):</span>
+                    <span>₹{currentPayslip.tax}</span>
+                  </div>
+
+                  {parseFloat(currentPayslip.customDeduction) > 0 && (
+                    <div className="flex justify-between w-full gap-4 text-red-500 font-medium">
+                      <span>{currentPayslip.deductionReason || 'Other'}:</span>
+                      <span>₹{currentPayslip.customDeduction}</span>
+                    </div>
+                  )}
+                </div>
               </div>
               <DollarSign className="text-red-600" size={32} />
             </div>
           </Card>
         )}
 
-        {template.visibility?.netPay !== false && privacySettings.netPay && (
+        {payslipConfig.visibility?.netPay !== false && privacySettings.netPay && (
           <Card>
             <div className="flex items-center justify-between">
               <div>
@@ -653,22 +716,20 @@ const Payslips = () => {
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Employee Name</p>
-                <p className="font-semibold text-gray-800 dark:text-white">{previewData.employee.name}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Employee ID</p>
-                <p className="font-semibold text-gray-800 dark:text-white">{previewData.employee.employeeId}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Designation</p>
-                <p className="font-semibold text-gray-800 dark:text-white">{previewData.employee.designation}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Department</p>
-                <p className="font-semibold text-gray-800 dark:text-white">{previewData.employee.department}</p>
-              </div>
+              {/* Dynamic Preview Fields */}
+              {Object.entries({
+                name: { label: 'Employee Name', value: previewData.employee.name },
+                employeeId: { label: 'Employee ID', value: previewData.employee.employeeId },
+                designation: { label: 'Designation', value: previewData.employee.designation },
+                department: { label: 'Department', value: previewData.employee.department }
+              }).map(([key, field]) => (
+                (key === 'name' || payslipConfig.components.header[key] !== false) && (
+                  <div key={key}>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">{field.label}</p>
+                    <p className="font-semibold text-gray-800 dark:text-white">{field.value}</p>
+                  </div>
+                )
+              ))}
             </div>
 
             <div className="border-t pt-4">
@@ -696,10 +757,23 @@ const Payslips = () => {
             <div className="border-t pt-4">
               <h3 className="font-semibold text-gray-800 dark:text-white mb-3">Earnings</h3>
               <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">Base Salary</span>
-                  <span className="font-semibold text-gray-800 dark:text-white">₹{previewData.baseSalary}</span>
-                </div>
+                {/* Standard Earnings */}
+                {payslipConfig.components.earnings.basic && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600 dark:text-gray-400">Base Salary</span>
+                    <span className="font-semibold text-gray-800 dark:text-white">₹{previewData.baseSalary}</span>
+                  </div>
+                )}
+                {/* ... other standard earnings if we were calculating them individually ... */}
+
+                {/* Custom Earnings in Preview */}
+                {payslipConfig.customComponents.earnings.filter(ce => ce.active).map(ce => (
+                  <div key={ce.id} className="flex justify-between">
+                    <span className="text-gray-600 dark:text-gray-400">{ce.name}</span>
+                    <span className="font-semibold text-gray-800 dark:text-white">₹0.00</span>
+                  </div>
+                ))}
+
                 <div className="flex justify-between">
                   <span className="text-gray-600 dark:text-gray-400">Gross Pay ({previewData.workingDays} days)</span>
                   <span className="font-semibold text-green-600">₹{previewData.grossPay}</span>
@@ -714,10 +788,21 @@ const Payslips = () => {
                   <span className="text-gray-600 dark:text-gray-400">Tax (10%)</span>
                   <span className="font-semibold text-gray-800 dark:text-white">₹{previewData.tax}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">Provident Fund (12%)</span>
-                  <span className="font-semibold text-gray-800 dark:text-white">₹{previewData.pf}</span>
-                </div>
+
+                {payslipConfig.components.deductions.pf && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600 dark:text-gray-400">PF (12%)</span>
+                    <span className="font-semibold text-gray-800 dark:text-white">₹{previewData.pf}</span>
+                  </div>
+                )}
+
+                {payslipConfig.customComponents.deductions.filter(d => d.active).map(cd => (
+                  <div key={cd.id} className="flex justify-between">
+                    <span className="text-gray-600 dark:text-gray-400">{cd.name}</span>
+                    <span className="font-semibold text-gray-800 dark:text-white">₹{cd.value}</span>
+                  </div>
+                ))}
+
                 <div className="flex justify-between font-semibold">
                   <span className="text-gray-600 dark:text-gray-400">Total Deductions</span>
                   <span className="text-red-600">₹{previewData.totalDeductions}</span>
@@ -735,6 +820,208 @@ const Payslips = () => {
             <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
               Generated on: {new Date().toLocaleDateString()}
             </p>
+          </div>
+        )}
+      </Modal>
+
+      {/* Settings Modal */}
+      <Modal isOpen={showSettings} onClose={() => setShowSettings(false)} title="Payslip Configuration" size="lg">
+        {tempConfig && (
+          <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-2">
+
+            {/* Header Section */}
+            <div>
+              <h3 className="font-semibold text-lg mb-3 border-b pb-2">Header Fields</h3>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                {Object.entries(tempConfig.components.header).map(([key, active]) => (
+                  <label key={key} className="flex items-center gap-2 p-2 border rounded hover:bg-gray-50 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={active}
+                      onChange={(e) => setTempConfig(prev => ({
+                        ...prev,
+                        components: {
+                          ...prev.components,
+                          header: { ...prev.components.header, [key]: e.target.checked }
+                        }
+                      }))}
+                      className="rounded text-primary-600"
+                    />
+                    <span className="capitalize text-sm">{key.replace(/([A-Z])/g, ' $1')}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Earnings Section */}
+            <div>
+              <h3 className="font-semibold text-lg mb-3 border-b pb-2">Earnings</h3>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
+                {Object.entries(tempConfig.components.earnings).map(([key, active]) => (
+                  <label key={key} className="flex items-center gap-2 p-2 border rounded hover:bg-gray-50 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={active}
+                      onChange={(e) => setTempConfig(prev => ({
+                        ...prev,
+                        components: {
+                          ...prev.components,
+                          earnings: { ...prev.components.earnings, [key]: e.target.checked }
+                        }
+                      }))}
+                      className="rounded text-primary-600"
+                    />
+                    <span className="capitalize text-sm">{key}</span>
+                  </label>
+                ))}
+              </div>
+
+              {/* Custom Earnings */}
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Custom Earnings</p>
+                {tempConfig.customComponents.earnings.map((ce, idx) => (
+                  <div key={ce.id} className="flex gap-2 items-center">
+                    <input
+                      type="text"
+                      value={ce.name}
+                      onChange={(e) => {
+                        const newEarnings = [...tempConfig.customComponents.earnings];
+                        newEarnings[idx].name = e.target.value;
+                        setTempConfig({ ...tempConfig, customComponents: { ...tempConfig.customComponents, earnings: newEarnings } });
+                      }}
+                      className="border p-1 rounded text-sm flex-1"
+                      placeholder="Earning Name"
+                    />
+                    <label className="flex items-center gap-1">
+                      <input
+                        type="checkbox"
+                        checked={ce.active}
+                        onChange={(e) => {
+                          const newEarnings = [...tempConfig.customComponents.earnings];
+                          newEarnings[idx].active = e.target.checked;
+                          setTempConfig({ ...tempConfig, customComponents: { ...tempConfig.customComponents, earnings: newEarnings } });
+                        }}
+                      />
+                      <span className="text-xs">Active</span>
+                    </label>
+                    <Button
+                      variant="danger"
+                      className="p-1 px-2 text-xs"
+                      onClick={() => {
+                        const newEarnings = tempConfig.customComponents.earnings.filter((_, i) => i !== idx);
+                        setTempConfig({ ...tempConfig, customComponents: { ...tempConfig.customComponents, earnings: newEarnings } });
+                      }}
+                    >X</Button>
+                  </div>
+                ))}
+                <Button
+                  variant="secondary"
+                  className="w-full text-xs"
+                  onClick={() => {
+                    setTempConfig({
+                      ...tempConfig,
+                      customComponents: {
+                        ...tempConfig.customComponents,
+                        earnings: [...tempConfig.customComponents.earnings, { id: Date.now(), name: 'New Earning', active: true, type: 'fixed' }]
+                      }
+                    });
+                  }}
+                >+ Add Custom Earning</Button>
+              </div>
+            </div>
+
+            {/* Deductions Section */}
+            <div>
+              <h3 className="font-semibold text-lg mb-3 border-b pb-2">Deductions</h3>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
+                {Object.entries(tempConfig.components.deductions).map(([key, active]) => (
+                  <label key={key} className="flex items-center gap-2 p-2 border rounded hover:bg-gray-50 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={active}
+                      onChange={(e) => setTempConfig(prev => ({
+                        ...prev,
+                        components: {
+                          ...prev.components,
+                          deductions: { ...prev.components.deductions, [key]: e.target.checked }
+                        }
+                      }))}
+                      className="rounded text-primary-600"
+                    />
+                    <span className="capitalize text-sm">{key.replace('pf', 'Provident Fund (PF)')}</span>
+                  </label>
+                ))}
+              </div>
+
+              {/* Custom Deductions */}
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Custom Deductions (Fixed Amount)</p>
+                {tempConfig.customComponents.deductions.map((cd, idx) => (
+                  <div key={cd.id} className="flex gap-2 items-center">
+                    <input
+                      type="text"
+                      value={cd.name}
+                      onChange={(e) => {
+                        const newDeductions = [...tempConfig.customComponents.deductions];
+                        newDeductions[idx].name = e.target.value;
+                        setTempConfig({ ...tempConfig, customComponents: { ...tempConfig.customComponents, deductions: newDeductions } });
+                      }}
+                      className="border p-1 rounded text-sm flex-1"
+                      placeholder="Deduction Name"
+                    />
+                    <input
+                      type="number"
+                      value={cd.value || 0}
+                      onChange={(e) => {
+                        const newDeductions = [...tempConfig.customComponents.deductions];
+                        newDeductions[idx].value = e.target.value;
+                        setTempConfig({ ...tempConfig, customComponents: { ...tempConfig.customComponents, deductions: newDeductions } });
+                      }}
+                      className="border p-1 rounded text-sm w-20"
+                      placeholder="Amount"
+                    />
+                    <label className="flex items-center gap-1">
+                      <input
+                        type="checkbox"
+                        checked={cd.active}
+                        onChange={(e) => {
+                          const newDeductions = [...tempConfig.customComponents.deductions];
+                          newDeductions[idx].active = e.target.checked;
+                          setTempConfig({ ...tempConfig, customComponents: { ...tempConfig.customComponents, deductions: newDeductions } });
+                        }}
+                      />
+                      <span className="text-xs">Active</span>
+                    </label>
+                    <Button
+                      variant="danger"
+                      className="p-1 px-2 text-xs"
+                      onClick={() => {
+                        const newDeductions = tempConfig.customComponents.deductions.filter((_, i) => i !== idx);
+                        setTempConfig({ ...tempConfig, customComponents: { ...tempConfig.customComponents, deductions: newDeductions } });
+                      }}
+                    >X</Button>
+                  </div>
+                ))}
+                <Button
+                  variant="secondary"
+                  className="w-full text-xs"
+                  onClick={() => {
+                    setTempConfig({
+                      ...tempConfig,
+                      customComponents: {
+                        ...tempConfig.customComponents,
+                        deductions: [...tempConfig.customComponents.deductions, { id: Date.now(), name: 'New Deduction', active: true, type: 'fixed', value: 0 }]
+                      }
+                    });
+                  }}
+                >+ Add Custom Deduction</Button>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-4 border-t">
+              <Button variant="secondary" onClick={() => setShowSettings(false)}>Cancel</Button>
+              <Button onClick={saveConfig}>Save Configuration</Button>
+            </div>
           </div>
         )}
       </Modal>
