@@ -53,13 +53,48 @@ export const getStatusColor = (status) => {
   return colors[status] || 'text-gray-600 bg-gray-100';
 };
 
-export const exportToCSV = (data, filename) => {
+export const exportToCSV = (data, filename, columns = null) => {
   if (!data || data.length === 0) return;
 
-  const headers = Object.keys(data[0]);
+  let headers = [];
+  let rows = [];
+
+  if (columns) {
+    headers = columns.map(col => col.header);
+    rows = data.map(row => {
+      return columns.map(col => {
+        let value = row[col.accessor];
+
+        // Use custom render function if available (but return text, not JSX)
+        // Since render usually returns JSX, we might need a specific 'csvRender' or 'accessor' that returns string.
+        // For simplicity, let's try to use the value directly or fallback to empty string.
+        // If we want formatted values, we need to handle that.
+        // The existing render functions return strings for most simple cases or simple JSX spans.
+        // We can't execute JSX renderers to get CSV text easily.
+
+        // Better approach: Allow simple accessor or a generic formatter.
+        // For now, let's Stick to checking if value is string/number.
+
+        // Actually, checking how the Table columns are defined in Attendance.js:
+        // { header: 'Date', accessor: 'date', render: (row) => formatDate(row.date) }
+        // We can't use `render` because it might be returning JSX objects which stringify to "[object Object]".
+
+        // Let's modify exportToCSV to accept a cleaner data transformation or we need to pass a specific `csvMap` 
+        // OR we just make `exportToCSV` in the component map the data FIRST before passing.
+
+        // However, making this helper smarter is good.
+        // Let's just use accessor for now. If accessor is missing, we can't extract easily.
+        return JSON.stringify(value || '');
+      }).join(',');
+    });
+  } else {
+    headers = Object.keys(data[0]);
+    rows = data.map(row => headers.map(header => JSON.stringify(row[header] || '')).join(','));
+  }
+
   const csvContent = [
     headers.join(','),
-    ...data.map(row => headers.map(header => JSON.stringify(row[header] || '')).join(','))
+    ...rows
   ].join('\n');
 
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
