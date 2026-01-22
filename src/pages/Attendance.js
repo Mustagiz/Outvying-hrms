@@ -446,7 +446,23 @@ const Attendance = () => {
           </div>
           <div className="flex flex-wrap gap-4">
             <Button
-              onClick={() => exportToCSV(filteredAttendance, 'attendance_report')}
+              onClick={() => {
+                const csvData = filteredAttendance.map(a => {
+                  const user = allUsers.find(u => String(u.id) === String(a.employeeId));
+                  return {
+                    Date: formatDate(a.date),
+                    'Employee Name': user?.name || 'Unknown',
+                    'Employee ID': user?.employeeId || 'N/A',
+                    'Clock In': a.clockIn || 'N/A',
+                    'Clock Out': a.clockOut || 'N/A',
+                    'Work Hours': `${a.workHours || 0}h`,
+                    'Overtime': `${a.overtime || 0}h`,
+                    Status: a.status,
+                    'Rule Applied': a.ruleApplied || 'Standard'
+                  };
+                });
+                exportToCSV(csvData, 'attendance_report');
+              }}
               variant="secondary"
             >
               Export to CSV
