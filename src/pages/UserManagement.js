@@ -20,11 +20,34 @@ const UserManagement = () => {
   );
 
   const handleAddUser = async () => {
-    const result = await addUser(formData);
-    setAlert({ type: result.success ? 'success' : 'error', message: result.message });
-    if (result.success) {
-      setShowAddModal(false);
-      setFormData({ name: '', email: '', employeeId: '', designation: '', department: '', role: 'employee', userId: '', password: '', reportingTo: '' });
+    try {
+      // Basic Validation
+      if (!formData.email && !formData.userId) {
+        setAlert({ type: 'error', message: 'Email/User ID is required' });
+        return;
+      }
+
+      if (!formData.password) {
+        setAlert({ type: 'error', message: 'Password is required' });
+        return;
+      }
+
+      // Ensure email is populated for Auth
+      const finalData = {
+        ...formData,
+        email: (formData.email || formData.userId).trim(),
+        userId: (formData.userId || formData.email).trim()
+      };
+
+      const result = await addUser(finalData);
+      setAlert({ type: result.success ? 'success' : 'error', message: result.message });
+      if (result.success) {
+        setShowAddModal(false);
+        setFormData({ name: '', email: '', employeeId: '', designation: '', department: '', role: 'employee', userId: '', password: '', reportingTo: '' });
+      }
+    } catch (error) {
+      console.error("Add User Error:", error);
+      setAlert({ type: 'error', message: 'An unexpected error occurred: ' + error.message });
     }
     setTimeout(() => setAlert(null), 3000);
   };
@@ -188,9 +211,12 @@ const UserManagement = () => {
             className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
           >
             <option value="">Select Reporting Manager (Optional)</option>
-            {[...allUsers].sort((a, b) => a.name.localeCompare(b.name)).map(u => (
-              <option key={u.id} value={u.name}>{u.name} ({u.role})</option>
-            ))}
+            {[...allUsers]
+              .filter(u => u && u.name)
+              .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+              .map(u => (
+                <option key={u.id || u.uid} value={u.name}>{u.name} ({u.role || u.designation})</option>
+              ))}
           </select>
           <input
             type="text"

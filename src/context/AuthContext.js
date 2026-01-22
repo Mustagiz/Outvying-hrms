@@ -806,6 +806,7 @@ export const AuthProvider = ({ children }) => {
   // For now: Simple Firestore Add.
   // ADMIN - CREATE USER (Creates Auth User + Firestore Profile via Secondary App)
   const addUser = async (userData) => {
+    if (!userData.email) return { success: false, message: 'Email is required for account creation.' };
     let secondaryApp = null;
     try {
       // 1. Initialize secondary app to create user without logging out current admin
