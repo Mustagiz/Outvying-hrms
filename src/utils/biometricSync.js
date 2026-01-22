@@ -6,8 +6,18 @@ export const calculateAttendanceStatus = (clockIn, clockOut, date = null, roster
   const istDate = date || new Date().toISOString().split('T')[0];
 
   if (!clockIn) {
+    // Check Roster for Holiday/Weekly Off
+    if (roster && (roster.shiftName === 'Holiday' || roster.shiftName === 'Weekly Off')) {
+      return {
+        status: roster.shiftName,
+        workHours: 0,
+        workingDays: 0,
+        ruleApplied: `Roster: ${roster.shiftName}`
+      };
+    }
+
     // Default Weekend Logic: Sat (6) and Sun (0) are Weekly Offs if no roster
-    // If roster exists, we assume roster handles off days (e.g. shift name 'Weekly Off')
+    // If roster exists, we assume roster handles off days (e.g. shiftName 'Weekly Off')
     // But if roster is purely shift timing, we might need check roster.isOff
     // For now, if no roster is provided (Standard Office), Sat/Sun are OFF.
     const day = new Date(istDate).getDay();
@@ -274,4 +284,41 @@ export const processBiometricImport = (importedRows, users, rosters, currentAtte
   });
 
   return { processedData, errors };
+};
+
+export const parseDatFile = (content) => {
+  const rows = [];
+  const lines = content.split(/\r?\n/);
+
+  lines.forEach(line => {
+    // Basic cleaning
+    const trimmed = line.trim();
+    if (!trimmed) return;
+
+    // Split by whitespace (tabs or spaces)
+    const parts = trimmed.split(/\s+/);
+
+    // Expected formats often used in .dat:
+    // Format 1: ID Date Time VerifyState WorkCode (e.g., 101 2024-01-23 09:00:00 1 0)
+    // Format 2: ID Date Time (e.g., 101 2024-01-23 09:00:00)
+
+    // We assume at least 3 parts: ID, Date, Time (or Date+Time combined string)
+    if (parts.length >= 3) {
+      const id = parts[0];
+      let dateStr = parts[1];
+      let timeStr = parts[2];
+
+      // Handle combined DateTime if stuck together or variations.
+      // Standard "YYYY-MM-DD" "HH:MM:SS"
+
+      rows.push({
+        'EmployeeID': id,
+        'Date': dateStr,
+        'Time': timeStr,
+        'Raw': line
+      });
+    }
+  });
+
+  return rows;
 };

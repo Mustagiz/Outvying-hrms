@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { Card, Button, Input, Alert, Table, Modal } from '../components/UI';
 import { Fingerprint, Plus, Wifi, CheckCircle, XCircle, Upload, FileText } from 'lucide-react';
 import Papa from 'papaparse';
-import { processBiometricImport } from '../utils/biometricSync';
+import { processBiometricImport, parseDatFile } from '../utils/biometricSync';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../config/firebase';
 
@@ -64,23 +64,41 @@ const BiometricConfig = () => {
     setTimeout(() => setAlert(null), 3000);
   };
 
-  // --- CSV Import Handlers ---
+  // --- CSV / DAT Import Handlers ---
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
       setImportFile(file);
       setImportStats(null);
-      Papa.parse(file, {
-        header: true,
-        skipEmptyLines: true,
-        preview: 5, // Only preview first 5 rows
-        complete: (results) => {
-          setPreviewData(results.data);
-        },
-        error: (error) => {
-          setAlert({ type: 'error', message: `Parse Error: ${error.message}` });
-        }
-      });
+      setPreviewData([]);
+
+      const fileName = file.name.toLowerCase();
+
+      if (fileName.endsWith('.csv')) {
+        Papa.parse(file, {
+          header: true,
+          skipEmptyLines: true,
+          preview: 5,
+          complete: (results) => {
+            setPreviewData(results.data);
+          },
+          error: (error) => {
+            setAlert({ type: 'error', message: `CSV Parse Error: ${error.message}` });
+          }
+        });
+      } else if (fileName.endsWith('.dat') || fileName.endsWith('.txt')) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const content = event.target.result;
+          const parsed = parseDatFile(content);
+          setPreviewData(parsed.slice(0, 5));
+        };
+        reader.onerror = () => setAlert({ type: 'error', message: 'File read error' });
+        reader.readAsText(file);
+      } else {
+        setAlert({ type: 'error', message: 'Unsupported file type. Please use .csv, .dat, or .txt' });
+        setImportFile(null);
+      }
     }
   };
 
@@ -88,59 +106,85 @@ const BiometricConfig = () => {
     if (!importFile) return;
 
     setIsProcessing(true);
-    Papa.parse(importFile, {
-      header: true,
-      skipEmptyLines: true,
-      complete: async (results) => {
-        try {
-          // 1. Process Data
-          const { processedData, errors } = processBiometricImport(results.data, allUsers, rosters, attendance);
 
-          if (errors.length > 0) {
-            console.warn("Import warning:", errors);
-            // Optional: Show some errors to user
-          }
+    const handleImportData = async (rawData) => {
+      try {
+        // 1. Process Data
+        const { processedData, errors } = processBiometricImport(rawData, allUsers, rosters, attendance);
 
-          if (processedData.length === 0) {
-            setAlert({ type: 'warning', message: 'No valid attendance records found to import.' });
-            setIsProcessing(false);
-            return;
-          }
+        if (errors.length > 0) {
+          console.warn("Import warning:", errors);
+        }
 
-          // 2. Save to Firestore
-          let successCount = 0;
-          const promises = processedData.map(async (record) => {
-            // We use setDoc with merge: true to avoid overwriting existing non-attendance fields if any,
-            // but here we are writing specific attendance docs.
-            // Ensure ID format matches what Attendance.js expects: `${employeeId}-${date}`
-            const docRef = doc(db, 'attendance', record.id);
-            // Add global metadata
-            return setDoc(docRef, {
-              ...record,
-              importedAt: serverTimestamp()
-            }, { merge: true }).then(() => successCount++);
-          });
+        if (processedData.length === 0) {
+          setAlert({ type: 'warning', message: 'No valid attendance records found to import.' });
+          setIsProcessing(false);
+          return;
+        }
 
-          await Promise.all(promises);
+        // 2. Save to Firestore
+        let successCount = 0;
+        const promises = processedData.map(async (record) => {
+          const docRef = doc(db, 'attendance', record.id);
+          return setDoc(docRef, {
+            ...record,
+            importedAt: serverTimestamp()
+          }, { merge: true }).then(() => successCount++);
+        });
 
-          setImportStats({
-            total: results.data.length,
-            processed: processedData.length,
-            errors: errors.length
-          });
+        await Promise.all(promises);
 
-          setAlert({ type: 'success', message: `Successfully imported ${successCount} attendance records.` });
-          setImportFile(null);
-          setPreviewData([]);
+        setImportStats({
+          total: rawData.length,
+          processed: processedData.length,
+          errors: errors.length
+        });
 
-        } catch (error) {
-          console.error("Import execution error:", error);
-          setAlert({ type: 'error', message: `Import failed: ${error.message}` });
-        } finally {
+        setAlert({ type: 'success', message: `Successfully imported ${successCount} attendance records.` });
+        setImportFile(null);
+        setPreviewData([]);
+
+      } catch (error) {
+        console.error("Import execution error:", error);
+        setAlert({ type: 'error', message: `Import failed: ${error.message}` });
+      } finally {
+        setIsProcessing(false);
+      }
+    };
+
+    const fileName = importFile.name.toLowerCase();
+
+    if (fileName.endsWith('.csv')) {
+      Papa.parse(importFile, {
+        header: true,
+        skipEmptyLines: true,
+        complete: (results) => handleImportData(results.data),
+        error: (error) => {
+          setAlert({ type: 'error', message: `CSV Parse Error: ${error.message}` });
           setIsProcessing(false);
         }
-      }
-    });
+      });
+    } else if (fileName.endsWith('.dat') || fileName.endsWith('.txt')) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const content = event.target.result;
+        try {
+          const parsed = parseDatFile(content);
+          handleImportData(parsed);
+        } catch (err) {
+          setAlert({ type: 'error', message: `DAT Parse Error: ${err.message}` });
+          setIsProcessing(false);
+        }
+      };
+      reader.onerror = () => {
+        setAlert({ type: 'error', message: 'File read error' });
+        setIsProcessing(false);
+      };
+      reader.readAsText(importFile);
+    } else {
+      setAlert({ type: 'error', message: 'Unsupported file type' });
+      setIsProcessing(false);
+    }
   };
 
 
