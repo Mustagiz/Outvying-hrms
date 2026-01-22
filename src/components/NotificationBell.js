@@ -9,7 +9,9 @@ const NotificationBell = () => {
     const dropdownRef = useRef(null);
     const navigate = useNavigate();
 
-    const unreadCount = notifications.filter(n => !n.read).length;
+    // Safety check for notifications
+    const safeNotifications = notifications || [];
+    const unreadCount = safeNotifications.filter(n => !n.read).length;
 
     // Close dropdown when clicking outside
     useEffect(() => {
@@ -24,21 +26,32 @@ const NotificationBell = () => {
     }, []);
 
     const handleNotificationClick = async (notification) => {
-        // Mark as read
-        if (!notification.read) {
-            await markNotificationAsRead(notification.id);
-        }
+        try {
+            // Mark as read first
+            if (!notification.read) {
+                await markNotificationAsRead(notification.id);
+            }
 
-        // Navigate to action URL if provided
-        if (notification.actionUrl) {
-            navigate(notification.actionUrl);
-        }
+            // Small delay to ensure Firestore updates
+            await new Promise(resolve => setTimeout(resolve, 100));
 
-        setShowDropdown(false);
+            // Navigate to action URL if provided
+            if (notification.actionUrl) {
+                navigate(notification.actionUrl);
+            }
+
+            setShowDropdown(false);
+        } catch (error) {
+            console.error('Error handling notification click:', error);
+        }
     };
 
     const handleMarkAllAsRead = async () => {
-        await markAllNotificationsAsRead();
+        try {
+            await markAllNotificationsAsRead();
+        } catch (error) {
+            console.error('Error marking all as read:', error);
+        }
     };
 
     const getNotificationIcon = (type) => {
@@ -105,12 +118,12 @@ const NotificationBell = () => {
                     </div>
 
                     <div className="overflow-y-auto flex-1">
-                        {notifications.length === 0 ? (
+                        {safeNotifications.length === 0 ? (
                             <div className="p-4 text-center text-gray-500 dark:text-gray-400 text-sm">
                                 No notifications
                             </div>
                         ) : (
-                            notifications.slice(0, 10).map((notification) => (
+                            safeNotifications.slice(0, 10).map((notification) => (
                                 <div
                                     key={notification.id}
                                     onClick={() => handleNotificationClick(notification)}
@@ -136,7 +149,7 @@ const NotificationBell = () => {
                         )}
                     </div>
 
-                    {notifications.length > 10 && (
+                    {safeNotifications.length > 10 && (
                         <div className="p-2 text-center border-t border-gray-200 dark:border-gray-700">
                             <button className="text-xs text-primary-600 hover:text-primary-700 dark:text-primary-400">
                                 View all notifications
