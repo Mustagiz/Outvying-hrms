@@ -6,8 +6,9 @@ import {
   TrendingUp, Calculator, FileText, Users,
   ChevronLeft, ChevronRight, Gift, History,
   Download, Eye, CheckCircle, BarChart, Wallet,
-  Receipt, Plus
+  Receipt, Plus, FileSpreadsheet
 } from 'lucide-react';
+import Papa from 'papaparse';
 import {
   BarElement, CategoryScale, Chart as ChartJS,
   Legend, LinearScale, Title, Tooltip, ArcElement
@@ -44,6 +45,7 @@ const Payroll = () => {
   const [showReimbursementModal, setShowReimbursementModal] = useState(false);
   const [newLoan, setNewLoan] = useState({ amount: '', duration: '12', reason: '', interest: '0' });
   const [newClaim, setNewClaim] = useState({ amount: '', type: 'Travel', reason: '' });
+  const [selectedProcessMonth, setSelectedProcessMonth] = useState('January 2026');
   const itemsPerPage = 10;
 
   const [adjustmentData, setAdjustmentData] = useState({
@@ -390,6 +392,50 @@ const Payroll = () => {
     setShowModal(false); setCtc(''); setAlert({ type: 'success', message: 'CTC updated' });
   };
 
+  const handleGenerateMonthlyReport = () => {
+    const reportData = filteredEmployees.map(emp => {
+      const b = emp.salaryBreakdown;
+      if (!b) return null;
+
+      const [month, year] = selectedProcessMonth.split(' ');
+      const daysInMonth = new Date(year, ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].indexOf(month) + 1, 0).getDate();
+
+      // For now using 31 as default or 3 as per image, but let's assume full pay if no attendance logic is yet fully integrated here
+      const workDays = 31;
+      const actualEarnings = (parseFloat(b.grossSalary) * (workDays / daysInMonth)).toFixed(2);
+      const netPayable = (parseFloat(actualEarnings) - parseFloat(b.totalDeductions)).toFixed(2);
+
+      return {
+        'Employee ID': emp.employeeId,
+        'Name': emp.name,
+        'Department': emp.department,
+        'Gross Salary': b.grossSalary,
+        'Actual Earnings': actualEarnings,
+        'Deductions': b.totalDeductions,
+        'Net Payable': netPayable,
+        'Month': selectedProcessMonth
+      };
+    }).filter(r => r !== null);
+
+    if (reportData.length === 0) {
+      setAlert({ type: 'error', message: 'No payroll data found to generate report' });
+      return;
+    }
+
+    const csv = Papa.unparse(reportData);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `Payroll_Report_${selectedProcessMonth.replace(' ', '_')}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    setAlert({ type: 'success', message: 'Report generated successfully' });
+  };
+
   const deptData = useMemo(() => {
     const depts = {};
     allUsers.forEach(u => { if (u.ctc && u.department) depts[u.department] = (depts[u.department] || 0) + (u.ctc / 12); });
@@ -443,14 +489,42 @@ const Payroll = () => {
         <Card title="Monthly Batch Review">
           <div className="space-y-6">
             <div className="flex gap-4">
-              <select className="px-4 py-2 rounded-xl border"><option>January 2026</option></select>
-              <Button>Generate Report</Button>
+              <select
+                value={selectedProcessMonth}
+                onChange={(e) => setSelectedProcessMonth(e.target.value)}
+                className="px-4 py-2 rounded-xl border bg-white dark:bg-gray-800 dark:border-gray-700 dark:text-white"
+              >
+                <option>January 2026</option>
+                <option>February 2026</option>
+                <option>March 2026</option>
+              </select>
+              <Button onClick={handleGenerateMonthlyReport}>
+                <FileSpreadsheet size={16} className="mr-2" />
+                Generate CSV Report
+              </Button>
             </div>
             <Table columns={[
               { header: 'Employee', accessor: 'name' },
-              { header: 'Gross Salary', render: (u) => `₹${u.salaryBreakdown?.grossSalary || 0}` },
-              { header: 'Deductions', render: (u) => `₹${u.salaryBreakdown?.totalDeductions || 0}` },
-              { header: 'Net Payable', render: (u) => `₹${u.salaryBreakdown?.netSalary || 0}` }
+              {
+                header: 'Actual Earnings',
+                render: (u) => {
+                  const [month, year] = selectedProcessMonth.split(' ');
+                  const daysInMonth = new Date(year, ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].indexOf(month) + 1, 0).getDate();
+                  const actual = (parseFloat(u.salaryBreakdown?.grossSalary || 0) * (31 / daysInMonth)).toFixed(2);
+                  return `₹${parseFloat(actual).toLocaleString()}`;
+                }
+              },
+              { header: 'Deductions', render: (u) => `₹${parseFloat(u.salaryBreakdown?.totalDeductions || 0).toLocaleString()}` },
+              {
+                header: 'Net Payable',
+                render: (u) => {
+                  const [month, year] = selectedProcessMonth.split(' ');
+                  const daysInMonth = new Date(year, ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].indexOf(month) + 1, 0).getDate();
+                  const actual = (parseFloat(u.salaryBreakdown?.grossSalary || 0) * (31 / daysInMonth));
+                  const net = (actual - parseFloat(u.salaryBreakdown?.totalDeductions || 0)).toFixed(2);
+                  return <span className="font-extrabold text-emerald-600">₹${parseFloat(net).toLocaleString()}</span>;
+                }
+              }
             ]} data={filteredEmployees} />
           </div>
         </Card>
