@@ -54,33 +54,42 @@ export const calculateAttendanceStatus = (clockIn, clockOut, date = null, roster
   }
 
   // Latency check in regional time
-  const istTimestamp = new Date(`${istDate}T${normalizedClockIn}:00+05:30`);
+  let clockInInMinutes = 0;
+  try {
+    // Default: Direct parsing (works for IST which is the primary system time)
+    const [h, m] = normalizedClockIn.split(':').map(Number);
+    clockInInMinutes = h * 60 + m;
 
-  // Robust time extraction based on parts to avoid string format issues
-  const formatter = new Intl.DateTimeFormat('en-US', {
-    timeZone: timezone,
-    hour: 'numeric',
-    minute: 'numeric',
-    hour12: false
-  });
-
-  const parts = formatter.formatToParts(istTimestamp);
-  const regH = parseInt(parts.find(p => p.type === 'hour')?.value || '0');
-  const regM = parseInt(parts.find(p => p.type === 'minute')?.value || '0');
-  const clockInInMinutes = regH * 60 + regM;
+    // Only use Intl conversion if timezone is non-IST
+    if (timezone && timezone !== 'Asia/Kolkata') {
+      const istTimestamp = new Date(`${istDate}T${normalizedClockIn}:00+05:30`);
+      const formatter = new Intl.DateTimeFormat('en-GB', {
+        timeZone: timezone,
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      });
+      const timeStr = formatter.format(istTimestamp);
+      const [regH, regM] = timeStr.split(':').map(Number);
+      if (!isNaN(regH)) clockInInMinutes = regH * 60 + regM;
+    }
+  } catch (e) {
+    console.warn("[Attendance] Time calculation error, falling back to raw:", e);
+    const [h, m] = normalizedClockIn.split(':').map(Number);
+    clockInInMinutes = h * 60 + m;
+  }
 
   const lateThreshold = Number(shiftStartInMinutes) + Number(gracePeriod);
   let status = clockInInMinutes > lateThreshold ? 'Late' : 'Present';
 
-  // Debugging log (visible in browser console for developers)
-  if (clockInInMinutes > shiftStartInMinutes) {
-    console.log(`[Attendance Debug] ${istDate} ${clockIn}: ClockInMin=${clockInInMinutes}, ShiftStart=${shiftStartInMinutes}, Grace=${gracePeriod}, Threshold=${lateThreshold}, Status=${status}`);
-  }
+  // Force Detailed Debugging Log in System
+  console.log(`[Status Calc] ${istDate} ${clockIn} -> Minutes: ${clockInInMinutes}, Threshold: ${lateThreshold} (${shiftStartInMinutes}+${gracePeriod}), Result: ${status}`);
+
   let workingDays = 0;
   let workHours = 0;
   let overtime = 0;
 
-  if (clockOut) {
+  if (clockOut && clockOut !== 'N/A') {
     let clockOutDate = istDate;
     const [outH] = clockOut.split(':').map(Number);
     const [inH] = clockIn.split(':').map(Number);
