@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Card, Button, Input, Alert } from '../components/UI';
-import { CreditCard, Building, Search, Download } from 'lucide-react';
+import { CreditCard, Building, Search, Download, User, Hash, MapPin } from 'lucide-react';
 
 const BankAccount = () => {
   const { currentUser, bankAccounts, updateBankAccount, allUsers } = useAuth();
@@ -252,19 +252,35 @@ const BankAccount = () => {
             {isEditing ? (
               <form onSubmit={handleSubmit}>
                 {/* Employee Info */}
-                <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wide">Employee Name</p>
-                      <p className="text-sm font-bold text-gray-800 dark:text-white mt-1">
-                        {allUsers.find(u => String(u.id) === String(selectedEmployee))?.name || 'N/A'}
-                      </p>
+                <div className="mb-6 p-5 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 border-2 border-blue-200 dark:border-blue-700 rounded-2xl shadow-sm">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="p-2 bg-blue-600 rounded-lg">
+                      <User size={18} className="text-white" />
                     </div>
-                    <div>
-                      <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wide">Employee ID</p>
-                      <p className="text-sm font-bold text-gray-800 dark:text-white mt-1">
-                        {allUsers.find(u => String(u.id) === String(selectedEmployee))?.employeeId || 'N/A'}
-                      </p>
+                    <h3 className="text-sm font-bold text-blue-900 dark:text-blue-100 uppercase tracking-wider">Employee Information</h3>
+                  </div>
+                  <div className="grid grid-cols-2 gap-6">
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 bg-white dark:bg-gray-800 rounded-lg shadow-sm">
+                        <User size={16} className="text-blue-600" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wide mb-1">Name</p>
+                        <p className="text-base font-bold text-gray-900 dark:text-white">
+                          {allUsers.find(u => String(u.id) === String(selectedEmployee))?.name || 'N/A'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 bg-white dark:bg-gray-800 rounded-lg shadow-sm">
+                        <Hash size={16} className="text-blue-600" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wide mb-1">Employee ID</p>
+                        <p className="text-base font-bold text-gray-900 dark:text-white">
+                          {allUsers.find(u => String(u.id) === String(selectedEmployee))?.employeeId || 'N/A'}
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -322,19 +338,35 @@ const BankAccount = () => {
             ) : (
               <div className="space-y-4">
                 {/* Employee Info */}
-                <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wide">Employee Name</p>
-                      <p className="text-sm font-bold text-gray-800 dark:text-white mt-1">
-                        {allUsers.find(u => String(u.id) === String(selectedEmployee))?.name || 'N/A'}
-                      </p>
+                <div className="mb-6 p-5 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 border-2 border-blue-200 dark:border-blue-700 rounded-2xl shadow-sm">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="p-2 bg-blue-600 rounded-lg">
+                      <User size={18} className="text-white" />
                     </div>
-                    <div>
-                      <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wide">Employee ID</p>
-                      <p className="text-sm font-bold text-gray-800 dark:text-white mt-1">
-                        {allUsers.find(u => String(u.id) === String(selectedEmployee))?.employeeId || 'N/A'}
-                      </p>
+                    <h3 className="text-sm font-bold text-blue-900 dark:text-blue-100 uppercase tracking-wider">Employee Information</h3>
+                  </div>
+                  <div className="grid grid-cols-2 gap-6">
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 bg-white dark:bg-gray-800 rounded-lg shadow-sm">
+                        <User size={16} className="text-blue-600" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wide mb-1">Name</p>
+                        <p className="text-base font-bold text-gray-900 dark:text-white">
+                          {allUsers.find(u => String(u.id) === String(selectedEmployee))?.name || 'N/A'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 bg-white dark:bg-gray-800 rounded-lg shadow-sm">
+                        <Hash size={16} className="text-blue-600" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wide mb-1">Employee ID</p>
+                        <p className="text-base font-bold text-gray-900 dark:text-white">
+                          {allUsers.find(u => String(u.id) === String(selectedEmployee))?.employeeId || 'N/A'}
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -360,22 +392,31 @@ const BankAccount = () => {
                 </div>
 
                 <div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">IFSC Code</p>
-                  <p className="text-sm font-medium text-gray-800 dark:text-white">
+                  <div className="flex items-center gap-2 mb-2">
+                    <MapPin size={16} className="text-gray-400" />
+                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">IFSC Code</p>
+                  </div>
+                  <p className="text-sm font-medium text-gray-800 dark:text-white pl-6">
                     {myBankAccount.ifscCode || 'Not provided'}
                   </p>
                 </div>
 
                 <div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Account Type</p>
-                  <p className="text-sm font-medium text-gray-800 dark:text-white">
+                  <div className="flex items-center gap-2 mb-2">
+                    <CreditCard size={16} className="text-gray-400" />
+                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Account Type</p>
+                  </div>
+                  <p className="text-sm font-medium text-gray-800 dark:text-white pl-6">
                     {myBankAccount.accountType || 'Not provided'}
                   </p>
                 </div>
 
                 <div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Branch</p>
-                  <p className="text-sm font-medium text-gray-800 dark:text-white">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Building size={16} className="text-gray-400" />
+                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Branch</p>
+                  </div>
+                  <p className="text-sm font-medium text-gray-800 dark:text-white pl-6">
                     {myBankAccount.branch || 'Not provided'}
                   </p>
                 </div>
