@@ -15,6 +15,8 @@ const AdminManagement = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [alert, setAlert] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   const [formData, setFormData] = useState({
     name: '',
@@ -192,6 +194,20 @@ const AdminManagement = () => {
   const admins = allUsers.filter(u => u.role === 'Admin' || u.role === 'admin' || u.role === 'super_admin');
   const employees = allUsers.filter(u => u.role === 'employee');
 
+  // Pagination for employees
+  const totalPages = Math.ceil(employees.length / itemsPerPage);
+  const paginatedEmployees = employees.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  // Reset to page 1 when switching to promote tab
+  useEffect(() => {
+    if (activeTab === 'promote') {
+      setCurrentPage(1);
+    }
+  }, [activeTab]);
+
   const adminColumns = [
     { header: 'Name', accessor: 'name' },
     { header: 'Email', accessor: 'email' },
@@ -291,8 +307,8 @@ const AdminManagement = () => {
           <button
             onClick={() => setActiveTab('admins')}
             className={`px-4 py-3 font-semibold text-sm border-b-2 transition-colors ${activeTab === 'admins'
-                ? 'border-primary-600 text-primary-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+              ? 'border-primary-600 text-primary-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
               }`}
           >
             <Shield size={16} className="inline mr-2" />
@@ -301,8 +317,8 @@ const AdminManagement = () => {
           <button
             onClick={() => setActiveTab('promote')}
             className={`px-4 py-3 font-semibold text-sm border-b-2 transition-colors ${activeTab === 'promote'
-                ? 'border-primary-600 text-primary-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+              ? 'border-primary-600 text-primary-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
               }`}
           >
             <Users size={16} className="inline mr-2" />
@@ -318,7 +334,59 @@ const AdminManagement = () => {
         </Card>
       ) : (
         <Card title="Employees Available for Promotion">
-          <Table columns={employeeColumns} data={employees} />
+          <Table columns={employeeColumns} data={paginatedEmployees} />
+
+          {totalPages > 1 && (
+            <div className="flex justify-between items-center mt-4 px-4 py-3 border-t border-gray-200 dark:border-gray-700">
+              <div className="text-sm text-gray-600 dark:text-gray-400">
+                Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, employees.length)} of {employees.length} employees
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  variant="secondary"
+                  className="text-xs py-1 px-3"
+                >
+                  Previous
+                </Button>
+                <div className="flex items-center gap-1">
+                  {[...Array(totalPages)].map((_, i) => {
+                    const page = i + 1;
+                    if (
+                      page === 1 ||
+                      page === totalPages ||
+                      Math.abs(page - currentPage) <= 1
+                    ) {
+                      return (
+                        <button
+                          key={page}
+                          onClick={() => setCurrentPage(page)}
+                          className={`min-w-[32px] h-8 px-2 rounded-lg text-xs font-semibold transition-all ${currentPage === page
+                            ? 'bg-primary-600 text-white'
+                            : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700'
+                            }`}
+                        >
+                          {page}
+                        </button>
+                      );
+                    } else if (Math.abs(page - currentPage) === 2) {
+                      return <span key={page} className="text-gray-400">...</span>;
+                    }
+                    return null;
+                  })}
+                </div>
+                <Button
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                  variant="secondary"
+                  className="text-xs py-1 px-3"
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
         </Card>
       )}
 
