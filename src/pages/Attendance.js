@@ -230,8 +230,12 @@ const Attendance = () => {
 
   const filteredAttendance = useMemo(() => {
     // 1. Get filtered attendance records
-    const activeUserIds = new Set(allUsers.map(u => String(u.id)));
-    let records = attendance.filter(a => activeUserIds.has(String(a.employeeId)));
+    const teamUserIds = new Set(
+      allUsers
+        .filter(u => currentUser.role === 'manager' ? u.reportingTo === currentUser.name : true)
+        .map(u => String(u.id))
+    );
+    let records = attendance.filter(a => teamUserIds.has(String(a.employeeId)));
     const today = new Date().toISOString().split('T')[0];
 
     // Identify current date ranges for virtual calculation
@@ -296,13 +300,23 @@ const Attendance = () => {
 
       const matchesEmployee = currentUser.role === 'employee'
         ? String(a.employeeId) === String(currentUser.id)
-        : appliedFilters.employee === 'all' ? true : String(a.employeeId) === String(appliedFilters.employee);
+        : appliedFilters.employee === 'all'
+          ? (currentUser.role === 'manager' ? teamUserIds.has(String(a.employeeId)) : true)
+          : String(a.employeeId) === String(appliedFilters.employee);
 
       const matchesStatus = appliedFilters.status === 'all' ? true : a.status === appliedFilters.status;
 
       return matchesEmployee && matchesStatus;
     }).sort((a, b) => new Date(b.date) - new Date(a.date));
   }, [attendance, rosters, allUsers, appliedFilters, currentUser]);
+
+  // Page Safety: Reset if current page is out of bounds
+  useEffect(() => {
+    const totalPages = Math.ceil(filteredAttendance.length / itemsPerPage);
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(1);
+    }
+  }, [filteredAttendance.length, currentPage]);
 
   const paginatedAttendance = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
@@ -311,7 +325,7 @@ const Attendance = () => {
       totalPages: Math.ceil(filteredAttendance.length / itemsPerPage),
       totalItems: filteredAttendance.length
     };
-  }, [filteredAttendance, currentPage, itemsPerPage]);
+  }, [filteredAttendance, currentPage]);
 
 
 
