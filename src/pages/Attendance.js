@@ -429,11 +429,18 @@ const Attendance = () => {
 
   const columns = [
     { header: 'Date', accessor: 'date', render: (row) => formatDate(row.date) },
-    ...(currentUser.role !== 'employee' ? [{
-      header: 'Employee',
-      accessor: 'employeeId',
-      render: (row) => allUsers.find(u => String(u.id) === String(row.employeeId))?.name || 'Unknown'
-    }] : []),
+    ...(currentUser.role !== 'employee' ? [
+      {
+        header: 'Emp ID',
+        accessor: 'employeeId',
+        render: (row) => allUsers.find(u => String(u.id) === String(row.employeeId))?.employeeId || 'N/A'
+      },
+      {
+        header: 'Employee',
+        accessor: 'employeeId',
+        render: (row) => allUsers.find(u => String(u.id) === String(row.employeeId))?.name || 'Unknown'
+      }
+    ] : []),
     { header: 'Clock In', accessor: 'clockIn', render: (row) => row.clockIn || 'N/A' },
     { header: 'Clock Out', accessor: 'clockOut', render: (row) => row.clockOut || 'N/A' },
     { header: 'Work Hours', accessor: 'workHours', render: (row) => `${row.workHours || 0}h` },
