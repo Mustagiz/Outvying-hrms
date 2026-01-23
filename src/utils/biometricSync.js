@@ -2,24 +2,34 @@ import { calculateAbsDuration, getEffectiveWorkDate } from './helpers';
 
 // Biometric attendance calculation utilities
 
+const timeToMinutes = (timeStr) => {
+  if (!timeStr || typeof timeStr !== 'string') return 0;
+  try {
+    const cleanTime = timeStr.trim().toUpperCase();
+    const isPM = cleanTime.includes('PM');
+    const isAM = cleanTime.includes('AM');
+    const [timePart] = cleanTime.split(' ');
+    let [h, m] = timePart.split(':').map(Number);
+
+    if (isNaN(h)) h = 0;
+    if (isNaN(m)) m = 0;
+
+    if (isPM && h < 12) h += 12;
+    if (isAM && h === 12) h = 0;
+
+    return h * 60 + m;
+  } catch (e) {
+    return 0;
+  }
+};
+
 export const calculateAttendanceStatus = (clockIn, clockOut, date = null, roster = null) => {
   const istDate = date || new Date().toISOString().split('T')[0];
 
   if (!clockIn) {
-    // Check Roster for Holiday/Weekly Off or Zero Hours (Custom Holiday)
     if (roster && (roster.shiftName === 'Holiday' || roster.shiftName === 'Weekly Off' || roster.fullDayHours === 0)) {
-      return {
-        status: roster.shiftName,
-        workHours: 0,
-        workingDays: 0,
-        ruleApplied: `Roster: ${roster.shiftName}`
-      };
+      return { status: roster.shiftName, workHours: 0, workingDays: 0, ruleApplied: `Roster: ${roster.shiftName}` };
     }
-
-    // Default Weekend Logic: Sat (6) and Sun (0) are Weekly Offs if no roster
-    // If roster exists, we assume roster handles off days (e.g. shiftName 'Weekly Off')
-    // But if roster is purely shift timing, we might need check roster.isOff
-    // For now, if no roster is provided (Standard Office), Sat/Sun are OFF.
     const day = new Date(istDate).getDay();
     if (!roster && (day === 0 || day === 6)) {
       return { status: 'Weekly Off', workHours: 0, workingDays: 0, ruleApplied: 'Default Weekend' };
@@ -28,83 +38,53 @@ export const calculateAttendanceStatus = (clockIn, clockOut, date = null, roster
   }
 
   const rules = JSON.parse(localStorage.getItem('attendanceRules') || '[]');
-  const defaultRule = rules.find(r => r.isDefault) || {
-    fullDayHours: 8.0,
-    halfDayHours: 4.0,
-    minPresentHours: 1.0,
-    gracePeriodMins: 15
-  };
+  const defaultRule = rules.find(r => r.isDefault) || { fullDayHours: 8.0, halfDayHours: 4.0, minPresentHours: 1.0, gracePeriodMins: 15 };
 
   const timezone = roster?.timezone || 'Asia/Kolkata';
-
-  // Map IST time to the regional Business Day
-  // If we have a roster, we use its assigned date. 
-  // Otherwise, we calculate the effective work date for the target region.
   const workDate = roster?.date || getEffectiveWorkDate(clockIn, istDate, timezone);
 
   const shiftStartTime = roster?.startTime || '09:00';
-  const [shiftHour, shiftMin] = shiftStartTime.split(':').map(Number);
-  const shiftStartInMinutes = shiftHour * 60 + shiftMin;
+  const shiftStartInMinutes = timeToMinutes(shiftStartTime);
   const gracePeriod = Number(roster?.gracePeriod ?? defaultRule.gracePeriodMins);
 
-  // Normalize Clock In (truncate seconds if present)
-  let normalizedClockIn = clockIn;
-  if (clockIn && clockIn.split(':').length > 2) {
-    normalizedClockIn = clockIn.split(':').slice(0, 2).join(':');
-  }
+  let clockInInMinutes = timeToMinutes(clockIn);
 
-  // Latency check in regional time
-  let clockInInMinutes = 0;
-  try {
-    // Default: Direct parsing (works for IST which is the primary system time)
-    const [h, m] = normalizedClockIn.split(':').map(Number);
-    clockInInMinutes = h * 60 + m;
-
-    // Only use Intl conversion if timezone is non-IST
-    if (timezone && timezone !== 'Asia/Kolkata') {
+  // Timezone adjustment for non-IST
+  if (timezone && timezone !== 'Asia/Kolkata') {
+    try {
+      const parts = clockIn.split(':');
+      const normalizedClockIn = parts.length > 2 ? parts.slice(0, 2).join(':') : clockIn;
       const istTimestamp = new Date(`${istDate}T${normalizedClockIn}:00+05:30`);
-      const formatter = new Intl.DateTimeFormat('en-GB', {
-        timeZone: timezone,
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false
-      });
+      const formatter = new Intl.DateTimeFormat('en-GB', { timeZone: timezone, hour: '2-digit', minute: '2-digit', hour12: false });
       const timeStr = formatter.format(istTimestamp);
-      const [regH, regM] = timeStr.split(':').map(Number);
-      if (!isNaN(regH)) clockInInMinutes = regH * 60 + regM;
+      clockInInMinutes = timeToMinutes(timeStr);
+    } catch (e) {
+      console.warn("Timezone error:", e);
     }
-  } catch (e) {
-    console.warn("[Attendance] Time calculation error, falling back to raw:", e);
-    const [h, m] = normalizedClockIn.split(':').map(Number);
-    clockInInMinutes = h * 60 + m;
   }
 
-  const lateThreshold = Number(shiftStartInMinutes) + Number(gracePeriod);
+  const lateThreshold = shiftStartInMinutes + gracePeriod;
   let status = clockInInMinutes > lateThreshold ? 'Late' : 'Present';
-
-  // Force Detailed Debugging Log in System
-  console.log(`[Status Calc] ${istDate} ${clockIn} -> Minutes: ${clockInInMinutes}, Threshold: ${lateThreshold} (${shiftStartInMinutes}+${gracePeriod}), Result: ${status}`);
 
   let workingDays = 0;
   let workHours = 0;
   let overtime = 0;
 
-  if (clockOut && clockOut !== 'N/A') {
-    let clockOutDate = istDate;
-    const [outH] = clockOut.split(':').map(Number);
-    const [inH] = clockIn.split(':').map(Number);
+  const effectiveClockOut = (clockOut && clockOut !== 'N/A') ? clockOut : null;
 
-    // Auto-detect cross-midnight clockout in IST
-    if (outH < inH) {
+  if (effectiveClockOut) {
+    let clockOutDate = istDate;
+    const inMin = timeToMinutes(clockIn);
+    const outMin = timeToMinutes(effectiveClockOut);
+
+    if (outMin < inMin) {
       const nextDay = new Date(istDate);
       nextDay.setDate(nextDay.getDate() + 1);
       clockOutDate = nextDay.toISOString().split('T')[0];
     }
 
-    workHours = calculateAbsDuration(clockIn, istDate, clockOut, clockOutDate);
+    workHours = calculateAbsDuration(clockIn, istDate, effectiveClockOut, clockOutDate);
 
-    // Standard business day accounting
-    // Rules: < halfDayHours = LWP, halfDayHours to fullDayHours = Half Day, >= fullDayHours = Full Day
     const fullDayThreshold = roster?.fullDayHours || defaultRule.fullDayHours;
     const halfDayThreshold = roster?.halfDayHours || defaultRule.halfDayHours;
 
@@ -116,23 +96,21 @@ export const calculateAttendanceStatus = (clockIn, clockOut, date = null, roster
       workingDays = 0.5;
     } else if (workHours >= fullDayThreshold) {
       workingDays = 1.0;
-      // Status remains 'Present' or 'Late' as determined by clock-in time (lines 43)
-      if (status !== 'Late') {
-        status = 'Present';
-      }
+      if (status !== 'Late') status = 'Present';
     }
 
     const overtimeThreshold = roster?.overtimeThreshold || (fullDayThreshold + 1);
     overtime = workHours > overtimeThreshold ? Math.round((workHours - overtimeThreshold) * 100) / 100 : 0;
   }
 
+  const diag = ` (In:${clockInInMinutes}, Thr:${lateThreshold})`;
   return {
     status,
     workHours: Math.round(workHours * 100) / 100,
     workingDays,
     workDate,
     overtime,
-    ruleApplied: roster ? `Roster: ${roster.shiftName}` : (defaultRule.name || 'Standard Office')
+    ruleApplied: (roster ? `Roster: ${roster.shiftName}` : (defaultRule.name || 'Standard Office')) + diag
   };
 };
 
