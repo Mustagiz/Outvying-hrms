@@ -539,7 +539,8 @@ const Attendance = () => {
         </Card>
       </div>
 
-      <Card title="Attendance History Records" className="border-gray-100 dark:border-gray-800/50 shadow-xl">
+      <div className="space-y-6 mt-8">
+        <h2 className="text-xl font-bold text-gray-800 dark:text-white px-1">Attendance History Records</h2>
         <div className="space-y-6">
           {/* Enhanced Filter Section */}
           <div className="p-5 bg-gray-50/50 dark:bg-gray-800/40 rounded-2xl border border-gray-100 dark:border-gray-700/50">
@@ -703,38 +704,6 @@ const Attendance = () => {
           </div>
         </div>
 
-        {currentUser.role !== 'employee' && (
-          <>
-            <div className="grid grid-cols-4 gap-4 mb-4">
-              <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                <p className="text-xs text-gray-600 dark:text-gray-400">Present</p>
-                <p className="text-xl font-bold text-green-600">{attendanceStats.present}</p>
-              </div>
-              <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
-                <p className="text-xs text-gray-600 dark:text-gray-400">Late</p>
-                <p className="text-xl font-bold text-yellow-600">{attendanceStats.late}</p>
-              </div>
-              <div className="p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
-                <p className="text-xs text-gray-600 dark:text-gray-400">Half Day</p>
-                <p className="text-xl font-bold text-orange-600">{attendanceStats.halfDay}</p>
-              </div>
-              <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
-                <p className="text-xs text-gray-600 dark:text-gray-400">LWP</p>
-                <p className="text-xl font-bold text-red-600">{attendanceStats.lwp}</p>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4 mb-4">
-              <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                <p className="text-xs text-gray-600 dark:text-gray-400">Total Hours</p>
-                <p className="text-xl font-bold text-blue-600">{attendanceStats.totalHours}h</p>
-              </div>
-              <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
-                <p className="text-xs text-gray-600 dark:text-gray-400">Working Days</p>
-                <p className="text-xl font-bold text-purple-600">{attendanceStats.workingDays}</p>
-              </div>
-            </div>
-          </>
-        )}
 
         <Table columns={columns} data={paginatedAttendance.data} responsive={true} />
 
