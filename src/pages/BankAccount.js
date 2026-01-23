@@ -251,6 +251,24 @@ const BankAccount = () => {
           <Card title="Account Information">
             {isEditing ? (
               <form onSubmit={handleSubmit}>
+                {/* Employee Info */}
+                <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wide">Employee Name</p>
+                      <p className="text-sm font-bold text-gray-800 dark:text-white mt-1">
+                        {allUsers.find(u => String(u.id) === String(selectedEmployee))?.name || 'N/A'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wide">Employee ID</p>
+                      <p className="text-sm font-bold text-gray-800 dark:text-white mt-1">
+                        {allUsers.find(u => String(u.id) === String(selectedEmployee))?.employeeId || 'N/A'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
                 <Input
                   label="Bank Name"
                   name="bankName"
@@ -303,6 +321,24 @@ const BankAccount = () => {
               </form>
             ) : (
               <div className="space-y-4">
+                {/* Employee Info */}
+                <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wide">Employee Name</p>
+                      <p className="text-sm font-bold text-gray-800 dark:text-white mt-1">
+                        {allUsers.find(u => String(u.id) === String(selectedEmployee))?.name || 'N/A'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wide">Employee ID</p>
+                      <p className="text-sm font-bold text-gray-800 dark:text-white mt-1">
+                        {allUsers.find(u => String(u.id) === String(selectedEmployee))?.employeeId || 'N/A'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="flex items-start space-x-3">
                   <Building className="text-gray-400 mt-1" size={20} />
                   <div>
