@@ -28,6 +28,7 @@ import {
 } from 'firebase/firestore';
 import { getCurrentIP, validateIP, logIPAccess, checkModuleAccess } from '../utils/ipValidation';
 import { calculateAttendanceStatus } from '../utils/biometricSync';
+import { getTodayLocal } from '../utils/helpers';
 
 // --- Default Data for Seeding (Optional) ---
 // You can remove this import if you don't plan to auto-seed
@@ -80,10 +81,9 @@ export const AuthProvider = ({ children }) => {
 
   // --- 1. Initialization & Auth Listener ---
   useEffect(() => {
-    // Theme Handler
+    // Theme Initialization
     const savedTheme = localStorage.getItem('theme') || 'light';
     setTheme(savedTheme);
-    if (savedTheme === 'dark') document.documentElement.classList.add('dark');
 
     // IP Initialization
     getCurrentIP().then(ip => {
@@ -430,23 +430,28 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // THEME
-  const toggleTheme = () => {
-    const newTheme = theme === 'light' ? 'dark' : 'light';
-    setTheme(newTheme);
-    localStorage.setItem('theme', newTheme);
-    if (newTheme === 'dark') {
+  // --- 4. Theme & IP Re-calculation ---
+  // Apply theme to document root reactively
+  useEffect(() => {
+    if (theme === 'dark') {
       document.documentElement.classList.add('dark');
     } else {
       document.documentElement.classList.remove('dark');
     }
-  };
+  }, [theme]);
 
-  // --- 4. Re-calculate IP Validation whenever IP or Settings change ---
+  // Re-calculate IP Validation whenever IP or Settings change
   useEffect(() => {
     const validation = validateIP(currentIP, ipSettings);
     setIpValidation(validation);
   }, [currentIP, ipSettings]);
+
+  // TOGGLE THEME
+  const toggleTheme = () => {
+    const newTheme = theme === 'light' ? 'dark' : 'light';
+    setTheme(newTheme);
+    localStorage.setItem('theme', newTheme);
+  };
 
   // MODULE ACCESS HELPER
   const checkAccess = (module) => {
@@ -460,7 +465,7 @@ export const AuthProvider = ({ children }) => {
       return { success: false, message: ipValidation.message };
     }
 
-    const today = new Date().toISOString().split('T')[0];
+    const today = getTodayLocal();
     const now = new Date();
     const clockInTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 
@@ -525,7 +530,7 @@ export const AuthProvider = ({ children }) => {
       return { success: false, message: ipValidation.message };
     }
 
-    const today = new Date().toISOString().split('T')[0];
+    const today = getTodayLocal();
     const now = new Date();
     const clockOutTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 

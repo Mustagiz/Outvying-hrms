@@ -1,4 +1,4 @@
-import { calculateAbsDuration, getEffectiveWorkDate } from './helpers';
+import { calculateAbsDuration, getEffectiveWorkDate, getTodayLocal } from './helpers';
 
 // Biometric attendance calculation utilities
 
@@ -24,7 +24,7 @@ const timeToMinutes = (timeStr) => {
 };
 
 export const calculateAttendanceStatus = (clockIn, clockOut, date = null, roster = null) => {
-  const istDate = date || new Date().toISOString().split('T')[0];
+  const istDate = date || getTodayLocal();
 
   if (!clockIn) {
     if (roster && (roster.shiftName === 'Holiday' || roster.shiftName === 'Weekly Off' || roster.fullDayHours === 0)) {

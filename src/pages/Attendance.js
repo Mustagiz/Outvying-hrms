@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Card, Button, Table, Alert, Select, Modal } from '../components/UI';
 import { Clock, Calendar, ChevronLeft, ChevronRight, TrendingUp, Search, Download, RefreshCw, FilePlus, Wrench, RotateCcw } from 'lucide-react';
-import { formatDate, getStatusColor, exportToCSV, getYearOptions } from '../utils/helpers';
+import { formatDate, getStatusColor, exportToCSV, getYearOptions, getTodayLocal } from '../utils/helpers';
 
 import { calculateAttendanceStatus } from '../utils/biometricSync';
 import { doc, setDoc, updateDoc, deleteDoc, collection, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
@@ -65,7 +65,7 @@ const Attendance = () => {
     status: ''
   });
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = getTodayLocal();
   const todayAttendance = attendance.find(a =>
     String(a.employeeId) === String(currentUser.id) && a.date === today
   );

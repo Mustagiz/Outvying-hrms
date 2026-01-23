@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Card, Button, Select } from '../components/UI';
-import { exportToCSV, getYearOptions } from '../utils/helpers';
+import { exportToCSV, getYearOptions, getTodayLocal } from '../utils/helpers';
 import { BarChart3, Download, TrendingUp, Users } from 'lucide-react';
 
 const Reports = () => {
@@ -10,7 +10,7 @@ const Reports = () => {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
   const attendanceReport = useMemo(() => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getTodayLocal();
     const start = new Date(selectedYear, selectedMonth, 1).toISOString().split('T')[0];
     const endRaw = new Date(selectedYear, selectedMonth + 1, 0).toISOString().split('T')[0];
     const end = endRaw > today ? today : endRaw;
@@ -62,7 +62,7 @@ const Reports = () => {
   }, [leaves, selectedMonth, selectedYear]);
 
   const departmentReport = useMemo(() => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getTodayLocal();
     const start = new Date(selectedYear, selectedMonth, 1).toISOString().split('T')[0];
     const endRaw = new Date(selectedYear, selectedMonth + 1, 0).toISOString().split('T')[0];
     const end = endRaw > today ? today : endRaw;
@@ -119,7 +119,7 @@ const Reports = () => {
   const yearOptions = getYearOptions();
 
   const exportAttendanceReport = () => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getTodayLocal();
     const start = new Date(selectedYear, selectedMonth, 1).toISOString().split('T')[0];
     const endRaw = new Date(selectedYear, selectedMonth + 1, 0).toISOString().split('T')[0];
     const end = endRaw > today ? today : endRaw;
@@ -160,7 +160,7 @@ const Reports = () => {
   };
 
   const exportAbsenteeReport = () => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getTodayLocal();
     const start = new Date(selectedYear, selectedMonth, 1).toISOString().split('T')[0];
     const endRaw = new Date(selectedYear, selectedMonth + 1, 0).toISOString().split('T')[0];
     const end = endRaw > today ? today : endRaw;

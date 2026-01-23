@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Card, Button, Alert } from '../components/UI';
 import { Users, Calendar, FileText, CheckCircle, Clock, TrendingUp, MapPin, ShieldCheck, ShieldAlert, Zap, ArrowRight, User } from 'lucide-react';
+import { getTodayLocal } from '../utils/helpers';
 
 const Dashboard = () => {
   const { currentUser, allUsers, attendance, leaves, leaveBalances, currentIP, ipValidation, ipSettings, clockIn, clockOut } = useAuth();
@@ -20,7 +21,7 @@ const Dashboard = () => {
   const activeAttendance = useMemo(() => {
     const openSession = attendance.find(a => String(a.employeeId) === String(currentUser.id) && !a.clockOut);
     if (openSession) return openSession;
-    const today = new Date().toISOString().split('T')[0];
+    const today = getTodayLocal();
     return attendance.find(a => String(a.employeeId) === String(currentUser.id) && a.date === today);
   }, [attendance, currentUser]);
 
@@ -37,9 +38,10 @@ const Dashboard = () => {
   };
 
   const stats = useMemo(() => {
-    const today = new Date().toISOString().split('T')[0];
-    const currentMonth = new Date().getMonth();
-    const currentYear = new Date().getFullYear();
+    const today = getTodayLocal();
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
 
     if (currentUser.role === 'employee') {
       const myAttendance = attendance.filter(a => String(a.employeeId) === String(currentUser.id));
@@ -62,7 +64,19 @@ const Dashboard = () => {
         { label: 'Work Hours', value: monthAttendance.reduce((sum, a) => sum + parseFloat(a.workHours || 0), 0).toFixed(1), icon: Clock, color: 'text-purple-600', bg: 'bg-purple-100', gradient: 'from-purple-500/20 to-transparent' }
       ];
     } else {
-      const presentToday = attendance.filter(a => (a.date === today || !a.clockOut) && (a.status === 'Present' || a.status === 'Late' || a.status === 'Pending' || !a.clockOut)).length;
+      // Admin View: Sync "Active Today" logic
+      // Must be from today OR from yesterday but still clocked in
+      const yesterdayDate = new Date();
+      yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+      const yesterdayStr = yesterdayDate.getFullYear() + '-' + String(yesterdayDate.getMonth() + 1).padStart(2, '0') + '-' + String(yesterdayDate.getDate()).padStart(2, '0');
+
+      const presentToday = attendance.filter(a => {
+        const isToday = a.date === today;
+        const isActiveYesterday = a.date === yesterdayStr && !a.clockOut;
+        const hasActiveStatus = a.status === 'Present' || a.status === 'Late' || a.status === 'Pending' || !a.clockOut;
+        return (isToday || isActiveYesterday) && hasActiveStatus;
+      }).length;
+
       const pendingLeaves = leaves.filter(l => l.status === 'Pending').length;
       const activeEmployees = allUsers.filter(u => u.role === 'employee').length;
 
