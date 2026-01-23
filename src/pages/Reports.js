@@ -5,25 +5,42 @@ import { exportToCSV, getYearOptions } from '../utils/helpers';
 import { BarChart3, Download, TrendingUp, Users } from 'lucide-react';
 
 const Reports = () => {
-  const { attendance, leaves, allUsers } = useAuth();
+  const { attendance, leaves, allUsers, rosters } = useAuth();
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
   const attendanceReport = useMemo(() => {
+    const today = new Date().toISOString().split('T')[0];
+    const start = new Date(selectedYear, selectedMonth, 1).toISOString().split('T')[0];
+    const endRaw = new Date(selectedYear, selectedMonth + 1, 0).toISOString().split('T')[0];
+    const end = endRaw > today ? today : endRaw;
+
     const filtered = attendance.filter(a => {
       const date = new Date(a.date);
       return date.getMonth() === selectedMonth && date.getFullYear() === selectedYear;
     });
 
-    const totalDays = filtered.length;
-    const present = filtered.filter(a => a.status === 'Present' || a.status === 'Late').length;
-    const absent = filtered.filter(a => a.status === 'Absent').length;
-    const late = filtered.filter(a => a.status === 'Late').length;
-    const totalHours = filtered.reduce((sum, a) => sum + parseFloat(a.workHours || 0), 0);
+    // Virtual Absentees
+    const rangeRosters = rosters.filter(r => r.date >= start && r.date <= end);
+    const virtualAbsents = [];
+    rangeRosters.forEach(roster => {
+      const hasRecord = filtered.find(a => String(a.employeeId) === String(roster.employeeId) && a.date === roster.date);
+      if (!hasRecord && roster.shiftName !== 'Holiday' && roster.shiftName !== 'Weekly Off' && (roster.fullDayHours || 0) > 0) {
+        virtualAbsents.push({ status: 'Absent', workHours: 0 });
+      }
+    });
+
+    const allAttendance = [...filtered, ...virtualAbsents];
+
+    const totalDays = allAttendance.length;
+    const present = allAttendance.filter(a => a.status === 'Present' || a.status === 'Late').length;
+    const absent = allAttendance.filter(a => a.status === 'Absent').length;
+    const late = allAttendance.filter(a => a.status === 'Late').length;
+    const totalHours = allAttendance.reduce((sum, a) => sum + parseFloat(a.workHours || 0), 0);
     const avgHours = totalDays > 0 ? (totalHours / totalDays).toFixed(2) : 0;
 
     return { totalDays, present, absent, late, totalHours: totalHours.toFixed(1), avgHours };
-  }, [attendance, selectedMonth, selectedYear]);
+  }, [attendance, rosters, selectedMonth, selectedYear]);
 
   const leaveReport = useMemo(() => {
     const filtered = leaves.filter(l => {
@@ -45,6 +62,11 @@ const Reports = () => {
   }, [leaves, selectedMonth, selectedYear]);
 
   const departmentReport = useMemo(() => {
+    const today = new Date().toISOString().split('T')[0];
+    const start = new Date(selectedYear, selectedMonth, 1).toISOString().split('T')[0];
+    const endRaw = new Date(selectedYear, selectedMonth + 1, 0).toISOString().split('T')[0];
+    const end = endRaw > today ? today : endRaw;
+
     const employees = allUsers.filter(u => u.role === 'employee');
     const byDepartment = {};
 
@@ -56,9 +78,24 @@ const Reports = () => {
 
       const empAttendance = attendance.filter(a => {
         const date = new Date(a.date);
-        return a.employeeId === emp.id &&
+        return String(a.employeeId) === String(emp.id) &&
           date.getMonth() === selectedMonth &&
           date.getFullYear() === selectedYear;
+      });
+
+      const empRosters = rosters.filter(r =>
+        String(r.employeeId) === String(emp.id) &&
+        r.date >= start &&
+        r.date <= end &&
+        r.shiftName !== 'Holiday' &&
+        r.shiftName !== 'Weekly Off' &&
+        (r.fullDayHours || 0) > 0
+      );
+
+      let virtualAbsents = 0;
+      empRosters.forEach(roster => {
+        const hasRecord = empAttendance.find(a => a.date === roster.date);
+        if (!hasRecord) virtualAbsents++;
       });
 
       byDepartment[emp.department].present += empAttendance.filter(a =>
@@ -66,11 +103,11 @@ const Reports = () => {
       ).length;
       byDepartment[emp.department].absent += empAttendance.filter(a =>
         a.status === 'Absent'
-      ).length;
+      ).length + virtualAbsents;
     });
 
     return byDepartment;
-  }, [allUsers, attendance, selectedMonth, selectedYear]);
+  }, [allUsers, attendance, rosters, selectedMonth, selectedYear]);
 
   const monthOptions = [
     { value: 0, label: 'January' }, { value: 1, label: 'February' }, { value: 2, label: 'March' },
@@ -82,11 +119,84 @@ const Reports = () => {
   const yearOptions = getYearOptions();
 
   const exportAttendanceReport = () => {
-    const data = attendance.filter(a => {
+    const today = new Date().toISOString().split('T')[0];
+    const start = new Date(selectedYear, selectedMonth, 1).toISOString().split('T')[0];
+    const endRaw = new Date(selectedYear, selectedMonth + 1, 0).toISOString().split('T')[0];
+    const end = endRaw > today ? today : endRaw;
+
+    const realAttendance = attendance.filter(a => {
       const date = new Date(a.date);
       return date.getMonth() === selectedMonth && date.getFullYear() === selectedYear;
     });
-    exportToCSV(data, 'attendance_report');
+
+    const rangeRosters = rosters.filter(r => r.date >= start && r.date <= end);
+    const virtualAbsents = [];
+    rangeRosters.forEach(roster => {
+      const hasRecord = realAttendance.find(a => String(a.employeeId) === String(roster.employeeId) && a.date === roster.date);
+      if (!hasRecord && roster.shiftName !== 'Holiday' && roster.shiftName !== 'Weekly Off' && (roster.fullDayHours || 0) > 0) {
+        virtualAbsents.push({
+          date: roster.date,
+          employeeId: roster.employeeId,
+          employeeName: allUsers.find(u => String(u.id) === String(roster.employeeId))?.name || 'Unknown',
+          status: 'Absent',
+          workHours: 0,
+          overtime: 0,
+          clockIn: 'N/A',
+          clockOut: 'N/A',
+          ruleApplied: 'Default Absent (Roster Assigned)'
+        });
+      }
+    });
+
+    const dataToExport = [
+      ...realAttendance.map(a => ({
+        ...a,
+        employeeName: allUsers.find(u => String(u.id) === String(a.employeeId))?.name || 'Unknown'
+      })),
+      ...virtualAbsents
+    ].sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    exportToCSV(dataToExport, `attendance_report_${selectedMonth + 1}_${selectedYear}`);
+  };
+
+  const exportAbsenteeReport = () => {
+    const today = new Date().toISOString().split('T')[0];
+    const start = new Date(selectedYear, selectedMonth, 1).toISOString().split('T')[0];
+    const endRaw = new Date(selectedYear, selectedMonth + 1, 0).toISOString().split('T')[0];
+    const end = endRaw > today ? today : endRaw;
+
+    const realAbsentees = attendance.filter(a => {
+      const date = new Date(a.date);
+      return date.getMonth() === selectedMonth && date.getFullYear() === selectedYear && a.status === 'Absent';
+    });
+
+    const rangeRosters = rosters.filter(r => r.date >= start && r.date <= end);
+    const virtualAbsents = [];
+    rangeRosters.forEach(roster => {
+      const hasRecord = attendance.find(a => String(a.employeeId) === String(roster.employeeId) && a.date === roster.date);
+      if (!hasRecord && roster.shiftName !== 'Holiday' && roster.shiftName !== 'Weekly Off' && (roster.fullDayHours || 0) > 0) {
+        virtualAbsents.push({
+          date: roster.date,
+          employeeId: roster.employeeId,
+          employeeName: allUsers.find(u => String(u.id) === String(roster.employeeId))?.name || 'Unknown',
+          department: allUsers.find(u => String(u.id) === String(roster.employeeId))?.department || 'N/A',
+          status: 'Absent',
+          reason: 'No log found for assigned roster'
+        });
+      }
+    });
+
+    const dataToExport = [
+      ...realAbsentees.map(a => ({
+        ...a,
+        employeeName: allUsers.find(u => String(u.id) === String(a.employeeId))?.name || 'Unknown',
+        department: allUsers.find(u => String(u.id) === String(a.employeeId))?.department || 'N/A',
+        reason: 'Marked Absent'
+      })),
+      ...virtualAbsents
+    ].sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    exportToCSV(dataToExport, `absentee_report_${selectedMonth + 1}_${selectedYear}`);
   };
 
   const exportLeaveReport = () => {
@@ -137,10 +247,16 @@ const Reports = () => {
                 <p className="text-2xl font-bold text-blue-600">{attendanceReport.avgHours}h</p>
               </div>
             </div>
-            <Button onClick={exportAttendanceReport} variant="secondary" className="w-full">
-              <Download size={16} className="inline mr-2" />
-              Export Attendance Report
-            </Button>
+            <div className="flex flex-col gap-2">
+              <Button onClick={exportAttendanceReport} variant="secondary" className="w-full">
+                <Download size={16} className="inline mr-2" />
+                Export Attendance Report
+              </Button>
+              <Button onClick={exportAbsenteeReport} variant="danger" className="w-full">
+                <Download size={16} className="inline mr-2" />
+                Export Absentee Report
+              </Button>
+            </div>
           </div>
         </Card>
 

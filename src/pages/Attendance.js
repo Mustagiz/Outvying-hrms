@@ -229,50 +229,80 @@ const Attendance = () => {
   };
 
   const filteredAttendance = useMemo(() => {
-    // 1. Sanity Check: Remove orphaned records
+    // 1. Get filtered attendance records
     const activeUserIds = new Set(allUsers.map(u => String(u.id)));
-    let filtered = attendance.filter(a => activeUserIds.has(String(a.employeeId)));
+    let records = attendance.filter(a => activeUserIds.has(String(a.employeeId)));
+    const today = new Date().toISOString().split('T')[0];
 
-    // 2. Apply filters
-    filtered = filtered.filter(a => {
+    // Identify current date ranges for virtual calculation
+    let start, end;
+    if (appliedFilters.startDate && appliedFilters.endDate) {
+      start = appliedFilters.startDate;
+      end = appliedFilters.endDate;
+    } else {
+      const year = appliedFilters.year;
+      const month = appliedFilters.month;
+      start = new Date(year, month, 1).toISOString().split('T')[0];
+      end = new Date(year, month + 1, 0).toISOString().split('T')[0];
+    }
+
+    // Don't show future absences
+    if (end > today) end = today;
+
+    // 2. Scan rosters to find missing entries
+    // Filter rosters for the range and active employee filter
+    const rangeRosters = rosters.filter(r => {
+      const matchesDate = r.date >= start && r.date <= end;
+      const matchesEmp = appliedFilters.employee === 'all'
+        ? (currentUser.role === 'employee' ? String(r.employeeId) === String(currentUser.id) : true)
+        : String(r.employeeId) === String(appliedFilters.employee);
+      return matchesDate && matchesEmp;
+    });
+
+    // For each roster, if no attendance record exists, create a virtual one
+    const virtualRecords = [];
+    rangeRosters.forEach(roster => {
+      const hasRecord = records.find(a => String(a.employeeId) === String(roster.employeeId) && a.date === roster.date);
+      if (!hasRecord) {
+        const result = calculateAttendanceStatus(null, null, roster.date, roster);
+        virtualRecords.push({
+          id: `virtual-${roster.employeeId}-${roster.date}`,
+          employeeId: roster.employeeId,
+          date: roster.date,
+          status: result.status,
+          workHours: 0,
+          overtime: 0,
+          workingDays: 0,
+          ruleApplied: result.ruleApplied || 'Roster Assigned',
+          isVirtual: true
+        });
+      }
+    });
+
+    const allRecords = [...records, ...virtualRecords];
+
+    // 3. Filter allRecords (including virtual) by the search/selection criteria
+    return allRecords.filter(a => {
       const date = new Date(a.date);
 
-      // Date range filter (takes precedence over month/year if set)
+      // Date range filter
       if (appliedFilters.startDate && appliedFilters.endDate) {
-        const recordDate = new Date(a.date);
-        const startDate = new Date(appliedFilters.startDate);
-        const endDate = new Date(appliedFilters.endDate);
-        if (recordDate < startDate || recordDate > endDate) {
-          return false;
-        }
-      } else if (appliedFilters.startDate || appliedFilters.endDate) {
-        // If only one date is set, filter accordingly
-        const recordDate = new Date(a.date);
-        if (appliedFilters.startDate && recordDate < new Date(appliedFilters.startDate)) {
-          return false;
-        }
-        if (appliedFilters.endDate && recordDate > new Date(appliedFilters.endDate)) {
-          return false;
-        }
+        if (a.date < appliedFilters.startDate || a.date > appliedFilters.endDate) return false;
       } else {
-        // Use month/year filters only if date range is not set
         const matchesMonth = date.getMonth() === appliedFilters.month;
         const matchesYear = date.getFullYear() === appliedFilters.year;
-        if (!matchesMonth || !matchesYear) {
-          return false;
-        }
+        if (!matchesMonth || !matchesYear) return false;
       }
 
       const matchesEmployee = currentUser.role === 'employee'
         ? String(a.employeeId) === String(currentUser.id)
         : appliedFilters.employee === 'all' ? true : String(a.employeeId) === String(appliedFilters.employee);
+
       const matchesStatus = appliedFilters.status === 'all' ? true : a.status === appliedFilters.status;
 
       return matchesEmployee && matchesStatus;
-    });
-
-    return filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
-  }, [attendance, allUsers, appliedFilters, currentUser]);
+    }).sort((a, b) => new Date(b.date) - new Date(a.date));
+  }, [attendance, rosters, allUsers, appliedFilters, currentUser]);
 
   const paginatedAttendance = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
