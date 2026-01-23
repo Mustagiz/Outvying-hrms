@@ -619,11 +619,11 @@ const Attendance = () => {
         <Table columns={columns} data={paginatedAttendance.data} responsive={true} />
 
         {paginatedAttendance.totalPages > 1 && (
-          <div className="flex items-center justify-between mt-4 px-2">
+          <div className="flex flex-col md:flex-row items-center justify-between mt-4 px-2 gap-4">
             <div className="text-sm text-gray-600 dark:text-gray-400">
-              Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, paginatedAttendance.totalItems)} of {paginatedAttendance.totalItems} entries
+              Showing <span className="font-semibold text-gray-800 dark:text-white">{((currentPage - 1) * itemsPerPage) + 1}</span> to <span className="font-semibold text-gray-800 dark:text-white">{Math.min(currentPage * itemsPerPage, paginatedAttendance.totalItems)}</span> of <span className="font-semibold text-gray-800 dark:text-white">{paginatedAttendance.totalItems}</span> entries
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 overflow-x-auto pb-2 md:pb-0">
               <Button
                 variant="secondary"
                 onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
@@ -633,18 +633,49 @@ const Attendance = () => {
                 <ChevronLeft size={20} />
               </Button>
               <div className="flex items-center gap-1">
-                {[...Array(paginatedAttendance.totalPages)].map((_, i) => (
-                  <button
-                    key={i + 1}
-                    onClick={() => setCurrentPage(i + 1)}
-                    className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${currentPage === i + 1
-                      ? 'bg-primary-600 text-white'
-                      : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
-                      }`}
-                  >
-                    {i + 1}
-                  </button>
-                ))}
+                {(() => {
+                  const pages = [];
+                  const total = paginatedAttendance.totalPages;
+                  const current = currentPage;
+
+                  // Show max 5 page buttons total
+                  let start = Math.max(1, current - 2);
+                  let end = Math.min(total, start + 4);
+
+                  if (end - start < 4) {
+                    start = Math.max(1, end - 4);
+                  }
+
+                  if (start > 1) {
+                    pages.push(1);
+                    if (start > 2) pages.push('...');
+                  }
+
+                  for (let i = start; i <= end; i++) {
+                    pages.push(i);
+                  }
+
+                  if (end < total) {
+                    if (end < total - 1) pages.push('...');
+                    pages.push(total);
+                  }
+
+                  return pages.map((page, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => typeof page === 'number' && setCurrentPage(page)}
+                      disabled={typeof page !== 'number'}
+                      className={`min-w-[32px] h-8 px-2 rounded-lg text-sm font-medium transition-colors ${currentPage === page
+                        ? 'bg-primary-600 text-white'
+                        : typeof page === 'number'
+                          ? 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                          : 'text-gray-400 cursor-default'
+                        }`}
+                    >
+                      {page}
+                    </button>
+                  ));
+                })()}
               </div>
               <Button
                 variant="secondary"
