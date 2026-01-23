@@ -23,7 +23,7 @@ const timeToMinutes = (timeStr) => {
   }
 };
 
-export const calculateAttendanceStatus = (clockIn, clockOut, date = null, roster = null) => {
+export const calculateAttendanceStatus = (clockIn, clockOut, date = null, roster = null, rules = []) => {
   const istDate = date || getTodayLocal();
 
   if (!clockIn) {
@@ -37,7 +37,6 @@ export const calculateAttendanceStatus = (clockIn, clockOut, date = null, roster
     return { status: 'Absent', workHours: 0, workingDays: 0 };
   }
 
-  const rules = JSON.parse(localStorage.getItem('attendanceRules') || '[]');
   const defaultRule = rules.find(r => r.isDefault) || { fullDayHours: 8.0, halfDayHours: 4.0, minPresentHours: 1.0, gracePeriodMins: 15 };
 
   const timezone = roster?.timezone || 'Asia/Kolkata';

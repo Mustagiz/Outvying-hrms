@@ -9,7 +9,7 @@ import { doc, setDoc, updateDoc, deleteDoc, collection, query, where, getDocs, s
 import { db } from '../config/firebase';
 
 const Attendance = () => {
-  const { currentUser, attendance, rosters, clockIn, clockOut, syncBiometric, allUsers } = useAuth();
+  const { currentUser, attendance, rosters, clockIn, clockOut, syncBiometric, allUsers, attendanceRules } = useAuth();
   const [alert, setAlert] = useState(null);
   const [isSyncing, setIsSyncing] = useState(false);
   // Applied Filters (used for data fetching)
@@ -103,7 +103,7 @@ const Attendance = () => {
       for (const record of recordsToScan) {
         if (record.clockIn) {
           const roster = rosters.find(r => String(r.employeeId) === String(record.employeeId) && r.date === record.date);
-          const result = calculateAttendanceStatus(record.clockIn, record.clockOut, record.date, roster);
+          const result = calculateAttendanceStatus(record.clockIn, record.clockOut, record.date, roster, attendanceRules);
 
           const ref = doc(db, 'attendance', record.id);
           await updateDoc(ref, {
@@ -155,7 +155,7 @@ const Attendance = () => {
               nextDay.setDate(nextDay.getDate() + 1);
               clockOutDate = nextDay.toISOString().split('T')[0];
             }
-            const result = calculateAttendanceStatus(clockIn, clockOut || null, date, roster);
+            const result = calculateAttendanceStatus(clockIn, clockOut || null, date, roster, attendanceRules);
             attendanceUpdate = {
               clockIn,
               clockOut: clockOut || null,
@@ -255,7 +255,7 @@ const Attendance = () => {
     rangeRosters.forEach(roster => {
       const hasRecord = records.find(a => String(a.employeeId) === String(roster.employeeId) && a.date === roster.date);
       if (!hasRecord) {
-        const result = calculateAttendanceStatus(null, null, roster.date, roster);
+        const result = calculateAttendanceStatus(null, null, roster.date, roster, attendanceRules);
         virtualRecords.push({
           id: `virtual-${roster.employeeId}-${roster.date}`,
           employeeId: roster.employeeId,

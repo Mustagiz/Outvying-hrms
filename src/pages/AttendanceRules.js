@@ -1,13 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Card, Button, Modal } from '../components/UI';
+import { Card, Button, Modal, Alert } from '../components/UI';
 import { Plus, Edit2, Trash2, Save } from 'lucide-react';
+import { db } from '../config/firebase';
+import { collection, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
 
 const AttendanceRules = () => {
-  const { currentUser } = useAuth();
-  const [rules, setRules] = useState([]);
+  const { currentUser, attendanceRules } = useAuth();
   const [showModal, setShowModal] = useState(false);
   const [editingRule, setEditingRule] = useState(null);
+  const [alert, setAlert] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
     fullDayHours: 8.0,
@@ -17,35 +19,9 @@ const AttendanceRules = () => {
     saturdayHalfDay: false,
     holidayAutoFull: false,
     wfhWebCheckin: false,
-    wfhWebCheckin: false,
     departments: 'All',
     isUniversal: false
   });
-
-  useEffect(() => {
-    const savedRules = JSON.parse(localStorage.getItem('attendanceRules') || '[]');
-    if (savedRules.length === 0) {
-      const defaultRule = {
-        id: 1,
-        name: 'Standard Office',
-        fullDayHours: 8.0,
-        halfDayHours: 4.0,
-        minPresentHours: 1.0,
-        gracePeriodMins: 15,
-        saturdayHalfDay: false,
-        holidayAutoFull: false,
-        wfhWebCheckin: false,
-        wfhWebCheckin: false,
-        departments: 'All',
-        isUniversal: true,
-        isDefault: true
-      };
-      setRules([defaultRule]);
-      localStorage.setItem('attendanceRules', JSON.stringify([defaultRule]));
-    } else {
-      setRules(savedRules);
-    }
-  }, []);
 
   const openModal = (rule = null) => {
     if (rule) {
@@ -62,7 +38,6 @@ const AttendanceRules = () => {
         saturdayHalfDay: false,
         holidayAutoFull: false,
         wfhWebCheckin: false,
-        wfhWebCheckin: false,
         departments: 'All',
         isUniversal: false
       });
@@ -70,35 +45,46 @@ const AttendanceRules = () => {
     setShowModal(true);
   };
 
-  const saveRule = () => {
+  const saveRule = async () => {
     if (!formData.name.trim()) {
-      alert('Please enter rule name');
+      setAlert({ type: 'error', message: 'Please enter rule name' });
       return;
     }
 
-    let updatedRules;
-    if (editingRule) {
-      updatedRules = rules.map(r => r.id === editingRule.id ? { ...formData, id: editingRule.id } : r);
-    } else {
-      const newRule = { ...formData, id: Date.now(), isDefault: false };
-      updatedRules = [...rules, newRule];
+    try {
+      if (editingRule) {
+        const docRef = doc(db, 'attendanceRules', editingRule.id);
+        const { id, ...saveData } = formData;
+        await updateDoc(docRef, { ...saveData, updatedAt: serverTimestamp() });
+      } else {
+        await addDoc(collection(db, 'attendanceRules'), {
+          ...formData,
+          createdAt: serverTimestamp(),
+          isDefault: attendanceRules.length === 0
+        });
+      }
+      setShowModal(false);
+      setAlert({ type: 'success', message: 'Rule saved successfully' });
+      setTimeout(() => setAlert(null), 3000);
+    } catch (error) {
+      setAlert({ type: 'error', message: 'Failed to save rule: ' + error.message });
     }
-
-    setRules(updatedRules);
-    localStorage.setItem('attendanceRules', JSON.stringify(updatedRules));
-    setShowModal(false);
   };
 
-  const deleteRule = (id) => {
-    const rule = rules.find(r => r.id === id);
+  const deleteRule = async (id) => {
+    const rule = attendanceRules.find(r => r.id === id);
     if (rule?.isDefault) {
-      alert('Cannot delete default rule');
+      setAlert({ type: 'error', message: 'Cannot delete default rule' });
       return;
     }
     if (window.confirm('Delete this rule?')) {
-      const updatedRules = rules.filter(r => r.id !== id);
-      setRules(updatedRules);
-      localStorage.setItem('attendanceRules', JSON.stringify(updatedRules));
+      try {
+        await deleteDoc(doc(db, 'attendanceRules', id));
+        setAlert({ type: 'success', message: 'Rule deleted' });
+        setTimeout(() => setAlert(null), 3000);
+      } catch (error) {
+        setAlert({ type: 'error', message: 'Delete failed: ' + error.message });
+      }
     }
   };
 
@@ -107,7 +93,7 @@ const AttendanceRules = () => {
   }
 
   return (
-    <div>
+    <div className="p-4 md:p-6 lg:p-8">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-gray-800 dark:text-white">Attendance Rules</h1>
         <Button onClick={() => openModal()} variant="primary">
@@ -115,48 +101,46 @@ const AttendanceRules = () => {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {rules.map(rule => (
-          <Card key={rule.id}>
+      {alert && <Alert type={alert.type} message={alert.message} onClose={() => setAlert(null)} />}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {attendanceRules.map(rule => (
+          <Card key={rule.id} className="border-gray-100 dark:border-gray-800">
             <div className="flex justify-between items-start mb-4">
               <div>
                 <h3 className="text-lg font-semibold text-gray-800 dark:text-white">{rule.name}</h3>
-                <div className="flex gap-2">
-                  {rule.isDefault && <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Default</span>}
-                  {rule.isUniversal && <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">Universal</span>}
+                <div className="flex gap-2 mt-1">
+                  {rule.isDefault && <span className="text-[10px] uppercase font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded">Default</span>}
+                  {rule.isUniversal && <span className="text-[10px] uppercase font-bold bg-purple-100 text-purple-700 px-2 py-0.5 rounded">Universal</span>}
                 </div>
               </div>
               <div className="flex gap-2">
-                <Button onClick={() => openModal(rule)} variant="secondary" className="text-xs py-1 px-2">
+                <Button onClick={() => openModal(rule)} variant="secondary" className="p-2 h-8 w-8">
                   <Edit2 size={14} />
                 </Button>
                 {!rule.isDefault && (
-                  <Button onClick={() => deleteRule(rule.id)} variant="danger" className="text-xs py-1 px-2">
+                  <Button onClick={() => deleteRule(rule.id)} variant="danger" className="p-2 h-8 w-8">
                     <Trash2 size={14} />
                   </Button>
                 )}
               </div>
             </div>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-600 dark:text-gray-400">Full Day:</span>
-                <span className="font-semibold text-gray-800 dark:text-white">{rule.fullDayHours} hours</span>
+            <div className="space-y-3 text-sm">
+              <div className="flex justify-between border-b border-gray-50 dark:border-gray-800 pb-2">
+                <span className="text-gray-500">Full Day:</span>
+                <span className="font-bold text-gray-800 dark:text-white">{rule.fullDayHours}h</span>
+              </div>
+              <div className="flex justify-between border-b border-gray-50 dark:border-gray-800 pb-2">
+                <span className="text-gray-500">Half Day:</span>
+                <span className="font-bold text-gray-800 dark:text-white">{rule.halfDayHours}h</span>
+              </div>
+              <div className="flex justify-between border-b border-gray-50 dark:border-gray-800 pb-2">
+                <span className="text-gray-500">Grace Period:</span>
+                <span className="font-bold text-gray-800 dark:text-white">{rule.gracePeriodMins} mins</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600 dark:text-gray-400">Half Day:</span>
-                <span className="font-semibold text-gray-800 dark:text-white">{rule.halfDayHours} hours</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600 dark:text-gray-400">Min Present:</span>
-                <span className="font-semibold text-gray-800 dark:text-white">{rule.minPresentHours} hour</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600 dark:text-gray-400">Grace Period:</span>
-                <span className="font-semibold text-gray-800 dark:text-white">{rule.gracePeriodMins} mins</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600 dark:text-gray-400">Departments:</span>
-                <span className="font-semibold text-gray-800 dark:text-white">{rule.departments}</span>
+                <span className="text-gray-500">Departments:</span>
+                <span className="font-bold text-primary-600">{rule.departments}</span>
               </div>
             </div>
           </Card>
@@ -166,129 +150,86 @@ const AttendanceRules = () => {
       <Modal isOpen={showModal} onClose={() => setShowModal(false)} title={editingRule ? 'Edit Rule' : 'New Rule'}>
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Rule Name</label>
+            <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Rule Name</label>
             <input
               type="text"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-              placeholder="e.g., Flexi-Shift Policy"
+              className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl dark:bg-gray-800 dark:border-gray-700 dark:text-white focus:ring-2 focus:ring-primary-500 outline-none transition-all"
+              placeholder="e.g., Standard Office Policy"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Full Day (hours)</label>
+              <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Full Day (hrs)</label>
               <input
                 type="number"
                 step="0.1"
                 value={formData.fullDayHours}
                 onChange={(e) => setFormData({ ...formData, fullDayHours: parseFloat(e.target.value) })}
-                className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl dark:bg-gray-800 dark:border-gray-700 dark:text-white focus:ring-2 focus:ring-primary-500 outline-none transition-all"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Half Day (hours)</label>
+              <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Half Day (hrs)</label>
               <input
                 type="number"
                 step="0.1"
                 value={formData.halfDayHours}
                 onChange={(e) => setFormData({ ...formData, halfDayHours: parseFloat(e.target.value) })}
-                className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl dark:bg-gray-800 dark:border-gray-700 dark:text-white focus:ring-2 focus:ring-primary-500 outline-none transition-all"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Min Present (hours)</label>
+              <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Min Present (hrs)</label>
               <input
                 type="number"
                 step="0.1"
                 value={formData.minPresentHours}
                 onChange={(e) => setFormData({ ...formData, minPresentHours: parseFloat(e.target.value) })}
-                className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl dark:bg-gray-800 dark:border-gray-700 dark:text-white focus:ring-2 focus:ring-primary-500 outline-none transition-all"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Grace Period (mins)</label>
+              <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Grace Period (m)</label>
               <input
                 type="number"
                 value={formData.gracePeriodMins}
                 onChange={(e) => setFormData({ ...formData, gracePeriodMins: parseInt(e.target.value) })}
-                className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl dark:bg-gray-800 dark:border-gray-700 dark:text-white focus:ring-2 focus:ring-primary-500 outline-none transition-all"
               />
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Exceptions</label>
-            <div className="space-y-2">
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={formData.saturdayHalfDay}
-                  onChange={(e) => setFormData({ ...formData, saturdayHalfDay: e.target.checked })}
-                  className="w-4 h-4"
-                />
-                <span className="text-sm text-gray-700 dark:text-gray-300">Saturday: Half day = 4hrs</span>
-              </label>
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={formData.holidayAutoFull}
-                  onChange={(e) => setFormData({ ...formData, holidayAutoFull: e.target.checked })}
-                  className="w-4 h-4"
-                />
-                <span className="text-sm text-gray-700 dark:text-gray-300">Holidays: Auto Full Day</span>
-              </label>
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={formData.wfhWebCheckin}
-                  onChange={(e) => setFormData({ ...formData, wfhWebCheckin: e.target.checked })}
-                  className="w-4 h-4"
-                />
-                <span className="text-sm text-gray-700 dark:text-gray-300">WFH Days: Hours from web check-in</span>
-              </label>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 border-t pt-2 mt-2">
-            <label className="flex items-center gap-2 cursor-pointer">
+          <div className="space-y-3 pt-2">
+            <label className="flex items-center gap-3 cursor-pointer group">
               <input
                 type="checkbox"
                 checked={formData.isUniversal}
-                onChange={(e) => {
-                  const isUniversal = e.target.checked;
-                  setFormData({
-                    ...formData,
-                    isUniversal,
-                    departments: isUniversal ? 'All' : formData.departments
-                  });
-                }}
-                className="w-4 h-4 text-purple-600 rounded focus:ring-purple-500"
+                onChange={(e) => setFormData({ ...formData, isUniversal: e.target.checked })}
+                className="w-5 h-5 rounded-lg border-gray-300 text-primary-600 focus:ring-primary-500"
               />
-              <span className="font-semibold text-gray-800 dark:text-white">Make this rule Universal</span>
+              <span className="text-sm font-semibold text-gray-700 dark:text-gray-300 group-hover:text-primary-600 transition-colors">Apply to all departments</span>
             </label>
-            <span className="text-xs text-gray-500">(Applies to everyone)</span>
+
+            <label className="flex items-center gap-3 cursor-pointer group">
+              <input
+                type="checkbox"
+                checked={formData.saturdayHalfDay}
+                onChange={(e) => setFormData({ ...formData, saturdayHalfDay: e.target.checked })}
+                className="w-5 h-5 rounded-lg border-gray-300 text-primary-600 focus:ring-primary-500"
+              />
+              <span className="text-sm font-semibold text-gray-700 dark:text-gray-300 group-hover:text-primary-600 transition-colors">Saturdays are always Half Day</span>
+            </label>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Departments</label>
-            <input
-              type="text"
-              value={formData.departments}
-              onChange={(e) => setFormData({ ...formData, departments: e.target.value })}
-              className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-              placeholder="All, IT, HR, etc."
-            />
-          </div>
-
-          <div className="flex justify-end gap-2 pt-4">
-            <Button onClick={() => setShowModal(false)} variant="secondary">Cancel</Button>
-            <Button onClick={saveRule} variant="primary">
-              <Save size={16} className="inline mr-2" />Save Rule
+          <div className="pt-6">
+            <Button onClick={saveRule} className="w-full py-3 text-sm font-bold uppercase tracking-widest shadow-lg shadow-primary-500/20">
+              <Save size={18} className="inline mr-2" />Save Attendance Policy
             </Button>
           </div>
         </div>

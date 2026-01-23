@@ -20,7 +20,7 @@ import { getEffectiveWorkDate, calculateAbsDuration } from '../utils/helpers';
 import { calculateAttendanceStatus } from '../utils/biometricSync';
 
 const AttendanceRegularization = () => {
-  const { currentUser, attendance, allUsers, regularizationRequests, rosters, createNotification } = useAuth();
+  const { currentUser, attendance, allUsers, regularizationRequests, rosters, createNotification, attendanceRules } = useAuth();
   const [showModal, setShowModal] = useState(false);
   const [alert, setAlert] = useState(null);
   const [editingRequest, setEditingRequest] = useState(null);
@@ -123,7 +123,7 @@ const AttendanceRegularization = () => {
               clockOutDate = nextDay.toISOString().split('T')[0];
             }
 
-            const result = calculateAttendanceStatus(inTime, outTime, date, roster);
+            const result = calculateAttendanceStatus(inTime, outTime, date, roster, attendanceRules);
             attendanceUpdate = {
               clockIn: inTime,
               clockOut: outTime,
@@ -263,7 +263,7 @@ const AttendanceRegularization = () => {
           const finalClockOut = existingData.clockOut || null;
 
           if (inTime && finalClockOut) {
-            const result = calculateAttendanceStatus(inTime, finalClockOut, date, roster);
+            const result = calculateAttendanceStatus(inTime, finalClockOut, date, roster, attendanceRules);
             attendanceUpdate = {
               clockIn: inTime,
               status: result.status,
@@ -287,7 +287,7 @@ const AttendanceRegularization = () => {
           const finalClockIn = existingData.clockIn || null;
 
           if (finalClockIn && outTime) {
-            const result = calculateAttendanceStatus(finalClockIn, outTime, date, roster);
+            const result = calculateAttendanceStatus(finalClockIn, outTime, date, roster, attendanceRules);
             attendanceUpdate = {
               clockOut: outTime,
               status: result.status,
@@ -319,7 +319,7 @@ const AttendanceRegularization = () => {
               clockOutDate = nextDay.toISOString().split('T')[0];
             }
 
-            const result = calculateAttendanceStatus(inTime, outTime, date, roster);
+            const result = calculateAttendanceStatus(inTime, outTime, date, roster, attendanceRules);
 
             attendanceUpdate = {
               clockIn: inTime,

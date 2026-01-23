@@ -67,6 +67,7 @@ export const AuthProvider = ({ children }) => {
   const [manualLeaveAllocations, setManualLeaveAllocations] = useState([]);
   const [regularizationRequests, setRegularizationRequests] = useState([]);
   const [notifications, setNotifications] = useState([]);
+  const [attendanceRules, setAttendanceRules] = useState([]);
 
   // Local State
   const [theme, setTheme] = useState('light');
@@ -147,7 +148,16 @@ export const AuthProvider = ({ children }) => {
       setLoading(false);
     });
 
-    return () => unsubscribeAuth();
+    // Subscribe to Attendance Rules (Single doc or collection)
+    const unsubRules = onSnapshot(collection(db, 'attendanceRules'), (snapshot) => {
+      const rulesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setAttendanceRules(rulesData);
+    });
+
+    return () => {
+      unsubscribeAuth();
+      unsubRules();
+    };
   }, []);
 
   // --- 2. Real-time Data Subscriptions ---
@@ -506,7 +516,7 @@ export const AuthProvider = ({ children }) => {
     const docRef = doc(db, 'attendance', docId);
 
     try {
-      const result = calculateAttendanceStatus(clockInTime, null, today, targetRoster);
+      const result = calculateAttendanceStatus(clockInTime, null, today, targetRoster, attendanceRules);
 
       const newRecord = {
         employeeId,
@@ -557,7 +567,7 @@ export const AuthProvider = ({ children }) => {
     try {
       // Ensure we match with the correct roster for rules
       const roster = rosters.find(r => String(r.employeeId) === String(employeeId) && r.date === record.date);
-      const result = calculateAttendanceStatus(record.clockIn, clockOutTime, record.istDate, roster);
+      const result = calculateAttendanceStatus(record.clockIn, clockOutTime, record.istDate, roster, attendanceRules);
 
       const updates = {
         clockOut: clockOutTime,
@@ -677,7 +687,7 @@ export const AuthProvider = ({ children }) => {
             for (const attDoc of snap.docs) {
               const attData = attDoc.data();
               if (attData.clockIn) {
-                const result = calculateAttendanceStatus(attData.clockIn, attData.clockOut, attData.istDate || dateStr, rosterData);
+                const result = calculateAttendanceStatus(attData.clockIn, attData.clockOut, attData.istDate || dateStr, rosterData, attendanceRules);
                 await updateDoc(attDoc.ref, {
                   status: result.status,
                   workHours: result.workHours,
@@ -748,7 +758,7 @@ export const AuthProvider = ({ children }) => {
         for (const attDoc of snap.docs) {
           const attData = attDoc.data();
           if (attData.clockIn) {
-            const result = calculateAttendanceStatus(attData.clockIn, attData.clockOut, attData.istDate || newRoster.date, newRoster);
+            const result = calculateAttendanceStatus(attData.clockIn, attData.clockOut, attData.istDate || newRoster.date, newRoster, attendanceRules);
             await updateDoc(attDoc.ref, {
               status: result.status,
               workHours: result.workHours,
@@ -1104,6 +1114,7 @@ export const AuthProvider = ({ children }) => {
     allLeaveTypes,
     leavePolicy,
     regularizationRequests,
+    attendanceRules,
     // Add Employee wrapper
     addEmployee: addUser,
     repairAdminProfile,
