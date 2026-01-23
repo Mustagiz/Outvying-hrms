@@ -490,7 +490,13 @@ export const AuthProvider = ({ children }) => {
     const targetRoster = findRosterMatch();
     const effectiveDate = targetRoster?.date || today;
 
-    // Check if already clocked in for this logical Business Day
+    // 1. Critical Session Check: Prevent multiple open sessions
+    const openSession = attendance.find(a => String(a.employeeId) === String(employeeId) && !a.clockOut);
+    if (openSession) {
+      return { success: false, message: `Found an active session from ${openSession.date}. Please clock out of it first.` };
+    }
+
+    // 2. Already clocked in for this specific day? (Safety check)
     const existingInState = attendance.find(a => String(a.employeeId) === String(employeeId) && a.date === effectiveDate);
     if (existingInState && existingInState.clockIn) {
       return { success: false, message: `Already clocked in for Work Date: ${effectiveDate}` };
@@ -535,17 +541,11 @@ export const AuthProvider = ({ children }) => {
     const clockOutTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 
     // Find the active record for this employee
-    // It might be on today's business day or yesterday's business day (if it's early morning IST)
+    // Enhanced: Look for ANY open session, regardless of date boundaries
     const findActiveRecord = () => {
-      // Check current IST day first
-      const current = attendance.find(a => String(a.employeeId) === String(employeeId) && a.date === today && !a.clockOut);
-      if (current) return current;
-
-      // Check yesterday (for a night shift that crossed midnight)
-      const prevDate = new Date(today);
-      prevDate.setDate(prevDate.getDate() - 1);
-      const prevStr = prevDate.toISOString().split('T')[0];
-      return attendance.find(a => String(a.employeeId) === String(employeeId) && a.date === prevStr && !a.clockOut);
+      return [...attendance]
+        .filter(a => String(a.employeeId) === String(employeeId) && !a.clockOut)
+        .sort((a, b) => new Date(b.date) - new Date(a.date))[0];
     };
 
     const record = findActiveRecord();

@@ -66,9 +66,13 @@ const Attendance = () => {
   });
 
   const today = getTodayLocal();
-  const todayAttendance = attendance.find(a =>
-    String(a.employeeId) === String(currentUser.id) && a.date === today
-  );
+  const activeAttendance = useMemo(() => {
+    // 1. Find ANY open session (Logical priority)
+    const openSession = attendance.find(a => String(a.employeeId) === String(currentUser.id) && !a.clockOut);
+    if (openSession) return openSession;
+    // 2. Fallback to today's completed record
+    return attendance.find(a => String(a.employeeId) === String(currentUser.id) && a.date === today);
+  }, [attendance, currentUser, today]);
 
   const handleClockIn = async () => {
     const result = await clockIn(currentUser?.id);
@@ -369,11 +373,11 @@ const Attendance = () => {
                   <div>
                     <p className="text-xs font-semibold text-gray-500 underline uppercase tracking-wider">Clock In</p>
                     <p className="text-lg font-bold text-gray-800 dark:text-white">
-                      {todayAttendance?.clockIn || 'Not clocked in'}
+                      {activeAttendance?.clockIn || 'Not clocked in'}
                     </p>
                   </div>
                 </div>
-                <Button onClick={handleClockIn} disabled={todayAttendance?.clockIn} className="shadow-sm">
+                <Button onClick={handleClockIn} disabled={activeAttendance?.clockIn} className="shadow-sm">
                   Clock In
                 </Button>
               </div>
@@ -386,20 +390,20 @@ const Attendance = () => {
                   <div>
                     <p className="text-xs font-semibold text-gray-500 underline uppercase tracking-wider">Clock Out</p>
                     <p className="text-lg font-bold text-gray-800 dark:text-white">
-                      {todayAttendance?.clockOut || 'Not clocked out'}
+                      {activeAttendance?.clockOut || 'Not clocked out'}
                     </p>
                   </div>
                 </div>
-                <Button onClick={handleClockOut} disabled={!todayAttendance?.clockIn || todayAttendance?.clockOut} variant="secondary" className="shadow-sm">
+                <Button onClick={handleClockOut} disabled={!activeAttendance?.clockIn || activeAttendance?.clockOut} variant="secondary" className="shadow-sm">
                   Clock Out
                 </Button>
               </div>
 
-              {todayAttendance && (
+              {activeAttendance && (
                 <div className="p-4 bg-gradient-to-r from-primary-500/10 to-transparent border-l-4 border-primary-500 rounded-lg shadow-sm">
                   <p className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wider">Today's Status</p>
-                  <span className={`px-4 py-1.5 rounded-full text-sm font-bold shadow-sm ${getStatusColor(todayAttendance.status)}`}>
-                    {todayAttendance.status}
+                  <span className={`px-4 py-1.5 rounded-full text-sm font-bold shadow-sm ${getStatusColor(activeAttendance.status)}`}>
+                    {activeAttendance.status}
                   </span>
                 </div>
               )}
