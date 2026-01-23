@@ -682,6 +682,7 @@ const Attendance = () => {
                   const user = allUsers.find(u => String(u.id) === String(a.employeeId));
                   return {
                     Date: formatDate(a.date),
+                    'Emp ID': user?.employeeId || 'N/A',
                     'Employee Name': user?.name || 'Unknown',
                     'Clock In': a.clockIn || 'N/A',
                     'Clock Out': a.clockOut || 'N/A',
