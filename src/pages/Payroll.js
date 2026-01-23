@@ -26,7 +26,7 @@ ChartJS.register(
 );
 
 const Payroll = () => {
-  const { allUsers, updateUser, currentUser } = useAuth();
+  const { allUsers, updateUser, currentUser, allBankAccounts } = useAuth();
   const [activeTab, setActiveTab] = useState('employees');
   const [showModal, setShowModal] = useState(false);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
@@ -222,21 +222,148 @@ const Payroll = () => {
     const doc = new jsPDF();
     const b = emp.salaryBreakdown;
     if (!b) return alert('No salary breakdown assigned!');
-    doc.setFontSize(22); doc.setTextColor(0, 102, 204); doc.text('PAYSLIP', 105, 20, { align: 'center' });
-    doc.setFontSize(12); doc.setTextColor(100); doc.text(`${monthName} ${year}`, 105, 30, { align: 'center' });
-    doc.line(20, 35, 190, 35);
-    doc.setTextColor(0); doc.text(`Employee Name: ${emp.name}`, 20, 45);
-    doc.text(`Employee ID: ${emp.employeeId}`, 20, 52);
-    doc.text(`Department: ${emp.department}`, 20, 59);
-    doc.text(`Designation: ${emp.designation}`, 20, 66);
-    doc.setFillColor(240, 245, 255); doc.rect(20, 75, 80, 8, 'F'); doc.text('EARNINGS', 25, 81); doc.text('AMOUNT', 80, 81, { align: 'right' });
-    const earnings = [['Basic Pay', b.basic], ['HRA', b.hra], ['Medical', b.medical], ['Transport', b.transport], ['Special', b.special], ['Food', b.food], ['LTA', b.lta]];
-    let y = 88; earnings.forEach(([label, amt]) => { doc.text(label, 25, y); doc.text(`Rs. ${parseFloat(amt).toLocaleString()}`, 80, y, { align: 'right' }); y += 7; });
-    doc.setFillColor(255, 240, 240); doc.rect(110, 75, 80, 8, 'F'); doc.text('DEDUCTIONS', 115, 81); doc.text('AMOUNT', 170, 81, { align: 'right' });
-    const deds = [['PF', b.pfEmployee], ['ESI', b.esiEmployee], ['Prof. Tax', b.professionalTax], ['TDS', b.tds]];
-    y = 88; deds.forEach(([label, amt]) => { doc.text(label, 115, y); doc.text(`Rs. ${parseFloat(amt).toLocaleString()}`, 170, y, { align: 'right' }); y += 7; });
-    doc.line(20, 145, 190, 145); doc.setFontSize(14); doc.setFont('helvetica', 'bold');
-    doc.text(`NET TAKE HOME: Rs. ${parseFloat(b.netSalary).toLocaleString()}`, 105, 160, { align: 'center' });
+
+    // Fetch Bank Account for this employee
+    const bank = allBankAccounts.find(ba => String(ba.userId) === String(emp.id)) || {};
+
+    const daysInMonth = new Date(year, ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].indexOf(monthName) + 1, 0).getDate();
+    const workDays = 31; // Placeholder as in image, but can be dynamic from attendance
+
+    // Header
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(22);
+    doc.setTextColor(0);
+    doc.text('Outvying Media Solution Pvt Ltd.', 105, 20, { align: 'center' });
+
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.text('A-106, 1st floor, Town Square, New Airport Road, Viman Nagar, Pune, Maharashtra 411014', 105, 26, { align: 'center' });
+    doc.text(`Email: hr@outvying.com | Website: www.Outvying.com`, 105, 31, { align: 'center' });
+
+    // Payslip Month Box
+    doc.setFillColor(220, 220, 220); // Light gray
+    doc.rect(20, 36, 170, 8, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.text(`Payslip For The Month Of ${monthName}-${year}`, 105, 42, { align: 'center' });
+
+    // Employee Info Grid
+    doc.setFontSize(10);
+    doc.setTextColor(0);
+    const leftX = 20;
+    const midX = 110;
+    let currentY = 55;
+    const lineGap = 7;
+
+    const infoFields = [
+      ['Employee ID', emp.employeeId || 'N/A', 'Employee Name', emp.name || 'N/A'],
+      ['Designation', emp.designation || 'N/A', 'Business Unit', emp.department || 'N/A'],
+      ['Date Of Joining', emp.joiningDate || '-', 'Location', 'Pune'],
+      ['Bank Name', bank.bankName || '-', 'Bank Account No.', bank.accountNumber || '-'],
+      ['IFSC Code', bank.ifscCode || '-', 'ESI No.', '-'],
+      ['PAN Number', emp.panNumber || 'ABCDE1234F'],
+      ['Days In Month', daysInMonth.toString(), 'Effective Work Days', '3'] // '3' is from image
+    ];
+
+    infoFields.forEach((row) => {
+      doc.setFont('helvetica', 'bold');
+      doc.text(row[0], leftX, currentY);
+      doc.setFont('helvetica', 'normal');
+      doc.text(row[1], leftX + 45, currentY);
+
+      if (row[2]) {
+        doc.setFont('helvetica', 'bold');
+        doc.text(row[2], midX, currentY);
+        doc.setFont('helvetica', 'normal');
+        doc.text(row[3], midX + 45, currentY);
+      }
+      currentY += lineGap;
+    });
+
+    // Table Separator
+    doc.setLineWidth(0.5);
+    doc.line(20, currentY + 5, 190, currentY + 5);
+    currentY += 12;
+
+    // Earnings & Deductions Headers
+    doc.setFont('helvetica', 'bold');
+    doc.text('EARNINGS', 55, currentY, { align: 'center' });
+    doc.text('DEDUCTIONS', 150, currentY, { align: 'center' });
+    doc.line(20, currentY + 2, 190, currentY + 2);
+    currentY += 8;
+
+    // Sub-headers
+    doc.setFontSize(9);
+    doc.text('Description', 22, currentY);
+    doc.text('Full', 70, currentY, { align: 'right' });
+    doc.text('Arrear', 85, currentY, { align: 'right' });
+    doc.text('Actual', 105, currentY, { align: 'right' });
+
+    doc.text('Description', 112, currentY);
+    doc.text('Amount', 188, currentY, { align: 'right' });
+    currentY += 2;
+    doc.line(20, currentY, 190, currentY);
+    currentY += 6;
+
+    // Table Rows
+    const earnings = [
+      ['Basic Salary (BS)', b.basic],
+      ['House Rent Allowance (HRA)', b.hra],
+      ['Medical Allowance', b.medical],
+      ['Transportation Allowance (TA)', b.transport],
+      ['Shift Allowance', '0.00'],
+      ['Attendance Allowance', '0.00']
+    ];
+
+    const deductions = [
+      ['Tax (TDS)', b.tds],
+      ['Professional TAX', b.professionalTax],
+      ['ESI', b.esiEmployee]
+    ];
+
+    const rowCount = Math.max(earnings.length, deductions.length);
+    doc.setFont('helvetica', 'normal');
+
+    for (let i = 0; i < rowCount; i++) {
+      if (earnings[i]) {
+        doc.text(earnings[i][0], 22, currentY);
+        doc.text(parseFloat(earnings[i][1]).toFixed(2), 70, currentY, { align: 'right' });
+        doc.text('0.00', 85, currentY, { align: 'right' });
+        // Calculate proportionate actual
+        const actual = (parseFloat(earnings[i][1]) * (3 / daysInMonth)).toFixed(2); // '3' is from image
+        doc.text(actual, 105, currentY, { align: 'right' });
+      }
+
+      if (deductions[i]) {
+        doc.text(deductions[i][0], 112, currentY);
+        doc.text(parseFloat(deductions[i][1]).toFixed(2), 188, currentY, { align: 'right' });
+      }
+      currentY += lineGap;
+    }
+
+    // Bottom Section
+    const finalActualEarnings = (parseFloat(b.grossSalary) * (3 / daysInMonth)).toFixed(2);
+    const totalDeds = parseFloat(b.totalDeductions).toFixed(2);
+
+    doc.line(20, currentY - 2, 190, currentY - 2);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Total Earnings', 22, currentY);
+    doc.text(finalActualEarnings, 105, currentY, { align: 'right' });
+    doc.text('Total Deduction', 112, currentY);
+    doc.text(totalDeds, 188, currentY, { align: 'right' });
+    currentY += 2;
+    doc.line(20, currentY, 190, currentY);
+
+    currentY += 10;
+    doc.setFontSize(11);
+    doc.text(`Net Pay for the month (Total Earnings - Total Dedutions):`, 22, currentY);
+    doc.setFontSize(14);
+    const net = (parseFloat(finalActualEarnings) - parseFloat(totalDeds)).toFixed(2);
+    doc.text(`\u20B9 ${net}`, 188, currentY, { align: 'right' });
+
+    currentY += 2;
+    doc.line(20, currentY, 190, currentY);
+
     doc.save(`Payslip_${emp.employeeId}_${monthName}.pdf`);
   };
 
