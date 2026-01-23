@@ -619,44 +619,42 @@ const Attendance = () => {
         <Table columns={columns} data={paginatedAttendance.data} responsive={true} />
 
         {paginatedAttendance.totalPages > 1 && (
-          <div className="flex flex-col md:flex-row items-center justify-between mt-4 px-2 gap-4">
-            <div className="text-sm text-gray-600 dark:text-gray-400">
-              Showing <span className="font-semibold text-gray-800 dark:text-white">{((currentPage - 1) * itemsPerPage) + 1}</span> to <span className="font-semibold text-gray-800 dark:text-white">{Math.min(currentPage * itemsPerPage, paginatedAttendance.totalItems)}</span> of <span className="font-semibold text-gray-800 dark:text-white">{paginatedAttendance.totalItems}</span> entries
+          <div className="flex flex-col sm:flex-row items-center justify-between mt-6 px-4 py-4 gap-4 border-t border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/50 rounded-b-lg overflow-hidden">
+            <div className="text-sm text-gray-500 dark:text-gray-400 font-medium flex-shrink-0">
+              Showing <span className="text-gray-900 dark:text-white font-bold">{((currentPage - 1) * itemsPerPage) + 1}</span> to <span className="text-gray-900 dark:text-white font-bold">{Math.min(currentPage * itemsPerPage, paginatedAttendance.totalItems)}</span> of <span className="text-gray-900 dark:text-white font-bold">{paginatedAttendance.totalItems}</span> entries
             </div>
-            <div className="flex items-center gap-2 overflow-x-auto pb-2 md:pb-0">
+
+            <div className="flex items-center gap-2 overflow-x-auto max-w-full no-scrollbar pb-1 sm:pb-0">
               <Button
                 variant="secondary"
                 onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                 disabled={currentPage === 1}
-                className="p-2"
+                className="p-1 px-2 h-9 min-w-[36px] flex items-center justify-center rounded-md border border-gray-200 dark:border-gray-700 hover:bg-white dark:hover:bg-gray-700 transition-all font-bold"
               >
-                <ChevronLeft size={20} />
+                <ChevronLeft size={18} />
               </Button>
+
               <div className="flex items-center gap-1">
                 {(() => {
                   const pages = [];
                   const total = paginatedAttendance.totalPages;
                   const current = currentPage;
 
-                  // Show max 5 page buttons total
-                  let start = Math.max(1, current - 2);
-                  let end = Math.min(total, start + 4);
-
-                  if (end - start < 4) {
-                    start = Math.max(1, end - 4);
-                  }
-
-                  if (start > 1) {
+                  if (total <= 7) {
+                    for (let i = 1; i <= total; i++) pages.push(i);
+                  } else {
                     pages.push(1);
-                    if (start > 2) pages.push('...');
-                  }
+                    if (current > 3) pages.push('...');
 
-                  for (let i = start; i <= end; i++) {
-                    pages.push(i);
-                  }
+                    let start = Math.max(2, current - 1);
+                    let end = Math.min(total - 1, current + 1);
 
-                  if (end < total) {
-                    if (end < total - 1) pages.push('...');
+                    if (current <= 3) end = 4;
+                    if (current >= total - 2) start = total - 3;
+
+                    for (let i = start; i <= end; i++) pages.push(i);
+
+                    if (current < total - 2) pages.push('...');
                     pages.push(total);
                   }
 
@@ -665,11 +663,11 @@ const Attendance = () => {
                       key={idx}
                       onClick={() => typeof page === 'number' && setCurrentPage(page)}
                       disabled={typeof page !== 'number'}
-                      className={`min-w-[32px] h-8 px-2 rounded-lg text-sm font-medium transition-colors ${currentPage === page
-                        ? 'bg-primary-600 text-white'
+                      className={`min-w-[36px] h-9 px-2 rounded-md text-sm font-bold transition-all transform active:scale-95 ${currentPage === page
+                        ? 'bg-primary-600 text-white shadow-md ring-2 ring-primary-500 ring-offset-1 dark:ring-offset-gray-800'
                         : typeof page === 'number'
-                          ? 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
-                          : 'text-gray-400 cursor-default'
+                          ? 'text-gray-600 dark:text-gray-400 hover:bg-white dark:hover:bg-gray-700 border border-gray-100 dark:border-gray-700'
+                          : 'text-gray-400 cursor-default px-1 min-w-[20px]'
                         }`}
                     >
                       {page}
@@ -677,13 +675,14 @@ const Attendance = () => {
                   ));
                 })()}
               </div>
+
               <Button
                 variant="secondary"
                 onClick={() => setCurrentPage(prev => Math.min(paginatedAttendance.totalPages, prev + 1))}
                 disabled={currentPage === paginatedAttendance.totalPages}
-                className="p-2"
+                className="p-1 px-2 h-9 min-w-[36px] flex items-center justify-center rounded-md border border-gray-200 dark:border-gray-700 hover:bg-white dark:hover:bg-gray-700 transition-all font-bold"
               >
-                <ChevronRight size={20} />
+                <ChevronRight size={18} />
               </Button>
             </div>
           </div>
