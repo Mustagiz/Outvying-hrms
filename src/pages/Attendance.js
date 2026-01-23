@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Card, Button, Table, Alert, Select, Modal } from '../components/UI';
-import { Clock, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Clock, Calendar, ChevronLeft, ChevronRight, TrendingUp } from 'lucide-react';
 import { formatDate, getStatusColor, exportToCSV, getYearOptions } from '../utils/helpers';
 
 import { calculateAttendanceStatus } from '../utils/biometricSync';
