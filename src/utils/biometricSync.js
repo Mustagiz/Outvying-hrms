@@ -55,17 +55,27 @@ export const calculateAttendanceStatus = (clockIn, clockOut, date = null, roster
 
   // Latency check in regional time
   const istTimestamp = new Date(`${istDate}T${normalizedClockIn}:00+05:30`);
-  const regionalFormat = new Intl.DateTimeFormat('en-US', {
-    timeZone: timezone,
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false
-  }).format(istTimestamp);
 
-  const [regH, regM] = regionalFormat.split(':').map(Number);
+  // Robust time extraction based on parts to avoid string format issues
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    hour: 'numeric',
+    minute: 'numeric',
+    hour12: false
+  });
+
+  const parts = formatter.formatToParts(istTimestamp);
+  const regH = parseInt(parts.find(p => p.type === 'hour')?.value || '0');
+  const regM = parseInt(parts.find(p => p.type === 'minute')?.value || '0');
   const clockInInMinutes = regH * 60 + regM;
 
-  let status = Number(clockInInMinutes) > (Number(shiftStartInMinutes) + Number(gracePeriod)) ? 'Late' : 'Present';
+  const lateThreshold = Number(shiftStartInMinutes) + Number(gracePeriod);
+  let status = clockInInMinutes > lateThreshold ? 'Late' : 'Present';
+
+  // Debugging log (visible in browser console for developers)
+  if (clockInInMinutes > shiftStartInMinutes) {
+    console.log(`[Attendance Debug] ${istDate} ${clockIn}: ClockInMin=${clockInInMinutes}, ShiftStart=${shiftStartInMinutes}, Grace=${gracePeriod}, Threshold=${lateThreshold}, Status=${status}`);
+  }
   let workingDays = 0;
   let workHours = 0;
   let overtime = 0;
