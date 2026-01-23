@@ -392,83 +392,134 @@ const Attendance = () => {
 
       {alert && <Alert type={alert.type} message={alert.message} onClose={() => setAlert(null)} />}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-        <Card title="Today's Attendance">
-          <div className="space-y-4">
-            {currentUser.role === 'manager' && (
-              <>
-                <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                  <div className="flex items-center space-x-3">
-                    <Clock className="text-primary-600" size={24} />
-                    <div>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">Clock In</p>
-                      <p className="text-lg font-semibold text-gray-800 dark:text-white">
-                        {todayAttendance?.clockIn || 'Not clocked in'}
-                      </p>
-                    </div>
+      <div className={`grid grid-cols-1 ${currentUser.role === 'manager' ? 'md:grid-cols-2' : ''} gap-6 mb-6 transition-all duration-300`}>
+        {currentUser.role === 'manager' && (
+          <Card title="Today's Attendance" className="h-full border-primary-100 dark:border-primary-900/30">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700/50 rounded-xl transition-all hover:shadow-sm">
+                <div className="flex items-center space-x-3">
+                  <div className="p-2 bg-primary-100 dark:bg-primary-900/30 rounded-lg text-primary-600 dark:text-primary-400">
+                    <Clock size={24} />
                   </div>
-                  <Button onClick={handleClockIn} disabled={todayAttendance?.clockIn}>
-                    Clock In
-                  </Button>
-                </div>
-
-                <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                  <div className="flex items-center space-x-3">
-                    <Clock className="text-primary-600" size={24} />
-                    <div>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">Clock Out</p>
-                      <p className="text-lg font-semibold text-gray-800 dark:text-white">
-                        {todayAttendance?.clockOut || 'Not clocked out'}
-                      </p>
-                    </div>
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Clock In</p>
+                    <p className="text-lg font-bold text-gray-800 dark:text-white">
+                      {todayAttendance?.clockIn || 'Not clocked in'}
+                    </p>
                   </div>
-                  <Button
-                    onClick={handleClockOut}
-                    disabled={!todayAttendance?.clockIn || todayAttendance?.clockOut}
-                    variant="secondary"
-                  >
-                    Clock Out
-                  </Button>
                 </div>
-              </>
-            )}
-
-            {todayAttendance && (
-              <div className="p-4 bg-primary-50 dark:bg-primary-900/20 rounded-lg">
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Today's Status</p>
-                <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(todayAttendance.status)}`}>
-                  {todayAttendance.status}
-                </span>
+                <Button
+                  onClick={handleClockIn}
+                  disabled={todayAttendance?.clockIn}
+                  className="shadow-sm hover:shadow-md transition-all active:scale-95"
+                >
+                  Clock In
+                </Button>
               </div>
-            )}
-          </div>
-        </Card>
 
-        <Card title="Monthly Statistics">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Present Days</p>
-              <p className="text-2xl font-bold text-green-600">{attendanceStats.present}</p>
+              <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700/50 rounded-xl transition-all hover:shadow-sm">
+                <div className="flex items-center space-x-3">
+                  <div className="p-2 bg-primary-100 dark:bg-primary-900/30 rounded-lg text-primary-600 dark:text-primary-400">
+                    <Clock size={24} />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Clock Out</p>
+                    <p className="text-lg font-bold text-gray-800 dark:text-white">
+                      {todayAttendance?.clockOut || 'Not clocked out'}
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  onClick={handleClockOut}
+                  disabled={!todayAttendance?.clockIn || todayAttendance?.clockOut}
+                  variant="secondary"
+                  className="shadow-sm hover:shadow-md transition-all active:scale-95"
+                >
+                  Clock Out
+                </Button>
+              </div>
+
+              {todayAttendance && (
+                <div className="p-4 bg-gradient-to-r from-primary-500/10 to-transparent border-l-4 border-primary-500 rounded-lg">
+                  <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Today's Status</p>
+                  <span className={`px-4 py-1.5 rounded-full text-sm font-bold shadow-sm ${getStatusColor(todayAttendance.status)}`}>
+                    {todayAttendance.status}
+                  </span>
+                </div>
+              )}
             </div>
-            <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Late Days</p>
-              <p className="text-2xl font-bold text-yellow-600">{attendanceStats.late}</p>
+          </Card>
+        )}
+
+        <Card title="Monthly Statistics Overview" className={`${currentUser.role !== 'manager' ? 'w-full' : ''} border-gray-100 dark:border-gray-800/50`}>
+          <div className={`grid grid-cols-1 sm:grid-cols-2 ${currentUser.role !== 'manager' ? 'lg:grid-cols-3' : 'lg:grid-cols-2'} gap-4`}>
+            <div className="group p-5 bg-gradient-to-br from-green-50 to-white dark:from-green-900/10 dark:to-gray-800 rounded-2xl border border-green-100 dark:border-green-900/30 hover:shadow-md transition-all duration-300">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs font-bold text-green-700 dark:text-green-400 uppercase tracking-widest">Present</p>
+                <div className="p-2 bg-green-100 dark:bg-green-900/40 rounded-lg text-green-600 dark:text-green-300 group-hover:scale-110 transition-transform">
+                  <Calendar size={20} />
+                </div>
+              </div>
+              <p className="text-3xl font-extrabold text-green-700 dark:text-green-300">{attendanceStats.present}</p>
+              <p className="text-[10px] text-green-600/60 dark:text-green-400/40 mt-1 font-medium italic">Days recorded this month</p>
             </div>
-            <div className="p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Half Days</p>
-              <p className="text-2xl font-bold text-orange-600">{attendanceStats.halfDay}</p>
+
+            <div className="group p-5 bg-gradient-to-br from-yellow-50 to-white dark:from-yellow-900/10 dark:to-gray-800 rounded-2xl border border-yellow-100 dark:border-yellow-900/30 hover:shadow-md transition-all duration-300">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs font-bold text-yellow-700 dark:text-yellow-400 uppercase tracking-widest">Late</p>
+                <div className="p-2 bg-yellow-100 dark:bg-yellow-900/40 rounded-lg text-yellow-600 dark:text-yellow-300 group-hover:scale-110 transition-transform">
+                  <Clock size={20} />
+                </div>
+              </div>
+              <p className="text-3xl font-extrabold text-yellow-700 dark:text-yellow-300">{attendanceStats.late}</p>
+              <p className="text-[10px] text-yellow-600/60 dark:text-yellow-400/40 mt-1 font-medium italic">Tardy arrivals detected</p>
             </div>
-            <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-lg">
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">LWP Days</p>
-              <p className="text-2xl font-bold text-red-600">{attendanceStats.lwp}</p>
+
+            <div className="group p-5 bg-gradient-to-br from-orange-50 to-white dark:from-orange-900/10 dark:to-gray-800 rounded-2xl border border-orange-100 dark:border-orange-900/30 hover:shadow-md transition-all duration-300">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs font-bold text-orange-700 dark:text-orange-400 uppercase tracking-widest">Half Days</p>
+                <div className="p-2 bg-orange-100 dark:bg-orange-900/40 rounded-lg text-orange-600 dark:text-orange-300 group-hover:scale-110 transition-transform">
+                  <Calendar size={20} />
+                </div>
+              </div>
+              <p className="text-3xl font-extrabold text-orange-700 dark:text-orange-300">{attendanceStats.halfDay}</p>
+              <p className="text-[10px] text-orange-600/60 dark:text-orange-400/40 mt-1 font-medium italic">Partial working days</p>
             </div>
-            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Total Hours</p>
-              <p className="text-2xl font-bold text-blue-600">{attendanceStats.totalHours}h</p>
+
+            <div className="group p-5 bg-gradient-to-br from-red-50 to-white dark:from-red-900/10 dark:to-gray-800 rounded-2xl border border-red-100 dark:border-red-900/30 hover:shadow-md transition-all duration-300">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs font-bold text-red-700 dark:text-red-400 uppercase tracking-widest">LWP / Absent</p>
+                <div className="p-2 bg-red-100 dark:bg-red-900/40 rounded-lg text-red-600 dark:text-red-300 group-hover:scale-110 transition-transform">
+                  <Calendar size={20} />
+                </div>
+              </div>
+              <p className="text-3xl font-extrabold text-red-700 dark:text-red-300">{attendanceStats.lwp}</p>
+              <p className="text-[10px] text-red-600/60 dark:text-red-400/40 mt-1 font-medium italic">Unpaid leave or no-shows</p>
             </div>
-            <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Working Days</p>
-              <p className="text-2xl font-bold text-purple-600">{attendanceStats.workingDays}</p>
+
+            <div className="group p-5 bg-gradient-to-br from-blue-50 to-white dark:from-blue-900/10 dark:to-gray-800 rounded-2xl border border-blue-100 dark:border-blue-900/30 hover:shadow-md transition-all duration-300">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs font-bold text-blue-700 dark:text-blue-400 uppercase tracking-widest">Total Hours</p>
+                <div className="p-2 bg-blue-100 dark:bg-blue-900/40 rounded-lg text-blue-600 dark:text-blue-300 group-hover:scale-110 transition-transform">
+                  <Clock size={20} />
+                </div>
+              </div>
+              <div className="flex items-baseline gap-1">
+                <p className="text-3xl font-extrabold text-blue-700 dark:text-blue-300">{attendanceStats.totalHours}</p>
+                <span className="text-sm font-bold text-blue-500/60">HRS</span>
+              </div>
+              <p className="text-[10px] text-blue-600/60 dark:text-blue-400/40 mt-1 font-medium italic">Net productive time</p>
+            </div>
+
+            <div className="group p-5 bg-gradient-to-br from-purple-50 to-white dark:from-purple-900/10 dark:to-gray-800 rounded-2xl border border-purple-100 dark:border-purple-900/30 hover:shadow-md transition-all duration-300">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs font-bold text-purple-700 dark:text-purple-400 uppercase tracking-widest">Salary Days</p>
+                <div className="p-2 bg-purple-100 dark:bg-purple-900/40 rounded-lg text-purple-600 dark:text-purple-300 group-hover:scale-110 transition-transform">
+                  <TrendingUp size={20} />
+                </div>
+              </div>
+              <p className="text-3xl font-extrabold text-purple-700 dark:text-purple-300">{attendanceStats.workingDays}</p>
+              <p className="text-[10px] text-purple-600/60 dark:text-purple-400/40 mt-1 font-medium italic">Total billable work days</p>
             </div>
           </div>
         </Card>
