@@ -1,20 +1,42 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Card, Button, Modal, Table, Alert } from '../components/UI';
-import { DollarSign, Edit, Search, Settings, TrendingUp, Calculator, FileText, Users, ChevronLeft, ChevronRight } from 'lucide-react';
+import {
+  DollarSign, Edit, Search, Settings,
+  TrendingUp, Calculator, FileText, Users,
+  ChevronLeft, ChevronRight, Gift, History,
+  Download, Eye, CheckCircle
+} from 'lucide-react';
+import { db } from '../config/firebase';
+import {
+  collection, query, where, getDocs,
+  addDoc, serverTimestamp, doc, updateDoc
+} from 'firebase/firestore';
+import { jsPDF } from 'jspdf';
 
 const Payroll = () => {
-  const { allUsers, updateUser, currentUser } = useAuth();
+  const { allUsers, updateUser, currentUser, attendanceRules } = useAuth();
   const [activeTab, setActiveTab] = useState('employees');
   const [showModal, setShowModal] = useState(false);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [showTaxModal, setShowTaxModal] = useState(false);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [ctc, setCtc] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [alert, setAlert] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [isProcessing, setIsProcessing] = useState(false);
   const itemsPerPage = 10;
+
+  // New State for Bonuses/Increments
+  const [adjustmentData, setAdjustmentData] = useState({
+    type: 'Bonus',
+    amount: '',
+    reason: '',
+    date: new Date().toISOString().split('T')[0]
+  });
+  const [history, setHistory] = useState([]);
 
   // Salary Template
   const [template, setTemplate] = useState(() => {
@@ -73,7 +95,7 @@ const Payroll = () => {
 
     const grossSalary = basic + hra + medical + transport + special + lta + food;
 
-    // Calculate deductions
+    // Deductions
     const pfBasic = Math.min(basic, taxConfig.pfCeiling);
     const pfEmployee = pfBasic * (taxConfig.pfEmployee / 100);
     const pfEmployer = pfBasic * (taxConfig.pfEmployer / 100);
@@ -84,9 +106,9 @@ const Payroll = () => {
 
     const professionalTax = taxConfig.professionalTax;
 
-    // Simple TDS calculation (can be enhanced)
+    // Simple TDS calculation 
     const annualGross = grossSalary * 12;
-    const taxableIncome = annualGross - (pfEmployee * 12) - 50000; // Standard deduction
+    const taxableIncome = annualGross - (pfEmployee * 12) - 50000;
     let tds = 0;
     if (taxableIncome > 1500000) tds = (taxableIncome - 1500000) * 0.30 + 187500;
     else if (taxableIncome > 1200000) tds = (taxableIncome - 1200000) * 0.20 + 127500;
@@ -100,11 +122,9 @@ const Payroll = () => {
     const totalDeductions = pfEmployee + esiEmployee + professionalTax + monthlyTds;
     const netSalary = grossSalary - totalDeductions;
 
-    // Employer cost
     const employerCost = monthly + pfEmployer + esiEmployer;
 
     return {
-      // Earnings
       basic: basic.toFixed(2),
       hra: hra.toFixed(2),
       medical: medical.toFixed(2),
@@ -113,8 +133,6 @@ const Payroll = () => {
       lta: lta.toFixed(2),
       food: food.toFixed(2),
       grossSalary: grossSalary.toFixed(2),
-
-      // Deductions
       pfEmployee: pfEmployee.toFixed(2),
       pfEmployer: pfEmployer.toFixed(2),
       esiEmployee: esiEmployee.toFixed(2),
@@ -122,8 +140,6 @@ const Payroll = () => {
       professionalTax: professionalTax.toFixed(2),
       tds: monthlyTds.toFixed(2),
       totalDeductions: totalDeductions.toFixed(2),
-
-      // Final amounts
       netSalary: netSalary.toFixed(2),
       monthly: monthly.toFixed(2),
       annual: annual.toFixed(2),
@@ -136,71 +152,153 @@ const Payroll = () => {
     const total = template.basic + template.hra + template.medical + template.transport + template.special + template.lta + template.food;
     if (Math.abs(total - 100) > 0.1) {
       setAlert({ type: 'error', message: 'Total percentage must equal 100%' });
-      setTimeout(() => setAlert(null), 3000);
       return;
     }
     localStorage.setItem('salaryTemplate', JSON.stringify(template));
     setShowTemplateModal(false);
-    setAlert({ type: 'success', message: 'Template saved successfully' });
-    setTimeout(() => setAlert(null), 3000);
+    setAlert({ type: 'success', message: 'Template saved' });
   };
 
-  const handleSaveTaxConfig = () => {
-    localStorage.setItem('taxConfig', JSON.stringify(taxConfig));
-    setShowTaxModal(false);
-    setAlert({ type: 'success', message: 'Tax configuration saved successfully' });
-    setTimeout(() => setAlert(null), 3000);
+  const handleAddAdjustment = async () => {
+    if (!selectedEmployee || !adjustmentData.amount) return;
+    setIsProcessing(true);
+    try {
+      await addDoc(collection(db, 'payrollHistory'), {
+        employeeId: selectedEmployee.id,
+        employeeName: selectedEmployee.name,
+        ...adjustmentData,
+        amount: parseFloat(adjustmentData.amount),
+        appliedBy: currentUser.id,
+        createdAt: serverTimestamp()
+      });
+
+      if (adjustmentData.type === 'Increment') {
+        const newCtc = (selectedEmployee.ctc || 0) + parseFloat(adjustmentData.amount);
+        const newBreakdown = calculateBreakdown(newCtc);
+        await updateUser(selectedEmployee.id, {
+          ctc: newCtc,
+          salaryBreakdown: newBreakdown
+        });
+      }
+
+      setAlert({ type: 'success', message: `${adjustmentData.type} applied successfully!` });
+      setAdjustmentData({ type: 'Bonus', amount: '', reason: '', date: new Date().toISOString().split('T')[0] });
+      fetchHistory(selectedEmployee.id);
+    } catch (e) {
+      setAlert({ type: 'error', message: 'Failed: ' + e.message });
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
-  const handleAssignCTC = async () => {
-    const breakdown = calculateBreakdown(ctc);
-    const result = await updateUser(selectedEmployee.id, {
-      ctc: parseFloat(ctc),
-      salaryBreakdown: breakdown
+  const fetchHistory = async (empId) => {
+    const q = query(collection(db, 'payrollHistory'), where('employeeId', '==', empId));
+    const snap = await getDocs(q);
+    const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    setHistory(data.sort((a, b) => b.createdAt?.seconds - a.createdAt?.seconds));
+  };
+
+  const generatePayslip = (emp, monthName, year) => {
+    const doc = new jsPDF();
+    const b = emp.salaryBreakdown;
+    if (!b) return alert('No salary breakdown assigned!');
+
+    doc.setFontSize(22);
+    doc.setTextColor(0, 102, 204);
+    doc.text('PAYSLIP', 105, 20, { align: 'center' });
+
+    doc.setFontSize(12);
+    doc.setTextColor(100);
+    doc.text(`${monthName} ${year}`, 105, 30, { align: 'center' });
+
+    doc.setDrawColor(200);
+    doc.line(20, 35, 190, 35);
+
+    // Employee Info
+    doc.setTextColor(0);
+    doc.text(`Employee Name: ${emp.name}`, 20, 45);
+    doc.text(`Employee ID: ${emp.employeeId}`, 20, 52);
+    doc.text(`Department: ${emp.department}`, 20, 59);
+    doc.text(`Designation: ${emp.designation}`, 20, 66);
+
+    // Earnings Table
+    doc.setFillColor(240, 245, 255);
+    doc.rect(20, 75, 80, 8, 'F');
+    doc.text('EARNINGS', 25, 81);
+    doc.text('AMOUNT', 80, 81, { align: 'right' });
+
+    const earnings = [
+      ['Basic Pay', b.basic],
+      ['HRA', b.hra],
+      ['Medical', b.medical],
+      ['Transport', b.transport],
+      ['Special', b.special],
+      ['Food', b.food],
+      ['LTA', b.lta]
+    ];
+
+    let y = 88;
+    earnings.forEach(([label, amt]) => {
+      doc.text(label, 25, y);
+      doc.text(`Rs. ${parseFloat(amt).toLocaleString()}`, 80, y, { align: 'right' });
+      y += 7;
     });
 
-    if (result.success) {
-      setAlert({ type: 'success', message: 'CTC assigned successfully' });
-    } else {
-      setAlert({ type: 'error', message: result.message || 'Failed to assign CTC' });
-    }
+    // Deductions Table
+    doc.setFillColor(255, 240, 240);
+    doc.rect(110, 75, 80, 8, 'F');
+    doc.text('DEDUCTIONS', 115, 81);
+    doc.text('AMOUNT', 170, 81, { align: 'right' });
 
-    setShowModal(false);
-    setSelectedEmployee(null);
-    setCtc('');
-    setTimeout(() => setAlert(null), 3000);
-  };
+    const deds = [
+      ['PF', b.pfEmployee],
+      ['ESI', b.esiEmployee],
+      ['Prof. Tax', b.professionalTax],
+      ['TDS', b.tds]
+    ];
 
-  const openModal = (employee) => {
-    setSelectedEmployee(employee);
-    setCtc(employee.ctc || '');
-    setShowModal(true);
+    y = 88;
+    deds.forEach(([label, amt]) => {
+      doc.text(label, 115, y);
+      doc.text(`Rs. ${parseFloat(amt).toLocaleString()}`, 170, y, { align: 'right' });
+      y += 7;
+    });
+
+    doc.line(20, 145, 190, 145);
+
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`NET TAKE HOME: Rs. ${parseFloat(b.netSalary).toLocaleString()}`, 105, 160, { align: 'center' });
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Computer generated payslip, no signature required.', 105, 180, { align: 'center' });
+
+    doc.save(`Payslip_${emp.employeeId}_${monthName}.pdf`);
   };
 
   const columns = [
-    { header: 'Employee ID', accessor: 'employeeId' },
+    { header: 'ID', accessor: 'employeeId' },
     { header: 'Name', accessor: 'name' },
-    { header: 'Designation', accessor: 'designation' },
-    { header: 'Department', accessor: 'department' },
-    {
-      header: 'Annual CTC',
-      render: (row) => row.ctc ? `₹${row.ctc.toLocaleString()}` : 'Not Assigned'
-    },
-    {
-      header: 'Net Salary',
-      render: (row) => row.salaryBreakdown ? `₹${parseFloat(row.salaryBreakdown.netSalary).toLocaleString()}` : '-'
-    },
+    { header: 'Annual CTC', render: (row) => row.ctc ? `₹${row.ctc.toLocaleString()}` : '-' },
+    { header: 'Net Salary', render: (row) => row.salaryBreakdown ? `₹${parseFloat(row.salaryBreakdown.netSalary).toLocaleString()}` : '-' },
     {
       header: 'Actions',
       render: (row) => (
-        <Button onClick={() => openModal(row)} variant="secondary" className="text-xs py-1 px-2">
-          <Edit size={14} className="inline mr-1" /> Manage CTC
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={() => openModal(row)} variant="secondary" className="p-2 h-8 w-8" title="Manage CTC">
+            <Edit size={14} />
+          </Button>
+          <Button onClick={() => { setSelectedEmployee(row); fetchHistory(row.id); setShowHistoryModal(true); }} variant="secondary" className="p-2 h-8 w-8 text-blue-600" title="Bonuses & History">
+            <History size={14} />
+          </Button>
+          <Button onClick={() => generatePayslip(row, 'January', '2026')} variant="secondary" className="p-2 h-8 w-8 text-emerald-600" title="Download Payslip">
+            <Download size={14} />
+          </Button>
+        </div>
       )
     }
   ];
-
-  const breakdown = ctc ? calculateBreakdown(ctc) : null;
 
   if (currentUser.role !== 'admin' && currentUser.role !== 'Admin') {
     return <div className="text-center py-8 text-gray-600 dark:text-gray-400">Access denied. Admin only.</div>;
@@ -208,7 +306,9 @@ const Payroll = () => {
 
   return (
     <div className="p-4 md:p-6 lg:p-8">
-      <h1 className="text-3xl font-bold text-gray-800 dark:text-white mb-6">Payroll Management</h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold text-gray-800 dark:text-white">Professional Payroll</h1>
+      </div>
 
       {alert && <Alert type={alert.type} message={alert.message} onClose={() => setAlert(null)} />}
 
@@ -218,442 +318,212 @@ const Payroll = () => {
           <button
             onClick={() => setActiveTab('employees')}
             className={`px-4 py-3 font-semibold text-sm border-b-2 transition-colors ${activeTab === 'employees'
-                ? 'border-primary-600 text-primary-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+              ? 'border-primary-600 text-primary-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
               }`}
           >
             <Users size={16} className="inline mr-2" />
-            Employee Payroll ({employees.length})
+            Employees ({employees.length})
           </button>
           <button
-            onClick={() => setActiveTab('components')}
-            className={`px-4 py-3 font-semibold text-sm border-b-2 transition-colors ${activeTab === 'components'
-                ? 'border-primary-600 text-primary-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+            onClick={() => setActiveTab('process')}
+            className={`px-4 py-3 font-semibold text-sm border-b-2 transition-colors ${activeTab === 'process'
+              ? 'border-primary-600 text-primary-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
               }`}
           >
             <Calculator size={16} className="inline mr-2" />
-            Salary Components
+            Monthly Process
           </button>
           <button
-            onClick={() => setActiveTab('tax')}
-            className={`px-4 py-3 font-semibold text-sm border-b-2 transition-colors ${activeTab === 'tax'
-                ? 'border-primary-600 text-primary-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
-              }`}
+            onClick={() => setShowTemplateModal(true)}
+            className="px-4 py-3 font-semibold text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+          >
+            <Settings size={16} className="inline mr-2" />
+            Template Policy
+          </button>
+          <button
+            onClick={() => setShowTaxModal(true)}
+            className="px-4 py-3 font-semibold text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
           >
             <FileText size={16} className="inline mr-2" />
-            Tax Configuration
+            Statutory Rules
           </button>
         </div>
       </div>
 
-      {/* Tab Content */}
       {activeTab === 'employees' && (
         <Card>
-          <div className="flex justify-between items-center mb-4">
-            <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-              <input
-                type="text"
-                placeholder="Search by name or employee ID..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              />
-            </div>
-            <Button onClick={() => setShowTemplateModal(true)} variant="secondary">
-              <Settings size={18} className="inline mr-2" />
-              Salary Template
-            </Button>
-          </div>
-
-          <Table columns={columns} data={paginatedEmployees} />
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex justify-between items-center mt-4 px-4 py-3 border-t border-gray-200 dark:border-gray-700">
-              <div className="text-sm text-gray-600 dark:text-gray-400">
-                Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredEmployees.length)} of {filteredEmployees.length} employees
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                  disabled={currentPage === 1}
-                  variant="secondary"
-                  className="text-xs py-1 px-3"
-                >
-                  <ChevronLeft size={16} className="inline mr-1" />
-                  Previous
-                </Button>
-                <div className="flex items-center gap-1">
-                  {[...Array(totalPages)].map((_, i) => {
-                    const page = i + 1;
-                    if (
-                      page === 1 ||
-                      page === totalPages ||
-                      Math.abs(page - currentPage) <= 1
-                    ) {
-                      return (
-                        <button
-                          key={page}
-                          onClick={() => setCurrentPage(page)}
-                          className={`min-w-[32px] h-8 px-2 rounded-lg text-xs font-semibold transition-all ${currentPage === page
-                              ? 'bg-primary-600 text-white'
-                              : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700'
-                            }`}
-                        >
-                          {page}
-                        </button>
-                      );
-                    } else if (Math.abs(page - currentPage) === 2) {
-                      return <span key={page} className="text-gray-400">...</span>;
-                    }
-                    return null;
-                  })}
-                </div>
-                <Button
-                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                  disabled={currentPage === totalPages}
-                  variant="secondary"
-                  className="text-xs py-1 px-3"
-                >
-                  Next
-                  <ChevronRight size={16} className="inline ml-1" />
-                </Button>
-              </div>
-            </div>
-          )}
-        </Card>
-      )}
-
-      {activeTab === 'components' && (
-        <Card title="Salary Components Configuration">
-          <div className="space-y-6">
-            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-              <p className="text-sm text-blue-800 dark:text-blue-300">
-                Configure the percentage breakdown for salary components. Total must equal 100%.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Basic Salary (%)</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={template.basic}
-                  onChange={(e) => setTemplate({ ...template, basic: parseFloat(e.target.value) || 0 })}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">House Rent Allowance (%)</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={template.hra}
-                  onChange={(e) => setTemplate({ ...template, hra: parseFloat(e.target.value) || 0 })}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Medical Allowance (%)</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={template.medical}
-                  onChange={(e) => setTemplate({ ...template, medical: parseFloat(e.target.value) || 0 })}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Transport Allowance (%)</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={template.transport}
-                  onChange={(e) => setTemplate({ ...template, transport: parseFloat(e.target.value) || 0 })}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Special Allowance (%)</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={template.special}
-                  onChange={(e) => setTemplate({ ...template, special: parseFloat(e.target.value) || 0 })}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Leave Travel Allowance (%)</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={template.lta}
-                  onChange={(e) => setTemplate({ ...template, lta: parseFloat(e.target.value) || 0 })}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Food Allowance (%)</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={template.food}
-                  onChange={(e) => setTemplate({ ...template, food: parseFloat(e.target.value) || 0 })}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                />
-              </div>
-            </div>
-
-            <div className="p-4 bg-primary-50 dark:bg-primary-900/20 rounded-lg">
-              <p className="text-sm font-bold text-gray-800 dark:text-white">
-                Total: {(template.basic + template.hra + template.medical + template.transport + template.special + template.lta + template.food).toFixed(1)}%
-              </p>
-            </div>
-
-            <Button onClick={handleSaveTemplate} className="w-full">
-              <Settings size={18} className="inline mr-2" />
-              Save Salary Template
-            </Button>
-          </div>
-        </Card>
-      )}
-
-      {activeTab === 'tax' && (
-        <Card title="Tax & Compliance Configuration">
-          <div className="space-y-6">
-            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-              <p className="text-sm text-blue-800 dark:text-blue-300">
-                Configure PF, ESI, TDS, and other statutory deductions as per compliance requirements.
-              </p>
-            </div>
-
-            <div className="space-y-4">
-              <h3 className="font-semibold text-gray-800 dark:text-white">Provident Fund (PF)</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Employee Contribution (%)</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    value={taxConfig.pfEmployee}
-                    onChange={(e) => setTaxConfig({ ...taxConfig, pfEmployee: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Employer Contribution (%)</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    value={taxConfig.pfEmployer}
-                    onChange={(e) => setTaxConfig({ ...taxConfig, pfEmployer: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Wage Ceiling (₹)</label>
-                  <input
-                    type="number"
-                    value={taxConfig.pfCeiling}
-                    onChange={(e) => setTaxConfig({ ...taxConfig, pfCeiling: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <h3 className="font-semibold text-gray-800 dark:text-white">Employee State Insurance (ESI)</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Employee Contribution (%)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={taxConfig.esiEmployee}
-                    onChange={(e) => setTaxConfig({ ...taxConfig, esiEmployee: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Employer Contribution (%)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={taxConfig.esiEmployer}
-                    onChange={(e) => setTaxConfig({ ...taxConfig, esiEmployer: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Wage Ceiling (₹)</label>
-                  <input
-                    type="number"
-                    value={taxConfig.esiCeiling}
-                    onChange={(e) => setTaxConfig({ ...taxConfig, esiCeiling: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <h3 className="font-semibold text-gray-800 dark:text-white">Other Deductions</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Professional Tax (₹/month)</label>
-                  <input
-                    type="number"
-                    value={taxConfig.professionalTax}
-                    onChange={(e) => setTaxConfig({ ...taxConfig, professionalTax: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  />
-                </div>
-                <div>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={taxConfig.tdsEnabled}
-                      onChange={(e) => setTaxConfig({ ...taxConfig, tdsEnabled: e.target.checked })}
-                      className="w-5 h-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                    />
-                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Enable TDS Calculation</span>
-                  </label>
-                </div>
-              </div>
-            </div>
-
-            <Button onClick={handleSaveTaxConfig} className="w-full">
-              <FileText size={18} className="inline mr-2" />
-              Save Tax Configuration
-            </Button>
-          </div>
-        </Card>
-      )}
-
-      {/* CTC Assignment Modal */}
-      <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="Manage Employee CTC" size="lg">
-        <div className="space-y-4">
-          <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 border-2 border-blue-200 dark:border-blue-700 rounded-2xl">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wide mb-1">Employee</p>
-                <p className="text-base font-bold text-gray-900 dark:text-white">{selectedEmployee?.name}</p>
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wide mb-1">Employee ID</p>
-                <p className="text-base font-bold text-gray-900 dark:text-white">{selectedEmployee?.employeeId}</p>
-              </div>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Annual CTC (₹)
-            </label>
+          <div className="flex items-center mb-4 max-w-md relative">
+            <Search className="absolute left-3 text-gray-400" size={18} />
             <input
-              type="number"
-              placeholder="Enter annual CTC"
-              value={ctc}
-              onChange={(e) => setCtc(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              placeholder="Search by name or employee ID..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl dark:bg-gray-800 dark:border-gray-700 dark:text-white"
             />
           </div>
-
-          {breakdown && (
-            <div className="border-t pt-4 space-y-4">
-              <h3 className="font-semibold text-gray-800 dark:text-white">Salary Breakdown</h3>
-
-              {/* Earnings */}
-              <div>
-                <h4 className="text-sm font-semibold text-green-600 mb-2">Earnings (Monthly)</h4>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded">
-                    <span className="text-gray-600 dark:text-gray-400">Basic ({template.basic}%)</span>
-                    <span className="font-semibold text-gray-800 dark:text-white">₹{breakdown.basic}</span>
-                  </div>
-                  <div className="flex justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded">
-                    <span className="text-gray-600 dark:text-gray-400">HRA ({template.hra}%)</span>
-                    <span className="font-semibold text-gray-800 dark:text-white">₹{breakdown.hra}</span>
-                  </div>
-                  <div className="flex justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded">
-                    <span className="text-gray-600 dark:text-gray-400">Medical ({template.medical}%)</span>
-                    <span className="font-semibold text-gray-800 dark:text-white">₹{breakdown.medical}</span>
-                  </div>
-                  <div className="flex justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded">
-                    <span className="text-gray-600 dark:text-gray-400">Transport ({template.transport}%)</span>
-                    <span className="font-semibold text-gray-800 dark:text-white">₹{breakdown.transport}</span>
-                  </div>
-                  <div className="flex justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded">
-                    <span className="text-gray-600 dark:text-gray-400">Special ({template.special}%)</span>
-                    <span className="font-semibold text-gray-800 dark:text-white">₹{breakdown.special}</span>
-                  </div>
-                  <div className="flex justify-between p-2 bg-green-50 dark:bg-green-900/20 rounded font-semibold">
-                    <span className="text-gray-800 dark:text-white">Gross Salary</span>
-                    <span className="text-green-600">₹{breakdown.grossSalary}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Deductions */}
-              <div>
-                <h4 className="text-sm font-semibold text-red-600 mb-2">Deductions (Monthly)</h4>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded">
-                    <span className="text-gray-600 dark:text-gray-400">PF ({taxConfig.pfEmployee}%)</span>
-                    <span className="font-semibold text-red-600">-₹{breakdown.pfEmployee}</span>
-                  </div>
-                  {parseFloat(breakdown.esiEmployee) > 0 && (
-                    <div className="flex justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded">
-                      <span className="text-gray-600 dark:text-gray-400">ESI ({taxConfig.esiEmployee}%)</span>
-                      <span className="font-semibold text-red-600">-₹{breakdown.esiEmployee}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded">
-                    <span className="text-gray-600 dark:text-gray-400">Professional Tax</span>
-                    <span className="font-semibold text-red-600">-₹{breakdown.professionalTax}</span>
-                  </div>
-                  {parseFloat(breakdown.tds) > 0 && (
-                    <div className="flex justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded">
-                      <span className="text-gray-600 dark:text-gray-400">TDS</span>
-                      <span className="font-semibold text-red-600">-₹{breakdown.tds}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between p-2 bg-red-50 dark:bg-red-900/20 rounded font-semibold">
-                    <span className="text-gray-800 dark:text-white">Total Deductions</span>
-                    <span className="text-red-600">-₹{breakdown.totalDeductions}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Net Salary */}
-              <div className="p-4 bg-gradient-to-r from-primary-50 to-blue-50 dark:from-primary-900/20 dark:to-blue-900/20 rounded-lg border-2 border-primary-200 dark:border-primary-700">
-                <div className="flex justify-between items-center">
-                  <span className="text-lg font-bold text-gray-800 dark:text-white">Net Take Home (Monthly)</span>
-                  <span className="text-2xl font-extrabold text-primary-600">₹{breakdown.netSalary}</span>
-                </div>
-              </div>
-
-              {/* Employer Cost */}
-              <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded">
-                <p className="text-xs text-gray-700 dark:text-gray-300">
-                  <strong>Employer Cost:</strong> ₹{breakdown.employerCost}/month (₹{breakdown.costToCompany}/year including PF & ESI employer contributions)
-                </p>
+          <Table columns={columns} data={paginatedEmployees} />
+          {totalPages > 1 && (
+            <div className="mt-4 flex justify-between items-center text-xs font-bold text-gray-400 uppercase tracking-widest">
+              <span>Page {currentPage} of {totalPages}</span>
+              <div className="flex gap-2">
+                <Button onClick={() => setCurrentPage(c => Math.max(1, c - 1))} disabled={currentPage === 1} className="p-2"><ChevronLeft size={16} /></Button>
+                <Button onClick={() => setCurrentPage(c => Math.min(totalPages, c + 1))} disabled={currentPage === totalPages} className="p-2"><ChevronRight size={16} /></Button>
               </div>
             </div>
           )}
+        </Card>
+      )}
 
-          <Button onClick={handleAssignCTC} className="w-full" disabled={!ctc}>
-            <DollarSign size={18} className="inline mr-2" />
-            Assign CTC
+      <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="Salary & CTC Management">
+        <div className="space-y-4">
+          <div className="p-4 bg-primary-50 dark:bg-primary-900/20 rounded-2xl border border-primary-100">
+            <p className="text-xs font-bold text-primary-600 uppercase tracking-widest mb-1">Employee Info</p>
+            <p className="text-lg font-bold text-gray-800 dark:text-white">{selectedEmployee?.name} ({selectedEmployee?.employeeId})</p>
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">Annual CTC (INR)</label>
+            <input
+              type="number"
+              value={ctc}
+              onChange={(e) => setCtc(e.target.value)}
+              className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl dark:bg-gray-800 dark:border-gray-700 text-lg font-bold"
+            />
+          </div>
+          <Button onClick={handleAssignCTC} className="w-full py-4 shadow-lg shadow-primary-500/20">
+            <CheckCircle className="mr-2" size={18} /> Update Salary Structure
           </Button>
         </div>
       </Modal>
+
+      <Modal isOpen={showHistoryModal} onClose={() => setShowHistoryModal(false)} title="Adjustment & Bonus History" size="lg">
+        <div className="space-y-6">
+          <div className="grid grid-cols-2 gap-4 bg-gray-50 dark:bg-gray-800/50 p-4 rounded-2xl border border-dashed border-gray-200">
+            <div className="col-span-2">
+              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Add New Adjustment</h3>
+            </div>
+            <select
+              value={adjustmentData.type}
+              onChange={(e) => setAdjustmentData({ ...adjustmentData, type: e.target.value })}
+              className="px-4 py-2 rounded-xl bg-white border border-gray-200"
+            >
+              <option>Bonus</option>
+              <option>Increment</option>
+              <option>Deduction</option>
+            </select>
+            <input
+              placeholder="Amount"
+              type="number"
+              value={adjustmentData.amount}
+              onChange={(e) => setAdjustmentData({ ...adjustmentData, amount: e.target.value })}
+              className="px-4 py-2 rounded-xl bg-white border border-gray-200"
+            />
+            <input
+              placeholder="Reason / Description"
+              value={adjustmentData.reason}
+              onChange={(e) => setAdjustmentData({ ...adjustmentData, reason: e.target.value })}
+              className="col-span-2 px-4 py-2 rounded-xl bg-white border border-gray-200"
+            />
+            <Button onClick={handleAddAdjustment} className="col-span-2" loading={isProcessing}>
+              Apply Adjustment
+            </Button>
+          </div>
+
+          <div className="space-y-2">
+            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest px-1">Record History</h3>
+            {history.length === 0 ? <p className="text-center py-4 text-gray-400 italic text-sm">No adjustments found</p> :
+              history.map(item => (
+                <div key={item.id} className="flex justify-between items-center p-3 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-800 rounded-xl">
+                  <div>
+                    <p className="text-sm font-bold text-gray-800 dark:text-white">{item.type}: ₹{item.amount}</p>
+                    <p className="text-xs text-gray-400">{item.reason} • {item.date}</p>
+                  </div>
+                  {item.type === 'Bonus' && <Gift size={20} className="text-amber-500" />}
+                  {item.type === 'Increment' && <TrendingUp size={20} className="text-emerald-500" />}
+                </div>
+              ))
+            }
+          </div>
+        </div>
+      </Modal>
+
+      {/* Template & Tax Modals (Simplified for brevity) */}
+      <Modal isOpen={showTemplateModal} onClose={() => setShowTemplateModal(false)} title="Salary Breakdown Template">
+        <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+          {Object.keys(template).map(key => (
+            <div key={key}>
+              <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">{key} (%)</label>
+              <input
+                type="number"
+                value={template[key]}
+                onChange={(e) => setTemplate({ ...template, [key]: parseFloat(e.target.value) || 0 })}
+                className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl"
+              />
+            </div>
+          ))}
+          <Button onClick={handleSaveTemplate} className="w-full">Save Policy</Button>
+        </div>
+      </Modal>
+
+      <Modal isOpen={showTaxModal} onClose={() => setShowTaxModal(false)} title="Global Tax & PF Rules">
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">PF Employee %</label>
+              <input type="number" value={taxConfig.pfEmployee} onChange={e => setTaxConfig({ ...taxConfig, pfEmployee: parseFloat(e.target.value) })} className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl" />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">PF Employer %</label>
+              <input type="number" value={taxConfig.pfEmployer} onChange={e => setTaxConfig({ ...taxConfig, pfEmployer: parseFloat(e.target.value) })} className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl" />
+            </div>
+          </div>
+          <Button onClick={handleSaveTaxConfig} className="w-full">Update Statutory Rules</Button>
+        </div>
+      </Modal>
+
+      {activeTab === 'process' && (
+        <Card title="Batch Monthly Payroll Processing">
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <select className="px-4 py-2 rounded-xl bg-gray-50 border border-gray-200">
+                <option>January 2026</option>
+                <option>December 2025</option>
+              </select>
+              <Button variant="primary">Generate Payroll Report</Button>
+              <Button variant="secondary"><Download size={16} className="mr-2" /> Export All Payslips</Button>
+            </div>
+
+            <div className="rounded-2xl border border-gray-100 overflow-hidden">
+              <table className="w-full text-sm text-left">
+                <thead className="bg-gray-50 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                  <tr>
+                    <th className="px-4 py-3">Employee</th>
+                    <th className="px-4 py-3">Gross Salary</th>
+                    <th className="px-4 py-3">LWP Days</th>
+                    <th className="px-4 py-3">Deductions</th>
+                    <th className="px-4 py-3">Net Payable</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {filteredEmployees.map(emp => {
+                    const b = emp.salaryBreakdown;
+                    return (
+                      <tr key={emp.id}>
+                        <td className="px-4 py-3 font-bold">{emp.name}</td>
+                        <td className="px-4 py-3 font-medium">₹{b?.grossSalary || 0}</td>
+                        <td className="px-4 py-3 text-red-600 font-bold">0</td>
+                        <td className="px-4 py-3">₹{b?.totalDeductions || 0}</td>
+                        <td className="px-4 py-3 text-emerald-600 font-bold">₹{b?.netSalary || 0}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </Card>
+      )}
     </div>
   );
 };
