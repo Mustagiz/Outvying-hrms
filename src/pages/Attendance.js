@@ -395,7 +395,7 @@ const Attendance = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         <Card title="Today's Attendance">
           <div className="space-y-4">
-            {currentUser.role !== 'employee' && (
+            {currentUser.role === 'manager' && (
               <>
                 <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
                   <div className="flex items-center space-x-3">
