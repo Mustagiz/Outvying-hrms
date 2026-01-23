@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Card, Button, Table, Alert, Select, Modal } from '../components/UI';
-import { Clock, Calendar, ChevronLeft, ChevronRight, TrendingUp, Search, Download, RefreshCw, FilePlus, Wrench, RotateCcw } from 'lucide-react';
+import { Clock, Calendar, ChevronLeft, ChevronRight, TrendingUp, Search, Download, RefreshCw, FilePlus, Wrench, RotateCcw, Upload } from 'lucide-react';
 import { formatDate, getStatusColor, exportToCSV, getYearOptions, getTodayLocal } from '../utils/helpers';
 
 import { calculateAttendanceStatus } from '../utils/biometricSync';
@@ -56,6 +56,7 @@ const Attendance = () => {
 
   // Manual Attendance State
   const [showManualModal, setShowManualModal] = useState(false);
+  const [showBulkModal, setShowBulkModal] = useState(false);
   const [manualData, setManualData] = useState({
     employeeIds: [],
     startDate: '',
@@ -222,6 +223,120 @@ const Attendance = () => {
     }
     setIsSyncing(false);
     setTimeout(() => setAlert(null), 3000);
+  };
+
+  const handleDownloadTemplate = () => {
+    const headers = ['employee_id', 'date', 'clock_in', 'clock_out'];
+    const sampleData = [
+      { employee_id: 'EMP101', date: '2026-01-24', clock_in: '09:00', clock_out: '18:00' },
+      { employee_id: 'EMP102', date: '2026-01-24', clock_in: '10:00', clock_out: '19:30' }
+    ];
+
+    const csvContent = [
+      headers.join(','),
+      ...sampleData.map(row => `${row.employee_id},${row.date},${row.clock_in},${row.clock_out}`)
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'attendance_template.csv';
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
+
+  const handleBulkUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    setIsSyncing(true);
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const text = e.target.result;
+        const lines = text.split('\n').filter(line => line.trim());
+        if (lines.length < 2) throw new Error("File is empty or missing headers");
+
+        const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+        const dataLines = lines.slice(1);
+
+        let successCount = 0;
+        let errorCount = 0;
+
+        for (const line of dataLines) {
+          const values = line.split(',').map(v => v.trim());
+          const row = {};
+          headers.forEach((header, index) => {
+            row[header] = values[index];
+          });
+
+          const { employee_id, date, clock_in, clock_out } = row;
+          if (!employee_id || !date || !clock_in) {
+            errorCount++;
+            continue;
+          }
+
+          // Find user by employeeId String field (not Firestore internal ID/UID)
+          const user = allUsers.find(u => String(u.employeeId) === String(employee_id));
+          if (!user) {
+            errorCount++;
+            continue;
+          }
+
+          const empId = user.id; // Internal UID for document naming
+          const roster = rosters.find(r => String(r.employeeId) === String(empId) && r.date === date);
+
+          const result = calculateAttendanceStatus(clock_in, clock_out || null, date, roster, attendanceRules);
+
+          let clockOutDate = date;
+          if (clock_out && clock_out < clock_in) {
+            const nextDay = new Date(date);
+            nextDay.setDate(nextDay.getDate() + 1);
+            clockOutDate = nextDay.toISOString().split('T')[0];
+          }
+
+          const attendanceUpdate = {
+            employeeId: empId,
+            date,
+            clockIn: clock_in,
+            clockOut: clock_out || null,
+            clockOutDate: clock_out ? clockOutDate : null,
+            status: result.status,
+            workHours: result.workHours,
+            workingDays: result.workingDays,
+            overtime: result.overtime,
+            ruleApplied: result.ruleApplied,
+            manualEntry: true,
+            updatedBy: currentUser.id,
+            updatedAt: serverTimestamp()
+          };
+
+          const docId = `${empId}-${date}`;
+          await setDoc(doc(db, 'attendance', docId), attendanceUpdate, { merge: true });
+          successCount++;
+        }
+
+        setAlert({
+          type: errorCount > 0 ? 'warning' : 'success',
+          message: `Import complete: ${successCount} success, ${errorCount} failed.`
+        });
+        setShowBulkModal(false);
+      } catch (error) {
+        console.error("Bulk upload error:", error);
+        setAlert({ type: 'error', message: 'Failed: ' + error.message });
+      } finally {
+        setIsSyncing(false);
+        setTimeout(() => setAlert(null), 5000);
+      }
+    };
+    reader.onerror = () => {
+      setAlert({ type: 'error', message: 'Error reading file.' });
+      setIsSyncing(false);
+    };
+    reader.readAsText(file);
+    // Reset input so same file can be uploaded again if needed
+    event.target.value = '';
   };
 
   const filteredAttendance = useMemo(() => {
@@ -576,6 +691,9 @@ const Attendance = () => {
 
             {currentUser.role !== 'employee' && (
               <div className="flex flex-wrap gap-2 w-full sm:w-auto justify-end">
+                <Button onClick={() => setShowBulkModal(true)} variant="secondary" className="bg-emerald-50 border-emerald-100 text-emerald-700 flex items-center gap-2 py-2 text-xs font-bold uppercase tracking-wider">
+                  <Upload size={16} /> Bulk Import
+                </Button>
                 <Button onClick={() => setShowManualModal(true)} variant="secondary" className="bg-indigo-50 border-indigo-100 text-indigo-700 flex items-center gap-2 py-2 text-xs font-bold uppercase tracking-wider">
                   <FilePlus size={16} /> Mark Attendance
                 </Button>
@@ -690,6 +808,47 @@ const Attendance = () => {
           <Button onClick={handleManualSubmit} className="w-full" disabled={!manualData.employeeIds.length || !manualData.startDate || !manualData.endDate || (!manualData.clockIn && !['PL', 'UPL', 'LWP', 'Absent'].includes(manualData.status)) || isSyncing}>
             {isSyncing ? 'Processing...' : 'Save Attendance'}
           </Button>
+        </div>
+      </Modal>
+
+      <Modal isOpen={showBulkModal} onClose={() => setShowBulkModal(false)} title="Bulk Attendance Import">
+        <div className="space-y-6">
+          <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-xl">
+            <h3 className="text-sm font-bold text-blue-800 dark:text-blue-300 mb-2 uppercase tracking-wide">Instructions</h3>
+            <ul className="text-xs text-blue-700 dark:text-blue-400 space-y-1 list-disc ml-4">
+              <li>Use the provided CSV template for best results.</li>
+              <li>Required columns: <code className="font-bold">employee_id</code>, <code className="font-bold">date</code>, <code className="font-bold">clock_in</code>.</li>
+              <li>Date format: <code className="font-bold">YYYY-MM-DD</code> (e.g., 2026-01-24).</li>
+              <li>Time format: <code className="font-bold">HH:MM</code> (24-hour, e.g., 09:30).</li>
+            </ul>
+          </div>
+
+          <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-2xl bg-gray-50 dark:bg-gray-800/50 hover:border-primary-500 transition-colors">
+            <div className="w-12 h-12 bg-primary-100 dark:bg-primary-900/30 text-primary-600 rounded-full flex items-center justify-center mb-4">
+              <Upload size={24} />
+            </div>
+            <p className="text-sm font-bold text-gray-700 dark:text-white mb-1">Upload CSV File</p>
+            <p className="text-xs text-gray-500 mb-4">Click to browse or drag and drop</p>
+            <input
+              type="file"
+              accept=".csv"
+              onChange={handleBulkUpload}
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+              title=""
+            />
+            <Button variant="primary" className="relative pointer-events-none">
+              Select File
+            </Button>
+          </div>
+
+          <div className="flex justify-between items-center pt-4 border-t border-gray-100 dark:border-gray-800">
+            <Button onClick={handleDownloadTemplate} variant="secondary" className="text-xs font-bold uppercase tracking-wider">
+              <Download size={14} className="mr-2" /> Download Template
+            </Button>
+            <Button onClick={() => setShowBulkModal(false)} variant="secondary" className="text-xs font-bold uppercase tracking-wider">
+              Cancel
+            </Button>
+          </div>
         </div>
       </Modal>
     </div>
