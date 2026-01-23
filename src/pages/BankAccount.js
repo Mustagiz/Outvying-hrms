@@ -8,9 +8,20 @@ const BankAccount = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [alert, setAlert] = useState(null);
   const [selectedEmployee, setSelectedEmployee] = useState(currentUser.role === 'employee' ? String(currentUser.id) : null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [departmentFilter, setDepartmentFilter] = useState('all');
-  const [dateFilter, setDateFilter] = useState('all');
+
+  // Local filter state (UI inputs)
+  const [localFilters, setLocalFilters] = useState({
+    searchTerm: '',
+    departmentFilter: 'all',
+    dateFilter: 'all'
+  });
+
+  // Applied filter state (actual filtering)
+  const [appliedFilters, setAppliedFilters] = useState({
+    searchTerm: '',
+    departmentFilter: 'all',
+    dateFilter: 'all'
+  });
 
   const myBankAccount = useMemo(() => {
     const empId = currentUser.role === 'employee' ? String(currentUser.id) : String(selectedEmployee);
@@ -70,8 +81,8 @@ const BankAccount = () => {
   const downloadCSV = () => {
     const filteredEmployees = allUsers.filter(u => {
       if (u.role !== 'employee' && u.role !== 'hr') return false;
-      if (searchTerm && !u.name.toLowerCase().includes(searchTerm.toLowerCase()) && !u.employeeId.toLowerCase().includes(searchTerm.toLowerCase())) return false;
-      if (departmentFilter !== 'all' && u.department !== departmentFilter) return false;
+      if (appliedFilters.searchTerm && !u.name.toLowerCase().includes(appliedFilters.searchTerm.toLowerCase()) && !u.employeeId.toLowerCase().includes(appliedFilters.searchTerm.toLowerCase())) return false;
+      if (appliedFilters.departmentFilter !== 'all' && u.department !== appliedFilters.departmentFilter) return false;
       return true;
     });
 
@@ -105,6 +116,20 @@ const BankAccount = () => {
     window.URL.revokeObjectURL(url);
   };
 
+  const handleApplyFilters = () => {
+    setAppliedFilters(localFilters);
+  };
+
+  const handleClearFilters = () => {
+    const cleared = {
+      searchTerm: '',
+      departmentFilter: 'all',
+      dateFilter: 'all'
+    };
+    setLocalFilters(cleared);
+    setAppliedFilters(cleared);
+  };
+
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
@@ -134,8 +159,8 @@ const BankAccount = () => {
                 <input
                   type="text"
                   placeholder="Search by name or ID..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  value={localFilters.searchTerm}
+                  onChange={(e) => setLocalFilters({ ...localFilters, searchTerm: e.target.value })}
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 />
               </div>
@@ -144,8 +169,8 @@ const BankAccount = () => {
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Department</label>
               <select
-                value={departmentFilter}
-                onChange={(e) => setDepartmentFilter(e.target.value)}
+                value={localFilters.departmentFilter}
+                onChange={(e) => setLocalFilters({ ...localFilters, departmentFilter: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               >
                 <option value="all">All Departments</option>
@@ -160,8 +185,8 @@ const BankAccount = () => {
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Joined Date</label>
               <select
-                value={dateFilter}
-                onChange={(e) => setDateFilter(e.target.value)}
+                value={localFilters.dateFilter}
+                onChange={(e) => setLocalFilters({ ...localFilters, dateFilter: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               >
                 <option value="all">All Time</option>
@@ -187,19 +212,19 @@ const BankAccount = () => {
                 {allUsers.filter(u => {
                   console.log("BankAccount Debug - Filtering User:", u.name, "Role:", u.role);
                   if (u.role !== 'employee' && u.role !== 'hr') return false;
-                  if (searchTerm && !u.name.toLowerCase().includes(searchTerm.toLowerCase()) && !u.employeeId.toLowerCase().includes(searchTerm.toLowerCase())) return false;
-                  if (departmentFilter !== 'all' && u.department !== departmentFilter) return false;
-                  if (dateFilter !== 'all' && u.dateOfJoining) {
+                  if (appliedFilters.searchTerm && !u.name.toLowerCase().includes(appliedFilters.searchTerm.toLowerCase()) && !u.employeeId.toLowerCase().includes(appliedFilters.searchTerm.toLowerCase())) return false;
+                  if (appliedFilters.departmentFilter !== 'all' && u.department !== appliedFilters.departmentFilter) return false;
+                  if (appliedFilters.dateFilter !== 'all' && u.dateOfJoining) {
                     const joinDate = new Date(u.dateOfJoining);
                     const now = new Date();
-                    if (dateFilter === 'thisMonth' && (joinDate.getMonth() !== now.getMonth() || joinDate.getFullYear() !== now.getFullYear())) return false;
-                    if (dateFilter === 'lastMonth') {
+                    if (appliedFilters.dateFilter === 'thisMonth' && (joinDate.getMonth() !== now.getMonth() || joinDate.getFullYear() !== now.getFullYear())) return false;
+                    if (appliedFilters.dateFilter === 'lastMonth') {
                       const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1);
                       if (joinDate.getMonth() !== lastMonth.getMonth() || joinDate.getFullYear() !== lastMonth.getFullYear()) return false;
                     }
-                    if (dateFilter === 'last3Months' && joinDate < new Date(now.setMonth(now.getMonth() - 3))) return false;
-                    if (dateFilter === 'last6Months' && joinDate < new Date(now.setMonth(now.getMonth() - 6))) return false;
-                    if (dateFilter === 'thisYear' && joinDate.getFullYear() !== new Date().getFullYear()) return false;
+                    if (appliedFilters.dateFilter === 'last3Months' && joinDate < new Date(now.setMonth(now.getMonth() - 3))) return false;
+                    if (appliedFilters.dateFilter === 'last6Months' && joinDate < new Date(now.setMonth(now.getMonth() - 6))) return false;
+                    if (appliedFilters.dateFilter === 'thisYear' && joinDate.getFullYear() !== new Date().getFullYear()) return false;
                   }
                   return true;
                 }).map(emp => (
@@ -207,6 +232,16 @@ const BankAccount = () => {
                 ))}
               </select>
             </div>
+          </div>
+
+          <div className="flex gap-2 mt-4">
+            <Button onClick={handleApplyFilters} variant="primary" className="flex-1">
+              <Search size={16} className="inline mr-2" />
+              Apply Filters
+            </Button>
+            <Button onClick={handleClearFilters} variant="secondary">
+              Clear
+            </Button>
           </div>
         </Card>
       )}
