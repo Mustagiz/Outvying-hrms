@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Card, Button, Table, Alert, Select, Modal } from '../components/UI';
-import { Clock, Calendar, ChevronLeft, ChevronRight, TrendingUp } from 'lucide-react';
+import { Clock, Calendar, ChevronLeft, ChevronRight, TrendingUp, Search, Download, RefreshCw, FilePlus, Wrench, RotateCcw } from 'lucide-react';
 import { formatDate, getStatusColor, exportToCSV, getYearOptions } from '../utils/helpers';
 
 import { calculateAttendanceStatus } from '../utils/biometricSync';
@@ -38,6 +38,20 @@ const Attendance = () => {
   const handleApplyFilters = () => {
     setAppliedFilters(localFilters);
     setCurrentPage(1); // Reset to first page
+  };
+
+  const handleClearFilters = () => {
+    const freshFilters = {
+      month: new Date().getMonth(),
+      year: new Date().getFullYear(),
+      startDate: '',
+      endDate: '',
+      employee: currentUser.role === 'employee' ? String(currentUser.id) : 'all',
+      status: 'all'
+    };
+    setLocalFilters(freshFilters);
+    setAppliedFilters(freshFilters);
+    setCurrentPage(1);
   };
 
   // Manual Attendance State
@@ -525,111 +539,166 @@ const Attendance = () => {
         </Card>
       </div>
 
-      <Card title="Attendance History">
-        <div className="mb-4">
-          <div className="flex flex-wrap gap-4 mb-4 items-end">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Start Date</label>
-              <input
-                type="date"
-                value={localFilters.startDate}
-                onChange={(e) => setLocalFilters({ ...localFilters, startDate: e.target.value })}
-                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">End Date</label>
-              <input
-                type="date"
-                value={localFilters.endDate}
-                onChange={(e) => setLocalFilters({ ...localFilters, endDate: e.target.value })}
-                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              />
-            </div>
-            <Select
-              label="Month"
-              value={localFilters.month}
-              onChange={(e) => setLocalFilters({ ...localFilters, month: parseInt(e.target.value) })}
-              options={monthOptions}
-            />
-            <Select
-              label="Year"
-              value={localFilters.year}
-              onChange={(e) => setLocalFilters({ ...localFilters, year: parseInt(e.target.value) })}
-              options={yearOptions}
-            />
-            {currentUser.role !== 'employee' && (
-              <>
+      <Card title="Attendance History Records" className="border-gray-100 dark:border-gray-800/50 shadow-xl">
+        <div className="space-y-6">
+          {/* Enhanced Filter Section */}
+          <div className="p-5 bg-gray-50/50 dark:bg-gray-800/40 rounded-2xl border border-gray-100 dark:border-gray-700/50">
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+              <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-400 dark:text-gray-500 mb-1 uppercase tracking-widest pl-1">Start Date</label>
+                  <input
+                    type="date"
+                    value={localFilters.startDate}
+                    onChange={(e) => setLocalFilters({ ...localFilters, startDate: e.target.value })}
+                    className="w-full px-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-primary-500/20 text-sm font-medium transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-400 dark:text-gray-500 mb-1 uppercase tracking-widest pl-1">End Date</label>
+                  <input
+                    type="date"
+                    value={localFilters.endDate}
+                    onChange={(e) => setLocalFilters({ ...localFilters, endDate: e.target.value })}
+                    className="w-full px-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-primary-500/20 text-sm font-medium transition-all"
+                  />
+                </div>
+              </div>
+
+              <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Select
-                  label="Employee"
-                  value={localFilters.employee}
-                  onChange={(e) => setLocalFilters({ ...localFilters, employee: e.target.value })}
-                  options={employeeOptions}
+                  label="Month Selection"
+                  value={localFilters.month}
+                  onChange={(e) => setLocalFilters({ ...localFilters, month: parseInt(e.target.value) })}
+                  options={monthOptions}
+                  className="mb-0"
                 />
                 <Select
-                  label="Status"
-                  value={localFilters.status}
-                  onChange={(e) => setLocalFilters({ ...localFilters, status: e.target.value })}
-                  options={statusOptions}
+                  label="Year Selection"
+                  value={localFilters.year}
+                  onChange={(e) => setLocalFilters({ ...localFilters, year: parseInt(e.target.value) })}
+                  options={yearOptions}
+                  className="mb-0"
                 />
-              </>
-            )}
-            <Button
-              onClick={handleApplyFilters}
-              variant="primary"
-              className="mb-[2px]" // align with inputs
-            >
-              Apply Filters
-            </Button>
+              </div>
+
+              {currentUser.role !== 'employee' && (
+                <div className="lg:col-span-4 grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
+                  <Select
+                    label="Search Employee"
+                    value={localFilters.employee}
+                    onChange={(e) => setLocalFilters({ ...localFilters, employee: e.target.value })}
+                    options={employeeOptions}
+                    className="mb-0"
+                  />
+                  <Select
+                    label="Filter Status"
+                    value={localFilters.status}
+                    onChange={(e) => setLocalFilters({ ...localFilters, status: e.target.value })}
+                    options={statusOptions}
+                    className="mb-0"
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={handleApplyFilters}
+                      variant="primary"
+                      className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl shadow-lg shadow-primary-500/20"
+                    >
+                      <Search size={18} />
+                      Apply
+                    </Button>
+                    <Button
+                      onClick={handleClearFilters}
+                      variant="secondary"
+                      className="flex items-center justify-center gap-2 py-2.5 rounded-xl border-gray-200 dark:border-gray-700"
+                    >
+                      <RotateCcw size={18} />
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {currentUser.role === 'employee' && (
+                <div className="lg:col-span-4 flex justify-end gap-2">
+                  <Button
+                    onClick={handleApplyFilters}
+                    variant="primary"
+                    className="px-8 flex items-center gap-2 py-2.5 rounded-xl shadow-lg shadow-primary-500/20"
+                  >
+                    <Search size={18} />
+                    Filter History
+                  </Button>
+                  <Button
+                    onClick={handleClearFilters}
+                    variant="secondary"
+                    className="flex items-center justify-center gap-2 py-2.5 rounded-xl"
+                  >
+                    <RotateCcw size={18} />
+                    Reset
+                  </Button>
+                </div>
+              )}
+            </div>
           </div>
-          <div className="flex flex-wrap gap-4">
-            <Button
-              onClick={() => {
-                const csvData = filteredAttendance.map(a => {
-                  const user = allUsers.find(u => String(u.id) === String(a.employeeId));
-                  return {
-                    Date: formatDate(a.date),
-                    'Employee Name': user?.name || 'Unknown',
-                    'Employee ID': user?.employeeId || 'N/A',
-                    'Clock In': a.clockIn || 'N/A',
-                    'Clock Out': a.clockOut || 'N/A',
-                    'Work Hours': `${a.workHours || 0}h`,
-                    'Overtime': `${a.overtime || 0}h`,
-                    Status: a.status,
-                    'Rule Applied': a.ruleApplied || 'Standard'
-                  };
-                });
-                exportToCSV(csvData, 'attendance_report');
-              }}
-              variant="secondary"
-            >
-              Export to CSV
-            </Button>
+
+          {/* Premium Utility Bar */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-2">
+            <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+              <Button
+                onClick={() => {
+                  const csvData = filteredAttendance.map(a => {
+                    const user = allUsers.find(u => String(u.id) === String(a.employeeId));
+                    return {
+                      Date: formatDate(a.date),
+                      'Employee Name': user?.name || 'Unknown',
+                      'Employee ID': user?.employeeId || 'N/A',
+                      'Clock In': a.clockIn || 'N/A',
+                      'Clock Out': a.clockOut || 'N/A',
+                      'Work Hours': `${a.workHours || 0}h`,
+                      'Overtime': `${a.overtime || 0}h`,
+                      Status: a.status,
+                      'Rule Applied': a.ruleApplied || 'Standard'
+                    };
+                  });
+                  exportToCSV(csvData, 'attendance_report');
+                }}
+                variant="secondary"
+                className="flex items-center gap-2 py-2 text-xs font-bold uppercase tracking-wider"
+              >
+                <Download size={16} />
+                Export CSV
+              </Button>
+            </div>
+
             {currentUser.role !== 'employee' && (
-              <>
+              <div className="flex flex-wrap gap-2 w-full sm:w-auto justify-end">
                 <Button
                   onClick={() => setShowManualModal(true)}
                   variant="secondary"
-                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                  className="bg-indigo-50 border-indigo-100 text-indigo-700 hover:bg-indigo-100 flex items-center gap-2 py-2 text-xs font-bold uppercase tracking-wider"
                 >
+                  <FilePlus size={16} />
                   Mark Attendance
                 </Button>
                 <Button
                   onClick={handleFixRecords}
                   loading={isSyncing}
-                  variant="danger"
-                  className="bg-red-600 hover:bg-red-700 text-white"
+                  variant="secondary"
+                  className="bg-red-50 border-red-100 text-red-700 hover:bg-red-100 flex items-center gap-2 py-2 text-xs font-bold uppercase tracking-wider"
                 >
-                  Fix Invalid Records
+                  <Wrench size={16} />
+                  Fix Records
                 </Button>
                 <Button
                   onClick={handleSyncBiometric}
                   loading={isSyncing}
                   variant="primary"
+                  className="flex items-center gap-2 py-2 text-xs font-bold uppercase tracking-wider shadow-md shadow-primary-500/10"
                 >
-                  Sync Biometric Data
+                  <RefreshCw size={16} className={`${isSyncing ? 'animate-spin' : ''}`} />
+                  Sync Biometric
                 </Button>
-              </>
+              </div>
             )}
           </div>
         </div>
