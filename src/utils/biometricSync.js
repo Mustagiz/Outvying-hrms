@@ -45,10 +45,16 @@ export const calculateAttendanceStatus = (clockIn, clockOut, date = null, roster
   const shiftStartTime = roster?.startTime || '09:00';
   const [shiftHour, shiftMin] = shiftStartTime.split(':').map(Number);
   const shiftStartInMinutes = shiftHour * 60 + shiftMin;
-  const gracePeriod = roster?.gracePeriod || defaultRule.gracePeriodMins;
+  const gracePeriod = Number(roster?.gracePeriod ?? defaultRule.gracePeriodMins);
+
+  // Normalize Clock In (truncate seconds if present)
+  let normalizedClockIn = clockIn;
+  if (clockIn && clockIn.split(':').length > 2) {
+    normalizedClockIn = clockIn.split(':').slice(0, 2).join(':');
+  }
 
   // Latency check in regional time
-  const istTimestamp = new Date(`${istDate}T${clockIn}:00+05:30`);
+  const istTimestamp = new Date(`${istDate}T${normalizedClockIn}:00+05:30`);
   const regionalFormat = new Intl.DateTimeFormat('en-US', {
     timeZone: timezone,
     hour: '2-digit',
@@ -59,7 +65,7 @@ export const calculateAttendanceStatus = (clockIn, clockOut, date = null, roster
   const [regH, regM] = regionalFormat.split(':').map(Number);
   const clockInInMinutes = regH * 60 + regM;
 
-  let status = clockInInMinutes > (shiftStartInMinutes + gracePeriod) ? 'Late' : 'Present';
+  let status = Number(clockInInMinutes) > (Number(shiftStartInMinutes) + Number(gracePeriod)) ? 'Late' : 'Present';
   let workingDays = 0;
   let workHours = 0;
   let overtime = 0;
