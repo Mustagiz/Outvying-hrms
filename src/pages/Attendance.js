@@ -823,7 +823,7 @@ const Attendance = () => {
             </ul>
           </div>
 
-          <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-2xl bg-gray-50 dark:bg-gray-800/50 hover:border-primary-500 transition-colors">
+          <div className="relative flex flex-col items-center justify-center p-8 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-2xl bg-gray-50 dark:bg-gray-800/50 hover:border-primary-500 transition-colors">
             <div className="w-12 h-12 bg-primary-100 dark:bg-primary-900/30 text-primary-600 rounded-full flex items-center justify-center mb-4">
               <Upload size={24} />
             </div>
