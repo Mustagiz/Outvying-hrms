@@ -169,7 +169,20 @@ const Payroll = () => {
   };
 
   const handleAddLoan = async () => {
-    if (!selectedEmployee || !newLoan.amount) return;
+    if (!selectedEmployee) {
+      setAlert({ type: 'error', message: 'Please select an employee' });
+      return;
+    }
+    if (!newLoan.amount || parseFloat(newLoan.amount) <= 0) {
+      setAlert({ type: 'error', message: 'Please enter a valid amount' });
+      return;
+    }
+    if (!newLoan.duration || parseInt(newLoan.duration) <= 0) {
+      setAlert({ type: 'error', message: 'Please enter a valid duration' });
+      return;
+    }
+
+    setIsProcessing(true);
     try {
       await addDoc(collection(db, 'payrollLoans'), {
         employeeId: selectedEmployee.id, employeeName: selectedEmployee.name,
@@ -177,8 +190,13 @@ const Payroll = () => {
       });
       setAlert({ type: 'success', message: 'Loan entry created' });
       setShowLoanModal(false);
+      setNewLoan({ amount: '', duration: '12', reason: '', interest: '0' });
       fetchLoans();
-    } catch (e) { setAlert({ type: 'error', message: e.message }); }
+    } catch (e) {
+      setAlert({ type: 'error', message: 'Failed to create loan: ' + e.message });
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleAddClaim = async () => {
@@ -321,7 +339,13 @@ const Payroll = () => {
       {activeTab === 'loans' && (
         <Card title="Company Loans">
           <div className="flex justify-between items-center mb-6">
-            <Button onClick={() => setShowLoanModal(true)}><Plus size={16} className="mr-2" /> New Loan</Button>
+            <Button onClick={() => {
+              setSelectedEmployee(null);
+              setNewLoan({ amount: '', duration: '12', reason: '', interest: '0' });
+              setShowLoanModal(true);
+            }}>
+              <Plus size={16} className="mr-2" /> New Loan
+            </Button>
           </div>
           <Table columns={[
             { header: 'Employee', accessor: 'employeeName' },
@@ -336,7 +360,13 @@ const Payroll = () => {
       {activeTab === 'reimbursements' && (
         <Card title="Expense Claims">
           <div className="flex justify-between items-center mb-6">
-            <Button onClick={() => setShowReimbursementModal(true)}><Plus size={16} className="mr-2" /> Log Claim</Button>
+            <Button onClick={() => {
+              setSelectedEmployee(null);
+              setNewClaim({ amount: '', type: 'Travel', reason: '' });
+              setShowReimbursementModal(true);
+            }}>
+              <Plus size={16} className="mr-2" /> Log Claim
+            </Button>
           </div>
           <Table columns={[
             { header: 'Category', accessor: 'type' },
