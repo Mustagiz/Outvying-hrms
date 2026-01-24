@@ -49,7 +49,7 @@ const Payroll = () => {
   const [newClaim, setNewClaim] = useState({ amount: '', type: 'Travel', reason: '' });
   const [selectedProcessMonth, setSelectedProcessMonth] = useState('January 2026');
   const [newComp, setNewComp] = useState({ name: '', value: '' });
-  const [optInPF, setOptInPF] = useState(true);
+  const [deductionToggles, setDeductionToggles] = useState({ pf: true, esi: true, tds: true, pt: true });
   const itemsPerPage = 10;
 
   const [adjustmentData, setAdjustmentData] = useState({
@@ -107,7 +107,7 @@ const Payroll = () => {
     return { effectiveDays, totalDays };
   };
 
-  const calculateBreakdown = (totalCtc, optIn = true) => {
+  const calculateBreakdown = (totalCtc, toggles = { pf: true, esi: true, tds: true, pt: true }) => {
     const annual = parseFloat(totalCtc) || 0;
     const monthly = annual / 12;
 
@@ -121,12 +121,15 @@ const Payroll = () => {
     });
 
     const pfBasic = Math.min(parseFloat(components.basic || 0), taxConfig.pfCeiling);
-    const pfEmployee = optIn ? pfBasic * (taxConfig.pfEmployee / 100) : 0;
-    const pfEmployer = optIn ? pfBasic * (taxConfig.pfEmployer / 100) : 0;
+    const pfEmployee = (toggles.pf !== false) ? pfBasic * (taxConfig.pfEmployee / 100) : 0;
+    const pfEmployer = (toggles.pf !== false) ? pfBasic * (taxConfig.pfEmployer / 100) : 0;
+
     const esiApplicable = grossSalary <= taxConfig.esiCeiling;
-    const esiEmployee = esiApplicable ? (grossSalary * (taxConfig.esiEmployee / 100)) : 0;
-    const esiEmployer = esiApplicable ? (grossSalary * (taxConfig.esiEmployer / 100)) : 0;
-    const professionalTax = taxConfig.professionalTax;
+    const esiEmployee = (toggles.esi !== false && esiApplicable) ? (grossSalary * (taxConfig.esiEmployee / 100)) : 0;
+    const esiEmployer = (toggles.esi !== false && esiApplicable) ? (grossSalary * (taxConfig.esiEmployer / 100)) : 0;
+
+    const professionalTax = (toggles.pt !== false) ? taxConfig.professionalTax : 0;
+
     const annualGross = grossSalary * 12;
     const taxableIncome = annualGross - (pfEmployee * 12) - 50000;
     let tds = 0;
@@ -136,7 +139,8 @@ const Payroll = () => {
     else if (taxableIncome > 600000) tds = (taxableIncome - 600000) * 0.10 + 52500;
     else if (taxableIncome > 300000) tds = (taxableIncome - 300000) * 0.05 + 12500;
     else if (taxableIncome > 250000) tds = (taxableIncome - 250000) * 0.05;
-    const monthlyTds = taxConfig.tdsEnabled ? (tds / 12) : 0;
+
+    const monthlyTds = (toggles.tds !== false && taxConfig.tdsEnabled) ? (tds / 12) : 0;
     const totalDeductions = pfEmployee + esiEmployee + professionalTax + monthlyTds;
     const netSalary = grossSalary - totalDeductions;
     const employerCost = monthly + pfEmployer + esiEmployer;
@@ -195,7 +199,10 @@ const Payroll = () => {
       });
       if (adjustmentData.type === 'Increment') {
         const newCtc = (selectedEmployee.ctc || 0) + parseFloat(adjustmentData.amount);
-        await updateUser(selectedEmployee.id, { ctc: newCtc, salaryBreakdown: calculateBreakdown(newCtc, selectedEmployee.optInPF !== false) });
+        await updateUser(selectedEmployee.id, {
+          ctc: newCtc,
+          salaryBreakdown: calculateBreakdown(newCtc, selectedEmployee.deductionToggles || { pf: true, esi: true, tds: true, pt: true })
+        });
       }
       setAlert({ type: 'success', message: 'Adjustment applied!' });
       fetchHistory(selectedEmployee.id);
@@ -330,7 +337,7 @@ const Payroll = () => {
           <Button onClick={() => {
             setSelectedEmployee(row);
             setCtc(row.ctc || '');
-            setOptInPF(row.optInPF !== false);
+            setDeductionToggles(row.deductionToggles || { pf: true, esi: true, tds: true, pt: true });
             setShowModal(true);
           }} variant="secondary" className="p-1.5 h-7 w-7" title="Edit CTC"><Edit size={12} /></Button>
           <Button onClick={() => { setSelectedEmployee(row); fetchHistory(row.id); setShowHistoryModal(true); }} variant="secondary" className="p-1.5 h-7 w-7 text-blue-600" title="Adjustments"><History size={12} /></Button>
@@ -345,10 +352,10 @@ const Payroll = () => {
   ];
 
   const handleAssignCTC = async () => {
-    const breakdown = calculateBreakdown(ctc, optInPF);
+    const breakdown = calculateBreakdown(ctc, deductionToggles);
     await updateUser(selectedEmployee.id, {
       ctc: parseFloat(ctc),
-      optInPF: optInPF,
+      deductionToggles: deductionToggles,
       salaryBreakdown: breakdown
     });
     setShowModal(false); setAlert({ type: 'success', message: 'Structure Updated' });
@@ -601,17 +608,27 @@ const Payroll = () => {
               <input type="number" value={ctc} onChange={e => setCtc(e.target.value)} className="w-full text-2xl font-black p-4 bg-gray-50 border-none rounded-[1.2rem] focus:ring-4 focus:ring-primary-100 transition-all outline-none" placeholder="00,00,000" />
             </div>
 
-            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-transparent hover:border-gray-100 transition-all">
-              <div>
-                <p className="text-xs font-bold text-gray-900">Provident Fund (PF) Opt-in</p>
-                <p className="text-[10px] text-gray-400">Statutory 12% deduction from basic salary</p>
-              </div>
-              <button
-                onClick={() => setOptInPF(!optInPF)}
-                className={`w-12 h-6 rounded-full transition-all relative ${optInPF ? 'bg-primary-600' : 'bg-gray-300'}`}
-              >
-                <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${optInPF ? 'left-7' : 'left-1'}`} />
-              </button>
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { id: 'pf', label: 'Provident Fund (PF)', sub: '12% statutory' },
+                { id: 'esi', label: 'ESI State Ins.', sub: '0.75% contribution' },
+                { id: 'tds', label: 'Income Tax (TDS)', sub: 'Based on slab' },
+                { id: 'pt', label: 'Prof. TAX (PT)', sub: 'Monthly fixed' }
+              ].map(d => (
+                <div key={d.id} className="p-3 bg-gray-50 rounded-2xl border border-transparent hover:border-gray-100 transition-all">
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-[10px] font-black text-gray-900 uppercase">{d.id}</p>
+                    <button
+                      onClick={() => setDeductionToggles({ ...deductionToggles, [d.id]: !deductionToggles[d.id] })}
+                      className={`w-8 h-4 rounded-full transition-all relative ${deductionToggles[d.id] ? 'bg-primary-600' : 'bg-gray-300'}`}
+                    >
+                      <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${deductionToggles[d.id] ? 'left-4.5' : 'left-0.5'}`} />
+                    </button>
+                  </div>
+                  <p className="text-[10px] font-bold text-gray-800 leading-tight">{d.label}</p>
+                  <p className="text-[8px] text-gray-400 uppercase tracking-tighter mt-0.5">{d.sub}</p>
+                </div>
+              ))}
             </div>
           </div>
           <Button onClick={handleAssignCTC} className="w-full py-5 text-lg font-black tracking-tight shadow-xl shadow-primary-500/20">Apply New Package</Button>
@@ -709,24 +726,30 @@ const Payroll = () => {
             <p className="text-lg font-black text-gray-900">{selectedEmployee?.name}</p>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            {(!selectedEmployee || selectedEmployee.optInPF !== false) && (
+            {(selectedEmployee?.deductionToggles?.pf !== false) && (
               <div className="p-4 border border-gray-100 rounded-2xl">
                 <p className="text-[10px] font-bold text-gray-400 uppercase">Provider Fund (PF)</p>
                 <p className="text-xl font-black text-gray-900">₹{parseFloat(selectedEmployee?.salaryBreakdown?.pfEmployee || 0).toLocaleString()}</p>
               </div>
             )}
-            <div className="p-4 border border-gray-100 rounded-2xl">
-              <p className="text-[10px] font-bold text-gray-400 uppercase">State Insurance (ESI)</p>
-              <p className="text-xl font-black text-gray-900">₹{parseFloat(selectedEmployee?.salaryBreakdown?.esiEmployee || 0).toLocaleString()}</p>
-            </div>
-            <div className="p-4 border border-gray-100 rounded-2xl">
-              <p className="text-[10px] font-bold text-gray-400 uppercase">Prof. TAX (PT)</p>
-              <p className="text-xl font-black text-gray-900">₹{parseFloat(selectedEmployee?.salaryBreakdown?.professionalTax || 0).toLocaleString()}</p>
-            </div>
-            <div className="p-4 border border-gray-100 rounded-2xl bg-amber-50 border-amber-100">
-              <p className="text-[10px] font-bold text-amber-600 uppercase">Income Tax (TDS)</p>
-              <p className="text-xl font-black text-amber-900">₹{parseFloat(selectedEmployee?.salaryBreakdown?.tds || 0).toLocaleString()}</p>
-            </div>
+            {(selectedEmployee?.deductionToggles?.esi !== false) && (
+              <div className="p-4 border border-gray-100 rounded-2xl">
+                <p className="text-[10px] font-bold text-gray-400 uppercase">State Insurance (ESI)</p>
+                <p className="text-xl font-black text-gray-900">₹{parseFloat(selectedEmployee?.salaryBreakdown?.esiEmployee || 0).toLocaleString()}</p>
+              </div>
+            )}
+            {(selectedEmployee?.deductionToggles?.pt !== false) && (
+              <div className="p-4 border border-gray-100 rounded-2xl">
+                <p className="text-[10px] font-bold text-gray-400 uppercase">Prof. TAX (PT)</p>
+                <p className="text-xl font-black text-gray-900">₹{parseFloat(selectedEmployee?.salaryBreakdown?.professionalTax || 0).toLocaleString()}</p>
+              </div>
+            )}
+            {(selectedEmployee?.deductionToggles?.tds !== false) && (
+              <div className="p-4 border border-gray-100 rounded-2xl bg-amber-50 border-amber-100">
+                <p className="text-[10px] font-bold text-amber-600 uppercase">Income Tax (TDS)</p>
+                <p className="text-xl font-black text-amber-900">₹{parseFloat(selectedEmployee?.salaryBreakdown?.tds || 0).toLocaleString()}</p>
+              </div>
+            )}
           </div>
           <div className="p-5 bg-red-50 rounded-2xl border border-red-100 flex justify-between items-center">
             <p className="font-bold text-red-900">Total Deductions</p>
