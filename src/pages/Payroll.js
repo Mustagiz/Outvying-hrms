@@ -59,7 +59,7 @@ const Payroll = () => {
   const [template, setTemplate] = useState(() => {
     const saved = localStorage.getItem('salaryTemplate');
     return saved ? JSON.parse(saved) : {
-      basic: 40, hra: 16, medical: 4, transport: 8.6, special: 15.4, lta: 8, food: 8
+      basic: 40, hra: 16, medical: 4, transport: 8.6, special: 15.4, shiftAllowance: 8, attendanceAllowance: 8
     };
   });
 
@@ -89,9 +89,9 @@ const Payroll = () => {
     const medical = monthly * (template.medical / 100);
     const transport = monthly * (template.transport / 100);
     const special = monthly * (template.special / 100);
-    const lta = monthly * (template.lta / 100);
-    const food = monthly * (template.food / 100);
-    const grossSalary = basic + hra + medical + transport + special + lta + food;
+    const shiftAllowance = monthly * (template.shiftAllowance / 100);
+    const attendanceAllowance = monthly * (template.attendanceAllowance / 100);
+    const grossSalary = basic + hra + medical + transport + special + shiftAllowance + attendanceAllowance;
     const pfBasic = Math.min(basic, taxConfig.pfCeiling);
     const pfEmployee = pfBasic * (taxConfig.pfEmployee / 100);
     const pfEmployer = pfBasic * (taxConfig.pfEmployer / 100);
@@ -114,7 +114,7 @@ const Payroll = () => {
     const employerCost = monthly + pfEmployer + esiEmployer;
     return {
       basic: basic.toFixed(2), hra: hra.toFixed(2), medical: medical.toFixed(2), transport: transport.toFixed(2),
-      special: special.toFixed(2), lta: lta.toFixed(2), food: food.toFixed(2), grossSalary: grossSalary.toFixed(2),
+      special: special.toFixed(2), shiftAllowance: shiftAllowance.toFixed(2), attendanceAllowance: attendanceAllowance.toFixed(2), grossSalary: grossSalary.toFixed(2),
       pfEmployee: pfEmployee.toFixed(2), pfEmployer: pfEmployer.toFixed(2), esiEmployee: esiEmployee.toFixed(2),
       esiEmployer: esiEmployer.toFixed(2), professionalTax: professionalTax.toFixed(2), tds: monthlyTds.toFixed(2),
       totalDeductions: totalDeductions.toFixed(2), netSalary: netSalary.toFixed(2), monthly: monthly.toFixed(2),
@@ -313,8 +313,8 @@ const Payroll = () => {
       ['House Rent Allowance (HRA)', b.hra],
       ['Medical Allowance', b.medical],
       ['Transportation Allowance (TA)', b.transport],
-      ['Shift Allowance', '0.00'],
-      ['Attendance Allowance', '0.00']
+      ['Shift Allowance', b.shiftAllowance],
+      ['Attendance Allowance', b.attendanceAllowance]
     ];
 
     const deductions = [
@@ -613,7 +613,22 @@ const Payroll = () => {
       </Modal>
 
       <Modal isOpen={showTemplateModal} onClose={() => setShowTemplateModal(false)} title="Salary Percentages">
-        <div className="space-y-3">{Object.keys(template).map(k => <div key={k}><label className="text-xs uppercase font-bold">{k}%</label><input type="number" value={template[k]} onChange={e => setTemplate({ ...template, [k]: parseFloat(e.target.value) })} className="w-full p-2 border rounded-xl" /></div>)}<Button onClick={handleSaveTemplate} className="w-full">Save</Button></div>
+        <div className="space-y-3">
+          {Object.keys(template).map(k => (
+            <div key={k}>
+              <label className="text-xs uppercase font-bold">
+                {k.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}%
+              </label>
+              <input
+                type="number"
+                value={template[k]}
+                onChange={e => setTemplate({ ...template, [k]: parseFloat(e.target.value) })}
+                className="w-full p-2 border rounded-xl"
+              />
+            </div>
+          ))}
+          <Button onClick={handleSaveTemplate} className="w-full">Save Policy</Button>
+        </div>
       </Modal>
 
       <Modal isOpen={showTaxModal} onClose={() => setShowTaxModal(false)} title="Tax Rules">
