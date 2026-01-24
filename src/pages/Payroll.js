@@ -28,7 +28,7 @@ ChartJS.register(
 );
 
 const Payroll = () => {
-  const { allUsers, updateUser, currentUser, allBankAccounts } = useAuth();
+  const { allUsers, updateUser, currentUser, allBankAccounts, attendance } = useAuth();
   const [activeTab, setActiveTab] = useState('employees');
   const [showModal, setShowModal] = useState(false);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
@@ -40,6 +40,7 @@ const Payroll = () => {
   const [alert, setAlert] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [showDeductionModal, setShowDeductionModal] = useState(false);
   const [loans, setLoans] = useState([]);
   const [reimbursements, setReimbursements] = useState([]);
   const [showLoanModal, setShowLoanModal] = useState(false);
@@ -79,6 +80,31 @@ const Payroll = () => {
 
   const totalPages = Math.ceil(filteredEmployees.length / itemsPerPage);
   const paginatedEmployees = filteredEmployees.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+  const getEmployeeWorkDays = (empId, monthStr) => {
+    const [monthName, year] = monthStr.split(' ');
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    const monthNum = months.indexOf(monthName);
+
+    // Total days in month
+    const totalDays = new Date(year, monthNum + 1, 0).getDate();
+
+    // Filter attendance for this employee and month
+    const records = attendance.filter(a => {
+      const d = new Date(a.date);
+      return String(a.employeeId) === String(empId) && d.getMonth() === monthNum && d.getFullYear() === parseInt(year);
+    });
+
+    // Calculate effective days
+    const effectiveDays = records.reduce((sum, rec) => {
+      if (rec.status === 'Present') return sum + 1;
+      if (rec.status === 'Late') return sum + 1;
+      if (rec.status === 'Half Day') return sum + 0.5;
+      return sum;
+    }, 0);
+
+    return { effectiveDays, totalDays };
+  };
 
   const calculateBreakdown = (totalCtc) => {
     const annual = parseFloat(totalCtc) || 0;
@@ -235,6 +261,8 @@ const Payroll = () => {
     if (!b) return alert('No salary breakdown assigned!');
     const bank = allBankAccounts.find(ba => String(ba.userId) === String(emp.id)) || {};
     const daysInMonth = new Date(year, ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].indexOf(monthName) + 1, 0).getDate();
+    const { effectiveDays } = getEmployeeWorkDays(emp.id, `${monthName} ${year}`);
+    const workDays = effectiveDays || daysInMonth;
 
     doc.setFont('helvetica', 'bold'); doc.setFontSize(22); doc.setTextColor(0);
     doc.text('Outvying Media Solution Pvt Ltd.', 105, 20, { align: 'center' });
@@ -253,7 +281,7 @@ const Payroll = () => {
       ['Bank Name', bank.bankName || '-', 'Bank Account No.', bank.accountNumber || '-'],
       ['IFSC Code', bank.ifscCode || '-', 'ESI No.', '-'],
       ['PAN Number', emp.panNumber || 'ABCDE1234F'],
-      ['Days In Month', daysInMonth.toString(), 'Effective Work Days', '31']
+      ['Days In Month', daysInMonth.toString(), 'Effective Work Days', workDays.toString()]
     ];
     infoFields.forEach((row) => {
       doc.setFont('helvetica', 'bold'); doc.text(row[0], leftX, currentY);
@@ -273,11 +301,16 @@ const Payroll = () => {
     const deductions = [['Tax (TDS)', b.tds], ['Professional TAX', b.professionalTax], ['ESI', b.esiEmployee]];
     const rowCount = Math.max(earnings.length, deductions.length);
     for (let i = 0; i < rowCount; i++) {
-      if (earnings[i]) { doc.text(earnings[i][0], 22, currentY); doc.text(parseFloat(earnings[i][1]).toFixed(2), 105, currentY, { align: 'right' }); }
+      if (earnings[i]) {
+        doc.text(earnings[i][0], 22, currentY);
+        const actualVal = (parseFloat(earnings[i][1] || 0) * (workDays / daysInMonth)).toFixed(2);
+        doc.text(actualVal, 105, currentY, { align: 'right' });
+      }
       if (deductions[i]) { doc.text(deductions[i][0], 112, currentY); doc.text(parseFloat(deductions[i][1]).toFixed(2), 188, currentY, { align: 'right' }); }
       currentY += lineGap;
     }
-    const finalEarnings = parseFloat(b.grossSalary).toFixed(2); const totalDeds = parseFloat(b.totalDeductions).toFixed(2);
+    const finalEarnings = (parseFloat(b.grossSalary) * (workDays / daysInMonth)).toFixed(2);
+    const totalDeds = parseFloat(b.totalDeductions).toFixed(2);
     doc.line(20, currentY - 2, 190, currentY - 2); doc.setFont('helvetica', 'bold'); doc.text('Total Earnings', 22, currentY); doc.text(finalEarnings, 105, currentY, { align: 'right' }); doc.text('Total Deduction', 112, currentY); doc.text(totalDeds, 188, currentY, { align: 'right' });
     currentY += 10; doc.setFontSize(11); doc.text(`Net Pay for the month (Total Earnings - Total Dedutions):`, 22, currentY); doc.setFontSize(14);
     const net = (parseFloat(finalEarnings) - parseFloat(totalDeds)).toFixed(2); doc.text(`₹ ${net}`, 188, currentY, { align: 'right' });
@@ -293,9 +326,13 @@ const Payroll = () => {
       header: 'Actions',
       render: (row) => (
         <div className="flex gap-1">
-          <Button onClick={() => { setSelectedEmployee(row); setCtc(row.ctc || ''); setShowModal(true); }} variant="secondary" className="p-1.5 h-7 w-7"><Edit size={12} /></Button>
-          <Button onClick={() => { setSelectedEmployee(row); fetchHistory(row.id); setShowHistoryModal(true); }} variant="secondary" className="p-1.5 h-7 w-7 text-blue-600"><History size={12} /></Button>
-          <Button onClick={() => generatePayslip(row, 'January', '2026')} variant="secondary" className="p-1.5 h-7 w-7 text-emerald-600"><Download size={12} /></Button>
+          <Button onClick={() => { setSelectedEmployee(row); setCtc(row.ctc || ''); setShowModal(true); }} variant="secondary" className="p-1.5 h-7 w-7" title="Edit CTC"><Edit size={12} /></Button>
+          <Button onClick={() => { setSelectedEmployee(row); fetchHistory(row.id); setShowHistoryModal(true); }} variant="secondary" className="p-1.5 h-7 w-7 text-blue-600" title="Adjustments"><History size={12} /></Button>
+          <Button onClick={() => { setSelectedEmployee(row); setShowDeductionModal(true); }} variant="secondary" className="p-1.5 h-7 w-7 text-red-400" title="Deductions"><Receipt size={12} /></Button>
+          <Button onClick={() => {
+            const [m, y] = selectedProcessMonth.split(' ');
+            generatePayslip(row, m, y);
+          }} variant="secondary" className="p-1.5 h-7 w-7 text-emerald-600" title="Download Payslip"><Download size={12} /></Button>
         </div>
       )
     }
@@ -460,9 +497,36 @@ const Payroll = () => {
             <Card title="Monthly Batch Review" className="border-none shadow-lg">
               <Table columns={[
                 { header: 'Employee', accessor: 'name' },
-                { header: 'Actual (Mo)', render: (u) => <span className="font-bold">₹{parseFloat(u.salaryBreakdown?.grossSalary || 0).toLocaleString()}</span> },
-                { header: 'Statutory Deds', render: (u) => <span className="text-red-400 font-medium">₹{parseFloat(u.salaryBreakdown?.totalDeductions || 0).toLocaleString()}</span> },
-                { header: 'Payout', render: (u) => <span className="font-black text-emerald-600">₹{parseFloat(u.salaryBreakdown?.netSalary || 0).toLocaleString()}</span> }
+                {
+                  header: 'Actual (Mo)',
+                  render: (u) => {
+                    const { effectiveDays, totalDays } = getEmployeeWorkDays(u.id, selectedProcessMonth);
+                    const val = (parseFloat(u.salaryBreakdown?.grossSalary || 0) * (effectiveDays / totalDays)).toFixed(2);
+                    return (
+                      <div>
+                        <p className="font-bold">₹{parseFloat(val).toLocaleString()}</p>
+                        <p className="text-[10px] text-gray-400">{effectiveDays} / {totalDays} Days</p>
+                      </div>
+                    );
+                  }
+                },
+                {
+                  header: 'Statutory Deds',
+                  render: (u) => (
+                    <div className="group relative cursor-help" onClick={() => { setSelectedEmployee(u); setShowDeductionModal(true); }}>
+                      <span className="text-red-400 font-medium underline decoration-dotted">₹{parseFloat(u.salaryBreakdown?.totalDeductions || 0).toLocaleString()}</span>
+                    </div>
+                  )
+                },
+                {
+                  header: 'Payout',
+                  render: (u) => {
+                    const { effectiveDays, totalDays } = getEmployeeWorkDays(u.id, selectedProcessMonth);
+                    const gross = (parseFloat(u.salaryBreakdown?.grossSalary || 0) * (effectiveDays / totalDays));
+                    const net = (gross - parseFloat(u.salaryBreakdown?.totalDeductions || 0)).toFixed(2);
+                    return <span className="font-black text-emerald-600">₹{parseFloat(net).toLocaleString()}</span>;
+                  }
+                }
               ]} data={filteredEmployees} />
             </Card>
           </div>
@@ -609,6 +673,37 @@ const Payroll = () => {
                 </div>
               ))}
             </div>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal isOpen={showDeductionModal} onClose={() => setShowDeductionModal(false)} title="Deduction Insights">
+        <div className="space-y-6">
+          <div className="p-4 bg-gray-50 rounded-2xl">
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Employee</p>
+            <p className="text-lg font-black text-gray-900">{selectedEmployee?.name}</p>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="p-4 border border-gray-100 rounded-2xl">
+              <p className="text-[10px] font-bold text-gray-400 uppercase">Provider Fund (PF)</p>
+              <p className="text-xl font-black text-gray-900">₹{parseFloat(selectedEmployee?.salaryBreakdown?.pfEmployee || 0).toLocaleString()}</p>
+            </div>
+            <div className="p-4 border border-gray-100 rounded-2xl">
+              <p className="text-[10px] font-bold text-gray-400 uppercase">State Insurance (ESI)</p>
+              <p className="text-xl font-black text-gray-900">₹{parseFloat(selectedEmployee?.salaryBreakdown?.esiEmployee || 0).toLocaleString()}</p>
+            </div>
+            <div className="p-4 border border-gray-100 rounded-2xl">
+              <p className="text-[10px] font-bold text-gray-400 uppercase">Prof. TAX (PT)</p>
+              <p className="text-xl font-black text-gray-900">₹{parseFloat(selectedEmployee?.salaryBreakdown?.professionalTax || 0).toLocaleString()}</p>
+            </div>
+            <div className="p-4 border border-gray-100 rounded-2xl bg-amber-50 border-amber-100">
+              <p className="text-[10px] font-bold text-amber-600 uppercase">Income Tax (TDS)</p>
+              <p className="text-xl font-black text-amber-900">₹{parseFloat(selectedEmployee?.salaryBreakdown?.tds || 0).toLocaleString()}</p>
+            </div>
+          </div>
+          <div className="p-5 bg-red-50 rounded-2xl border border-red-100 flex justify-between items-center">
+            <p className="font-bold text-red-900">Total Deductions</p>
+            <p className="text-2xl font-black text-red-600">₹{parseFloat(selectedEmployee?.salaryBreakdown?.totalDeductions || 0).toLocaleString()}</p>
           </div>
         </div>
       </Modal>
