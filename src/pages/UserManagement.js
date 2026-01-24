@@ -11,12 +11,12 @@ const UserManagement = () => {
   const [selectedUser, setSelectedUser] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [formData, setFormData] = useState({
-    name: '', email: '', employeeId: '', designation: '', department: '', role: 'employee', userId: '', password: '', reportingTo: ''
+    name: '', email: '', employeeId: '', designation: '', department: '', role: 'employee', userId: '', password: '', newPassword: '', reportingTo: ''
   });
 
   const filteredUsers = allUsers.filter(u =>
-    u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    u.employeeId.toLowerCase().includes(searchTerm.toLowerCase())
+    (u.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (u.employeeId || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const handleAddUser = async () => {
@@ -133,7 +133,7 @@ const UserManagement = () => {
     { header: 'Email', accessor: 'email' },
     { header: 'Designation', accessor: 'designation' },
     { header: 'Department', accessor: 'department' },
-    { header: 'Role', render: (row) => <span className="capitalize">{row.role}</span> },
+    { header: 'Role', render: (row) => <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${row.role === 'admin' ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'}`}>{row.role}</span> },
     {
       header: 'Actions',
       render: (row) => (
@@ -153,38 +153,40 @@ const UserManagement = () => {
   ];
 
   return (
-    <div>
-      <h1 className="text-3xl font-bold text-gray-800 dark:text-white mb-6">User Management</h1>
+    <div className="p-4 md:p-8 max-w-[1600px] mx-auto min-h-screen bg-gray-50/30">
 
-      {alert && (
-        <div className={`mb-4 p-4 rounded-lg flex justify-between items-center ${alert.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-          }`}>
-          <span>{alert.message}</span>
-          <button onClick={() => setAlert(null)} className="font-bold">&times;</button>
+      {/* Premium Header */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-10">
+        <div>
+          <div className="flex items-center gap-2 text-primary-600 font-bold text-xs uppercase tracking-[0.2em] mb-1">
+            <Shield size={14} /> Access Control Center
+          </div>
+          <h1 className="text-4xl font-black text-gray-900 tracking-tight">User <span className="text-primary-600">Management</span></h1>
+          <p className="text-gray-400 text-sm mt-1">Provision accounts, manage permissions, and oversee system security.</p>
         </div>
-      )}
 
-      <Card>
-        <div className="flex justify-between items-center mb-4">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+        <div className="flex gap-3">
+          <Button onClick={handleRepairPermissions} variant="secondary" className="bg-white hover:shadow-md transition-all">
+            <Shield size={16} className="mr-2" /> Repair My Access
+          </Button>
+          <Button onClick={() => setShowAddModal(true)} variant="primary" className="shadow-lg shadow-primary-500/20">
+            <UserPlus size={16} className="mr-2" /> New Operator
+          </Button>
+        </div>
+      </div>
+
+      {alert && <div className="mb-6"><Alert type={alert.type} message={alert.message} onClose={() => setAlert(null)} /></div>}
+
+      <Card className="border-none shadow-xl shadow-gray-200/50">
+        <div className="mb-8">
+          <div className="relative max-w-md">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
             <input
-              type="text"
-              placeholder="Search by name or employee ID..."
+              placeholder="Find operators by name or ID..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              className="w-full pl-12 pr-4 py-3 bg-gray-50/50 border border-transparent focus:border-primary-200 focus:bg-white rounded-2xl outline-none transition-all"
             />
-          </div>
-          <div className="flex gap-2">
-            <Button onClick={handleRepairPermissions} variant="secondary">
-              <Shield size={18} className="inline mr-2" />
-              Repair Admin Permissions
-            </Button>
-            <Button onClick={() => setShowAddModal(true)}>
-              <UserPlus size={18} className="inline mr-2" />
-              Add User
-            </Button>
           </div>
         </div>
 
