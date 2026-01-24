@@ -49,6 +49,7 @@ const Payroll = () => {
   const [newClaim, setNewClaim] = useState({ amount: '', type: 'Travel', reason: '' });
   const [selectedProcessMonth, setSelectedProcessMonth] = useState('January 2026');
   const [newComp, setNewComp] = useState({ name: '', value: '' });
+  const [optInPF, setOptInPF] = useState(true);
   const itemsPerPage = 10;
 
   const [adjustmentData, setAdjustmentData] = useState({
@@ -106,7 +107,7 @@ const Payroll = () => {
     return { effectiveDays, totalDays };
   };
 
-  const calculateBreakdown = (totalCtc) => {
+  const calculateBreakdown = (totalCtc, optIn = true) => {
     const annual = parseFloat(totalCtc) || 0;
     const monthly = annual / 12;
 
@@ -120,8 +121,8 @@ const Payroll = () => {
     });
 
     const pfBasic = Math.min(parseFloat(components.basic || 0), taxConfig.pfCeiling);
-    const pfEmployee = pfBasic * (taxConfig.pfEmployee / 100);
-    const pfEmployer = pfBasic * (taxConfig.pfEmployer / 100);
+    const pfEmployee = optIn ? pfBasic * (taxConfig.pfEmployee / 100) : 0;
+    const pfEmployer = optIn ? pfBasic * (taxConfig.pfEmployer / 100) : 0;
     const esiApplicable = grossSalary <= taxConfig.esiCeiling;
     const esiEmployee = esiApplicable ? (grossSalary * (taxConfig.esiEmployee / 100)) : 0;
     const esiEmployer = esiApplicable ? (grossSalary * (taxConfig.esiEmployer / 100)) : 0;
@@ -194,7 +195,7 @@ const Payroll = () => {
       });
       if (adjustmentData.type === 'Increment') {
         const newCtc = (selectedEmployee.ctc || 0) + parseFloat(adjustmentData.amount);
-        await updateUser(selectedEmployee.id, { ctc: newCtc, salaryBreakdown: calculateBreakdown(newCtc) });
+        await updateUser(selectedEmployee.id, { ctc: newCtc, salaryBreakdown: calculateBreakdown(newCtc, selectedEmployee.optInPF !== false) });
       }
       setAlert({ type: 'success', message: 'Adjustment applied!' });
       fetchHistory(selectedEmployee.id);
@@ -326,7 +327,12 @@ const Payroll = () => {
       header: 'Actions',
       render: (row) => (
         <div className="flex gap-1">
-          <Button onClick={() => { setSelectedEmployee(row); setCtc(row.ctc || ''); setShowModal(true); }} variant="secondary" className="p-1.5 h-7 w-7" title="Edit CTC"><Edit size={12} /></Button>
+          <Button onClick={() => {
+            setSelectedEmployee(row);
+            setCtc(row.ctc || '');
+            setOptInPF(row.optInPF !== false);
+            setShowModal(true);
+          }} variant="secondary" className="p-1.5 h-7 w-7" title="Edit CTC"><Edit size={12} /></Button>
           <Button onClick={() => { setSelectedEmployee(row); fetchHistory(row.id); setShowHistoryModal(true); }} variant="secondary" className="p-1.5 h-7 w-7 text-blue-600" title="Adjustments"><History size={12} /></Button>
           <Button onClick={() => { setSelectedEmployee(row); setShowDeductionModal(true); }} variant="secondary" className="p-1.5 h-7 w-7 text-red-400" title="Deductions"><Receipt size={12} /></Button>
           <Button onClick={() => {
@@ -339,8 +345,12 @@ const Payroll = () => {
   ];
 
   const handleAssignCTC = async () => {
-    const breakdown = calculateBreakdown(ctc);
-    await updateUser(selectedEmployee.id, { ctc: parseFloat(ctc), salaryBreakdown: breakdown });
+    const breakdown = calculateBreakdown(ctc, optInPF);
+    await updateUser(selectedEmployee.id, {
+      ctc: parseFloat(ctc),
+      optInPF: optInPF,
+      salaryBreakdown: breakdown
+    });
     setShowModal(false); setAlert({ type: 'success', message: 'Structure Updated' });
   };
 
@@ -585,9 +595,24 @@ const Payroll = () => {
             <p className="text-[10px] font-black text-primary-600 uppercase tracking-widest mb-1">Target Profile</p>
             <p className="text-xl font-black text-gray-900">{selectedEmployee?.name}</p>
           </div>
-          <div className="space-y-2">
-            <label className="text-[10px] font-bold text-gray-400 uppercase px-1">Annual CTC (INR)</label>
-            <input type="number" value={ctc} onChange={e => setCtc(e.target.value)} className="w-full text-2xl font-black p-4 bg-gray-50 border-none rounded-[1.2rem] focus:ring-4 focus:ring-primary-100 transition-all outline-none" placeholder="00,00,000" />
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-gray-400 uppercase px-1">Annual CTC (INR)</label>
+              <input type="number" value={ctc} onChange={e => setCtc(e.target.value)} className="w-full text-2xl font-black p-4 bg-gray-50 border-none rounded-[1.2rem] focus:ring-4 focus:ring-primary-100 transition-all outline-none" placeholder="00,00,000" />
+            </div>
+
+            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-transparent hover:border-gray-100 transition-all">
+              <div>
+                <p className="text-xs font-bold text-gray-900">Provident Fund (PF) Opt-in</p>
+                <p className="text-[10px] text-gray-400">Statutory 12% deduction from basic salary</p>
+              </div>
+              <button
+                onClick={() => setOptInPF(!optInPF)}
+                className={`w-12 h-6 rounded-full transition-all relative ${optInPF ? 'bg-primary-600' : 'bg-gray-300'}`}
+              >
+                <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${optInPF ? 'left-7' : 'left-1'}`} />
+              </button>
+            </div>
           </div>
           <Button onClick={handleAssignCTC} className="w-full py-5 text-lg font-black tracking-tight shadow-xl shadow-primary-500/20">Apply New Package</Button>
         </div>
@@ -684,10 +709,12 @@ const Payroll = () => {
             <p className="text-lg font-black text-gray-900">{selectedEmployee?.name}</p>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <div className="p-4 border border-gray-100 rounded-2xl">
-              <p className="text-[10px] font-bold text-gray-400 uppercase">Provider Fund (PF)</p>
-              <p className="text-xl font-black text-gray-900">₹{parseFloat(selectedEmployee?.salaryBreakdown?.pfEmployee || 0).toLocaleString()}</p>
-            </div>
+            {(!selectedEmployee || selectedEmployee.optInPF !== false) && (
+              <div className="p-4 border border-gray-100 rounded-2xl">
+                <p className="text-[10px] font-bold text-gray-400 uppercase">Provider Fund (PF)</p>
+                <p className="text-xl font-black text-gray-900">₹{parseFloat(selectedEmployee?.salaryBreakdown?.pfEmployee || 0).toLocaleString()}</p>
+              </div>
+            )}
             <div className="p-4 border border-gray-100 rounded-2xl">
               <p className="text-[10px] font-bold text-gray-400 uppercase">State Insurance (ESI)</p>
               <p className="text-xl font-black text-gray-900">₹{parseFloat(selectedEmployee?.salaryBreakdown?.esiEmployee || 0).toLocaleString()}</p>
