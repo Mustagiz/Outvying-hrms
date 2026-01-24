@@ -6,7 +6,8 @@ import {
   TrendingUp, Calculator, FileText, Users,
   ChevronLeft, ChevronRight, Gift, History,
   Download, Eye, CheckCircle, BarChart, Wallet,
-  Receipt, Plus, FileSpreadsheet
+  Receipt, Plus, FileSpreadsheet, TrendingDown,
+  Briefcase, Landmark, ShieldCheck
 } from 'lucide-react';
 import Papa from 'papaparse';
 import {
@@ -49,10 +50,7 @@ const Payroll = () => {
   const itemsPerPage = 10;
 
   const [adjustmentData, setAdjustmentData] = useState({
-    type: 'Bonus',
-    amount: '',
-    reason: '',
-    date: new Date().toISOString().split('T')[0]
+    type: 'Bonus', amount: '', reason: '', date: new Date().toISOString().split('T')[0]
   });
   const [history, setHistory] = useState([]);
 
@@ -171,19 +169,8 @@ const Payroll = () => {
   };
 
   const handleAddLoan = async () => {
-    if (!selectedEmployee) {
-      setAlert({ type: 'error', message: 'Please select an employee' });
-      return;
-    }
-    if (!newLoan.amount || parseFloat(newLoan.amount) <= 0) {
-      setAlert({ type: 'error', message: 'Please enter a valid amount' });
-      return;
-    }
-    if (!newLoan.duration || parseInt(newLoan.duration) <= 0) {
-      setAlert({ type: 'error', message: 'Please enter a valid duration' });
-      return;
-    }
-
+    if (!selectedEmployee) return setAlert({ type: 'error', message: 'Please select an employee' });
+    if (!newLoan.amount || parseFloat(newLoan.amount) <= 0) return setAlert({ type: 'error', message: 'Valid amount required' });
     setIsProcessing(true);
     try {
       await addDoc(collection(db, 'payrollLoans'), {
@@ -192,13 +179,9 @@ const Payroll = () => {
       });
       setAlert({ type: 'success', message: 'Loan entry created' });
       setShowLoanModal(false);
-      setNewLoan({ amount: '', duration: '12', reason: '', interest: '0' });
       fetchLoans();
-    } catch (e) {
-      setAlert({ type: 'error', message: 'Failed to create loan: ' + e.message });
-    } finally {
-      setIsProcessing(false);
-    }
+    } catch (e) { setAlert({ type: 'error', message: e.message }); }
+    finally { setIsProcessing(false); }
   };
 
   const handleAddClaim = async () => {
@@ -224,39 +207,19 @@ const Payroll = () => {
     const doc = new jsPDF();
     const b = emp.salaryBreakdown;
     if (!b) return alert('No salary breakdown assigned!');
-
-    // Fetch Bank Account for this employee
     const bank = allBankAccounts.find(ba => String(ba.userId) === String(emp.id)) || {};
-
     const daysInMonth = new Date(year, ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].indexOf(monthName) + 1, 0).getDate();
-    const workDays = 31; // Placeholder as in image, but can be dynamic from attendance
 
-    // Header
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(22);
-    doc.setTextColor(0);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(22); doc.setTextColor(0);
     doc.text('Outvying Media Solution Pvt Ltd.', 105, 20, { align: 'center' });
-
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9); doc.setFont('helvetica', 'normal');
     doc.text('A-106, 1st floor, Town Square, New Airport Road, Viman Nagar, Pune, Maharashtra 411014', 105, 26, { align: 'center' });
     doc.text(`Email: hr@outvying.com | Website: www.Outvying.com`, 105, 31, { align: 'center' });
+    doc.setFillColor(220, 220, 220); doc.rect(20, 36, 170, 8, 'F');
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.text(`Payslip For The Month Of ${monthName}-${year}`, 105, 42, { align: 'center' });
 
-    // Payslip Month Box
-    doc.setFillColor(220, 220, 220); // Light gray
-    doc.rect(20, 36, 170, 8, 'F');
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(12);
-    doc.text(`Payslip For The Month Of ${monthName}-${year}`, 105, 42, { align: 'center' });
-
-    // Employee Info Grid
-    doc.setFontSize(10);
-    doc.setTextColor(0);
-    const leftX = 20;
-    const midX = 110;
-    let currentY = 55;
-    const lineGap = 7;
-
+    doc.setFontSize(10); doc.setTextColor(0);
+    const leftX = 20, midX = 110; let currentY = 55; const lineGap = 7;
     const infoFields = [
       ['Employee ID', emp.employeeId || 'N/A', 'Employee Name', emp.name || 'N/A'],
       ['Designation', emp.designation || 'N/A', 'Business Unit', emp.department || 'N/A'],
@@ -264,123 +227,46 @@ const Payroll = () => {
       ['Bank Name', bank.bankName || '-', 'Bank Account No.', bank.accountNumber || '-'],
       ['IFSC Code', bank.ifscCode || '-', 'ESI No.', '-'],
       ['PAN Number', emp.panNumber || 'ABCDE1234F'],
-      ['Days In Month', daysInMonth.toString(), 'Effective Work Days', '3'] // '3' is from image
+      ['Days In Month', daysInMonth.toString(), 'Effective Work Days', '31']
     ];
-
     infoFields.forEach((row) => {
-      doc.setFont('helvetica', 'bold');
-      doc.text(row[0], leftX, currentY);
-      doc.setFont('helvetica', 'normal');
-      doc.text(row[1], leftX + 45, currentY);
-
-      if (row[2]) {
-        doc.setFont('helvetica', 'bold');
-        doc.text(row[2], midX, currentY);
-        doc.setFont('helvetica', 'normal');
-        doc.text(row[3], midX + 45, currentY);
-      }
+      doc.setFont('helvetica', 'bold'); doc.text(row[0], leftX, currentY);
+      doc.setFont('helvetica', 'normal'); doc.text(row[1], leftX + 45, currentY);
+      if (row[2]) { doc.setFont('helvetica', 'bold'); doc.text(row[2], midX, currentY); doc.setFont('helvetica', 'normal'); doc.text(row[3], midX + 45, currentY); }
       currentY += lineGap;
     });
-
-    // Table Separator
-    doc.setLineWidth(0.5);
-    doc.line(20, currentY + 5, 190, currentY + 5);
-    currentY += 12;
-
-    // Earnings & Deductions Headers
-    doc.setFont('helvetica', 'bold');
-    doc.text('EARNINGS', 55, currentY, { align: 'center' });
-    doc.text('DEDUCTIONS', 150, currentY, { align: 'center' });
-    doc.line(20, currentY + 2, 190, currentY + 2);
-    currentY += 8;
-
-    // Sub-headers
-    doc.setFontSize(9);
-    doc.text('Description', 22, currentY);
-    doc.text('Full', 70, currentY, { align: 'right' });
-    doc.text('Arrear', 85, currentY, { align: 'right' });
-    doc.text('Actual', 105, currentY, { align: 'right' });
-
-    doc.text('Description', 112, currentY);
-    doc.text('Amount', 188, currentY, { align: 'right' });
-    currentY += 2;
-    doc.line(20, currentY, 190, currentY);
-    currentY += 6;
-
-    // Table Rows
-    const earnings = [
-      ['Basic Salary (BS)', b.basic],
-      ['House Rent Allowance (HRA)', b.hra],
-      ['Medical Allowance', b.medical],
-      ['Transportation Allowance (TA)', b.transport],
-      ['Shift Allowance', b.shiftAllowance],
-      ['Attendance Allowance', b.attendanceAllowance]
-    ];
-
-    const deductions = [
-      ['Tax (TDS)', b.tds],
-      ['Professional TAX', b.professionalTax],
-      ['ESI', b.esiEmployee]
-    ];
-
+    doc.setLineWidth(0.5); doc.line(20, currentY + 5, 190, currentY + 5); currentY += 12;
+    doc.setFont('helvetica', 'bold'); doc.text('EARNINGS', 55, currentY, { align: 'center' }); doc.text('DEDUCTIONS', 150, currentY, { align: 'center' });
+    doc.line(20, currentY + 2, 190, currentY + 2); currentY += 8;
+    doc.setFontSize(9); doc.text('Description', 22, currentY); doc.text('Full', 70, currentY, { align: 'right' }); doc.text('Actual', 105, currentY, { align: 'right' });
+    doc.text('Description', 112, currentY); doc.text('Amount', 188, currentY, { align: 'right' }); currentY += 6;
+    const earnings = [['Basic Salary (BS)', b.basic], ['House Rent Allowance (HRA)', b.hra], ['Medical Allowance', b.medical], ['Transportation Allowance (TA)', b.transport], ['Shift Allowance', b.shiftAllowance], ['Attendance Allowance', b.attendanceAllowance]];
+    const deductions = [['Tax (TDS)', b.tds], ['Professional TAX', b.professionalTax], ['ESI', b.esiEmployee]];
     const rowCount = Math.max(earnings.length, deductions.length);
-    doc.setFont('helvetica', 'normal');
-
     for (let i = 0; i < rowCount; i++) {
-      if (earnings[i]) {
-        doc.text(earnings[i][0], 22, currentY);
-        doc.text(parseFloat(earnings[i][1]).toFixed(2), 70, currentY, { align: 'right' });
-        doc.text('0.00', 85, currentY, { align: 'right' });
-        // Calculate proportionate actual
-        const actual = (parseFloat(earnings[i][1]) * (3 / daysInMonth)).toFixed(2); // '3' is from image
-        doc.text(actual, 105, currentY, { align: 'right' });
-      }
-
-      if (deductions[i]) {
-        doc.text(deductions[i][0], 112, currentY);
-        doc.text(parseFloat(deductions[i][1]).toFixed(2), 188, currentY, { align: 'right' });
-      }
+      if (earnings[i]) { doc.text(earnings[i][0], 22, currentY); doc.text(parseFloat(earnings[i][1]).toFixed(2), 105, currentY, { align: 'right' }); }
+      if (deductions[i]) { doc.text(deductions[i][0], 112, currentY); doc.text(parseFloat(deductions[i][1]).toFixed(2), 188, currentY, { align: 'right' }); }
       currentY += lineGap;
     }
-
-    // Bottom Section
-    const finalActualEarnings = (parseFloat(b.grossSalary) * (3 / daysInMonth)).toFixed(2);
-    const totalDeds = parseFloat(b.totalDeductions).toFixed(2);
-
-    doc.line(20, currentY - 2, 190, currentY - 2);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Total Earnings', 22, currentY);
-    doc.text(finalActualEarnings, 105, currentY, { align: 'right' });
-    doc.text('Total Deduction', 112, currentY);
-    doc.text(totalDeds, 188, currentY, { align: 'right' });
-    currentY += 2;
-    doc.line(20, currentY, 190, currentY);
-
-    currentY += 10;
-    doc.setFontSize(11);
-    doc.text(`Net Pay for the month (Total Earnings - Total Dedutions):`, 22, currentY);
-    doc.setFontSize(14);
-    const net = (parseFloat(finalActualEarnings) - parseFloat(totalDeds)).toFixed(2);
-    doc.text(`\u20B9 ${net}`, 188, currentY, { align: 'right' });
-
-    currentY += 2;
-    doc.line(20, currentY, 190, currentY);
-
+    const finalEarnings = parseFloat(b.grossSalary).toFixed(2); const totalDeds = parseFloat(b.totalDeductions).toFixed(2);
+    doc.line(20, currentY - 2, 190, currentY - 2); doc.setFont('helvetica', 'bold'); doc.text('Total Earnings', 22, currentY); doc.text(finalEarnings, 105, currentY, { align: 'right' }); doc.text('Total Deduction', 112, currentY); doc.text(totalDeds, 188, currentY, { align: 'right' });
+    currentY += 10; doc.setFontSize(11); doc.text(`Net Pay for the month (Total Earnings - Total Dedutions):`, 22, currentY); doc.setFontSize(14);
+    const net = (parseFloat(finalEarnings) - parseFloat(totalDeds)).toFixed(2); doc.text(`₹ ${net}`, 188, currentY, { align: 'right' });
     doc.save(`Payslip_${emp.employeeId}_${monthName}.pdf`);
   };
 
   const columns = [
-    { header: 'ID', accessor: 'employeeId' },
-    { header: 'Name', accessor: 'name' },
-    { header: 'Annual CTC', render: (row) => row.ctc ? `₹${row.ctc.toLocaleString()}` : '-' },
-    { header: 'Net Salary', render: (row) => row.salaryBreakdown ? `₹${parseFloat(row.salaryBreakdown.netSalary).toLocaleString()}` : '-' },
+    { header: 'Employee', render: (row) => <div className="flex items-center gap-3"><div className="h-8 w-8 rounded-full bg-primary-100 flex items-center justify-center text-primary-600 font-bold text-xs">{row.name.charAt(0)}</div><div><p className="font-bold text-gray-800 dark:text-white leading-none">{row.name}</p><p className="text-[10px] text-gray-400 mt-1 uppercase tracking-tight">{row.employeeId}</p></div></div> },
+    { header: 'Status', render: (row) => <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest ${row.ctc ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>{row.ctc ? 'Configured' : 'Pending'}</span> },
+    { header: 'Annual CTC', render: (row) => <span className="font-mono font-bold text-gray-600">₹{row.ctc?.toLocaleString() || '-'}</span> },
+    { header: 'Take Home', render: (row) => <span className="font-mono font-bold text-blue-600">₹{parseFloat(row.salaryBreakdown?.netSalary || 0).toLocaleString()}</span> },
     {
       header: 'Actions',
       render: (row) => (
-        <div className="flex gap-2">
-          <Button onClick={() => { setSelectedEmployee(row); setCtc(row.ctc || ''); setShowModal(true); }} variant="secondary" className="p-2 h-8 w-8"><Edit size={14} /></Button>
-          <Button onClick={() => { setSelectedEmployee(row); fetchHistory(row.id); setShowHistoryModal(true); }} variant="secondary" className="p-2 h-8 w-8 text-blue-600"><History size={14} /></Button>
-          <Button onClick={() => generatePayslip(row, 'January', '2026')} variant="secondary" className="p-2 h-8 w-8 text-emerald-600"><Download size={14} /></Button>
+        <div className="flex gap-1">
+          <Button onClick={() => { setSelectedEmployee(row); setCtc(row.ctc || ''); setShowModal(true); }} variant="secondary" className="p-1.5 h-7 w-7"><Edit size={12} /></Button>
+          <Button onClick={() => { setSelectedEmployee(row); fetchHistory(row.id); setShowHistoryModal(true); }} variant="secondary" className="p-1.5 h-7 w-7 text-blue-600"><History size={12} /></Button>
+          <Button onClick={() => generatePayslip(row, 'January', '2026')} variant="secondary" className="p-1.5 h-7 w-7 text-emerald-600"><Download size={12} /></Button>
         </div>
       )
     }
@@ -389,51 +275,18 @@ const Payroll = () => {
   const handleAssignCTC = async () => {
     const breakdown = calculateBreakdown(ctc);
     await updateUser(selectedEmployee.id, { ctc: parseFloat(ctc), salaryBreakdown: breakdown });
-    setShowModal(false); setCtc(''); setAlert({ type: 'success', message: 'CTC updated' });
+    setShowModal(false); setAlert({ type: 'success', message: 'Structure Updated' });
   };
 
   const handleGenerateMonthlyReport = () => {
-    const reportData = filteredEmployees.map(emp => {
-      const b = emp.salaryBreakdown;
-      if (!b) return null;
-
-      const [month, year] = selectedProcessMonth.split(' ');
-      const daysInMonth = new Date(year, ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].indexOf(month) + 1, 0).getDate();
-
-      // For now using 31 as default or 3 as per image, but let's assume full pay if no attendance logic is yet fully integrated here
-      const workDays = 31;
-      const actualEarnings = (parseFloat(b.grossSalary) * (workDays / daysInMonth)).toFixed(2);
-      const netPayable = (parseFloat(actualEarnings) - parseFloat(b.totalDeductions)).toFixed(2);
-
-      return {
-        'Employee ID': emp.employeeId,
-        'Name': emp.name,
-        'Department': emp.department,
-        'Gross Salary': b.grossSalary,
-        'Actual Earnings': actualEarnings,
-        'Deductions': b.totalDeductions,
-        'Net Payable': netPayable,
-        'Month': selectedProcessMonth
-      };
-    }).filter(r => r !== null);
-
-    if (reportData.length === 0) {
-      setAlert({ type: 'error', message: 'No payroll data found to generate report' });
-      return;
-    }
-
+    const reportData = employees.map(emp => {
+      const b = emp.salaryBreakdown; if (!b) return null;
+      return { 'ID': emp.employeeId, 'Name': emp.name, 'Gross': b.grossSalary, 'Net': b.netSalary };
+    }).filter(Boolean);
     const csv = Papa.unparse(reportData);
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
+    const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `Payroll_Report_${selectedProcessMonth.replace(' ', '_')}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-
-    setAlert({ type: 'success', message: 'Report generated successfully' });
+    const link = document.createElement('a'); link.href = url; link.download = 'Report.csv'; link.click();
   };
 
   const deptData = useMemo(() => {
@@ -442,208 +295,265 @@ const Payroll = () => {
     return depts;
   }, [allUsers]);
 
-  const topCtcData = useMemo(() => {
-    return allUsers.filter(u => u.ctc).sort((a, b) => b.ctc - a.ctc).slice(0, 7);
-  }, [allUsers]);
+  const stats = useMemo(() => {
+    const totalItems = allUsers.length;
+    const processed = allUsers.filter(u => u.salaryBreakdown).length;
+    const activeLoanAmt = loans.reduce((s, l) => s + l.amount, 0);
+    return { totalItems, processed, activeLoanAmt };
+  }, [allUsers, loans]);
 
-  if (currentUser.role !== 'admin' && currentUser.role !== 'Admin') return <div className="text-center py-8">Access denied. Admin only.</div>;
+  if (currentUser.role !== 'admin' && currentUser.role !== 'Admin' && currentUser.role !== 'hr') return <div className="text-center py-20 text-gray-400 italic">Restricted Access Dashboard.</div>;
 
   return (
-    <div className="p-4 md:p-6 lg:p-8">
-      <div className="mb-6 flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Payroll Ecosystem</h1>
+    <div className="p-4 md:p-8 max-w-[1600px] mx-auto min-h-screen bg-gray-50/30">
+
+      {/* Header Section */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-10">
+        <div>
+          <div className="flex items-center gap-2 text-primary-600 font-bold text-xs uppercase tracking-[0.2em] mb-1">
+            <ShieldCheck size={14} /> Secure Financial Hub
+          </div>
+          <h1 className="text-4xl font-black text-gray-900 tracking-tight">Payroll <span className="text-primary-600">Ecosystem</span></h1>
+          <p className="text-gray-400 text-sm mt-1">Manage, Revise and Monitor Organization-wide payouts.</p>
+        </div>
+
+        <div className="flex gap-3">
+          <Button onClick={() => setShowTemplateModal(true)} variant="secondary" className="bg-white hover:shadow-md transition-all">
+            <Settings size={16} className="mr-2" /> Configuration
+          </Button>
+          <Button onClick={handleGenerateMonthlyReport} variant="primary" className="shadow-lg shadow-primary-500/20">
+            <FileSpreadsheet size={16} className="mr-2" /> Export Ledger
+          </Button>
+        </div>
       </div>
 
-      {alert && <Alert type={alert.type} message={alert.message} onClose={() => setAlert(null)} />}
+      {alert && <div className="mb-6"><Alert type={alert.type} message={alert.message} onClose={() => setAlert(null)} /></div>}
 
-      <div className="mb-6 border-b flex gap-4 overflow-x-auto pb-2">
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-10">
+        <Card className="border-none shadow-sm hover:shadow-md transition-all group overflow-hidden">
+          <div className="relative z-10">
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Total Headcount</p>
+            <div className="flex items-center justify-between">
+              <h3 className="text-3xl font-black text-gray-900">{stats.totalItems}</h3>
+              <div className="p-2 bg-blue-50 text-blue-600 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-colors"><Users size={20} /></div>
+            </div>
+          </div>
+        </Card>
+        <Card className="border-none shadow-sm hover:shadow-md transition-all group overflow-hidden">
+          <div className="relative z-10">
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Processed Profiles</p>
+            <div className="flex items-center justify-between">
+              <h3 className="text-3xl font-black text-gray-900">{stats.processed}</h3>
+              <p className="text-[10px] text-emerald-600 font-bold">{(stats.processed / stats.totalItems * 100).toFixed(0)}% Done</p>
+            </div>
+          </div>
+        </Card>
+        <Card className="border-none shadow-sm hover:shadow-md transition-all group overflow-hidden">
+          <div className="relative z-10">
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Active Loan Payout</p>
+            <div className="flex items-center justify-between">
+              <h3 className="text-3xl font-black text-gray-900">₹{stats.activeLoanAmt.toLocaleString()}</h3>
+              <div className="p-2 bg-amber-50 text-amber-600 rounded-lg group-hover:bg-amber-600 group-hover:text-white transition-colors"><Wallet size={20} /></div>
+            </div>
+          </div>
+        </Card>
+        <Card className="border-none shadow-sm hover:shadow-md transition-all group overflow-hidden">
+          <div className="relative z-10">
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Estimated Tax/Mo</p>
+            <div className="flex items-center justify-between">
+              <h3 className="text-3xl font-black text-gray-900">₹{(stats.processed * 1200).toLocaleString()}</h3>
+              <div className="p-2 bg-purple-50 text-purple-600 rounded-lg group-hover:bg-purple-600 group-hover:text-white transition-colors"><TrendingUp size={20} /></div>
+            </div>
+          </div>
+        </Card>
+      </div>
+
+      {/* Tabs Navigation */}
+      <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-[2rem] p-2 mb-8 inline-flex items-center shadow-sm">
         {['employees', 'process', 'reports', 'loans', 'reimbursements'].map(tab => (
-          <button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 py-2 font-bold text-sm capitalize border-b-2 transition-all ${activeTab === tab ? 'border-primary-600 text-primary-600' : 'border-transparent text-gray-500'}`}>
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`px-6 py-3 rounded-[1.5rem] font-bold text-xs uppercase tracking-widest transition-all ${activeTab === tab ? 'bg-primary-600 text-white shadow-lg' : 'text-gray-400 hover:text-gray-900'
+              }`}
+          >
             {tab}
           </button>
         ))}
-        <button onClick={() => setShowTemplateModal(true)} className="px-4 py-2 font-bold text-sm text-gray-400">Template</button>
-        <button onClick={() => setShowTaxModal(true)} className="px-4 py-2 font-bold text-sm text-gray-400">Statutory</button>
       </div>
 
-      {activeTab === 'employees' && (
-        <Card>
-          <div className="flex items-center mb-4 max-w-md relative">
-            <Search className="absolute left-3 text-gray-400" size={18} />
-            <input placeholder="Search employees..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2 bg-gray-50 border rounded-xl" />
-          </div>
-          <Table columns={columns} data={paginatedEmployees} />
-          {totalPages > 1 && (
-            <div className="mt-4 flex justify-between items-center text-xs font-bold text-gray-400">
-              <span>Page {currentPage} of {totalPages}</span>
+      {/* Main Content Area */}
+      <div className="min-h-[500px]">
+        {activeTab === 'employees' && (
+          <Card className="border-none shadow-xl shadow-gray-200/50">
+            <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-8">
+              <div className="relative w-full max-w-sm">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                <input placeholder="Search Staff DB..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-12 pr-4 py-3 bg-gray-50/50 border border-transparent focus:border-primary-200 focus:bg-white rounded-2xl outline-none transition-all" />
+              </div>
               <div className="flex gap-2">
-                <Button onClick={() => setCurrentPage(c => Math.max(1, c - 1))} disabled={currentPage === 1} className="p-2"><ChevronLeft size={16} /></Button>
-                <Button onClick={() => setCurrentPage(c => Math.min(totalPages, c + 1))} disabled={currentPage === totalPages} className="p-2"><ChevronRight size={16} /></Button>
+                <Button variant="secondary" onClick={() => setShowTaxModal(true)} className="rounded-xl"><Landmark size={16} className="mr-2" /> Statutory Rules</Button>
               </div>
             </div>
-          )}
-        </Card>
-      )}
 
-      {activeTab === 'process' && (
-        <Card title="Monthly Batch Review">
+            <Table columns={columns} data={paginatedEmployees} />
+
+            {totalPages > 1 && (
+              <div className="mt-8 pt-6 border-t border-gray-50 flex justify-between items-center px-4">
+                <p className="text-xs font-bold text-gray-400 uppercase">Page {currentPage} of {totalPages}</p>
+                <div className="flex gap-2">
+                  <Button onClick={() => setCurrentPage(c => Math.max(1, c - 1))} disabled={currentPage === 1} variant="secondary" className="p-2 w-10 h-10"><ChevronLeft size={18} /></Button>
+                  <Button onClick={() => setCurrentPage(c => Math.min(totalPages, c + 1))} disabled={currentPage === totalPages} variant="secondary" className="p-2 w-10 h-10"><ChevronRight size={18} /></Button>
+                </div>
+              </div>
+            )}
+          </Card>
+        )}
+
+        {activeTab === 'process' && (
           <div className="space-y-6">
-            <div className="flex gap-4">
-              <select
-                value={selectedProcessMonth}
-                onChange={(e) => setSelectedProcessMonth(e.target.value)}
-                className="px-4 py-2 rounded-xl border bg-white dark:bg-gray-800 dark:border-gray-700 dark:text-white"
-              >
-                <option>January 2026</option>
-                <option>February 2026</option>
-                <option>March 2026</option>
-              </select>
-              <Button onClick={handleGenerateMonthlyReport}>
-                <FileSpreadsheet size={16} className="mr-2" />
-                Generate CSV Report
+            <Card className="border-none shadow-lg">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-4">
+                  <select value={selectedProcessMonth} onChange={(e) => setSelectedProcessMonth(e.target.value)} className="bg-gray-100 border-none rounded-xl px-4 py-3 font-bold text-sm outline-none">
+                    <option>January 2026</option><option>February 2026</option>
+                  </select>
+                  <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">Active Processing Period</p>
+                </div>
+                <Button><Calculator size={18} className="mr-2" /> Commit Salaries</Button>
+              </div>
+            </Card>
+            <Card title="Monthly Batch Review" className="border-none shadow-lg">
+              <Table columns={[
+                { header: 'Employee', accessor: 'name' },
+                { header: 'Actual (Mo)', render: (u) => <span className="font-bold">₹{parseFloat(u.salaryBreakdown?.grossSalary || 0).toLocaleString()}</span> },
+                { header: 'Statutory Deds', render: (u) => <span className="text-red-400 font-medium">₹{parseFloat(u.salaryBreakdown?.totalDeductions || 0).toLocaleString()}</span> },
+                { header: 'Payout', render: (u) => <span className="font-black text-emerald-600">₹{parseFloat(u.salaryBreakdown?.netSalary || 0).toLocaleString()}</span> }
+              ]} data={filteredEmployees} />
+            </Card>
+          </div>
+        )}
+
+        {activeTab === 'reports' && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <Card title="Market Competitiveness" className="border-none shadow-lg h-full">
+              <div className="h-[350px] mt-6"><Bar data={{ labels: topCtcData.map(u => u.name.split(' ')[0]), datasets: [{ label: 'CTC Package', data: topCtcData.map(u => u.ctc), backgroundColor: '#3b82f6', borderRadius: 8, barThickness: 20 }] }} options={{ maintainAspectRatio: false, plugins: { legend: { display: false } } }} /></div>
+            </Card>
+            <Card title="Spend by Department" className="border-none shadow-lg h-full">
+              <div className="h-[350px] mt-6 flex justify-center"><Pie data={{ labels: Object.keys(deptData), datasets: [{ data: Object.values(deptData), backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4'], borderWidth: 0 }] }} options={{ maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }} /></div>
+            </Card>
+          </div>
+        )}
+
+        {activeTab === 'loans' && (
+          <Card className="border-none shadow-lg">
+            <div className="flex justify-between items-center mb-8 bg-black text-white p-6 rounded-[1.5rem]">
+              <div>
+                <h2 className="text-xl font-black tracking-tight">Financial Support Center</h2>
+                <p className="text-gray-400 text-xs">Currently tracking {loans.length} active employee loans.</p>
+              </div>
+              <Button onClick={() => { setSelectedEmployee(null); setNewLoan({ amount: '', duration: '12', reason: '', interest: '0' }); setShowLoanModal(true); }} className="bg-white text-black border-none hover:bg-gray-100 flex items-center gap-2">
+                <Plus size={18} /> New Sanction
               </Button>
             </div>
             <Table columns={[
-              { header: 'Employee', accessor: 'name' },
-              {
-                header: 'Actual Earnings',
-                render: (u) => {
-                  const [month, year] = selectedProcessMonth.split(' ');
-                  const daysInMonth = new Date(year, ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].indexOf(month) + 1, 0).getDate();
-                  const actual = (parseFloat(u.salaryBreakdown?.grossSalary || 0) * (31 / daysInMonth)).toFixed(2);
-                  return `₹${parseFloat(actual).toLocaleString()}`;
-                }
-              },
-              { header: 'Deductions', render: (u) => `₹${parseFloat(u.salaryBreakdown?.totalDeductions || 0).toLocaleString()}` },
-              {
-                header: 'Net Payable',
-                render: (u) => {
-                  const [month, year] = selectedProcessMonth.split(' ');
-                  const daysInMonth = new Date(year, ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].indexOf(month) + 1, 0).getDate();
-                  const actual = (parseFloat(u.salaryBreakdown?.grossSalary || 0) * (31 / daysInMonth));
-                  const net = (actual - parseFloat(u.salaryBreakdown?.totalDeductions || 0)).toFixed(2);
-                  return <span className="font-extrabold text-emerald-600">₹${parseFloat(net).toLocaleString()}</span>;
-                }
-              }
-            ]} data={filteredEmployees} />
+              { header: 'Beneficiary', accessor: 'employeeName' },
+              { header: 'Principal', render: (l) => <span className="font-bold">₹{l.amount.toLocaleString()}</span> },
+              { header: 'EMI Size', render: (l) => <span className="text-primary-600 font-bold">₹{Math.round(l.amount / l.duration).toLocaleString()}</span> },
+              { header: 'Status', render: (l) => <span className="px-3 py-1 bg-primary-100 text-primary-600 rounded-full text-[9px] font-black uppercase">{l.status}</span> }
+            ]} data={loans} />
+          </Card>
+        )}
+
+        {activeTab === 'reimbursements' && (
+          <Card title="Open Expense Claims" className="border-none shadow-lg">
+            <div className="flex justify-start mb-6">
+              <Button onClick={() => { setSelectedEmployee(null); setNewClaim({ amount: '', type: 'Travel', reason: '' }); setShowReimbursementModal(true); }}><Plus size={16} className="mr-2" /> Log Internal Claim</Button>
+            </div>
+            <Table columns={[
+              { header: 'Type', render: (c) => <div className="flex items-center gap-2"><div className="h-2 w-2 rounded-full bg-blue-500"></div>{c.type}</div> },
+              { header: 'Claimant', accessor: 'employeeName' },
+              { header: 'Amount', render: (c) => <span className="font-black">₹{c.amount.toLocaleString()}</span> },
+              { header: 'Status', render: (c) => <span className="text-[10px] font-black uppercase text-amber-500">{c.status}</span> }
+            ]} data={reimbursements} />
+          </Card>
+        )}
+      </div>
+
+      {/* All Fixed Position Modals */}
+      <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="Assign Annual CTC Structure">
+        <div className="space-y-6 pt-2">
+          <div className="p-4 bg-primary-50 rounded-2xl border border-primary-100">
+            <p className="text-[10px] font-black text-primary-600 uppercase tracking-widest mb-1">Target Profile</p>
+            <p className="text-xl font-black text-gray-900">{selectedEmployee?.name}</p>
           </div>
-        </Card>
-      )}
-
-      {activeTab === 'reports' && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card title="Department Payouts"><div className="h-[300px]"><Pie data={{ labels: Object.keys(deptData), datasets: [{ data: Object.values(deptData), backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'] }] }} options={{ maintainAspectRatio: false }} /></div></Card>
-          <Card title="Top CTCs"><div className="h-[300px]"><Bar data={{ labels: topCtcData.map(u => u.name.split(' ')[0]), datasets: [{ label: 'CTC (₹)', data: topCtcData.map(u => u.ctc), backgroundColor: '#3b82f6', borderRadius: 8 }] }} options={{ maintainAspectRatio: false }} /></div></Card>
-        </div>
-      )}
-
-      {activeTab === 'loans' && (
-        <Card title="Company Loans">
-          <div className="flex justify-between items-center mb-6">
-            <Button onClick={() => {
-              setSelectedEmployee(null);
-              setNewLoan({ amount: '', duration: '12', reason: '', interest: '0' });
-              setShowLoanModal(true);
-            }}>
-              <Plus size={16} className="mr-2" /> New Loan
-            </Button>
+          <div className="space-y-2">
+            <label className="text-[10px] font-bold text-gray-400 uppercase px-1">Annual CTC (INR)</label>
+            <input type="number" value={ctc} onChange={e => setCtc(e.target.value)} className="w-full text-2xl font-black p-4 bg-gray-50 border-none rounded-[1.2rem] focus:ring-4 focus:ring-primary-100 transition-all outline-none" placeholder="00,00,000" />
           </div>
-          <Table columns={[
-            { header: 'Employee', accessor: 'employeeName' },
-            { header: 'Principal', render: (l) => `₹${l.amount.toLocaleString()}` },
-            { header: 'EMI', render: (l) => `₹${Math.round(l.amount / l.duration).toLocaleString()}` },
-            { header: 'Duration', render: (l) => `${l.duration} Mo` },
-            { header: 'Status', accessor: 'status' }
-          ]} data={loans} />
-        </Card>
-      )}
-
-      {activeTab === 'reimbursements' && (
-        <Card title="Expense Claims">
-          <div className="flex justify-between items-center mb-6">
-            <Button onClick={() => {
-              setSelectedEmployee(null);
-              setNewClaim({ amount: '', type: 'Travel', reason: '' });
-              setShowReimbursementModal(true);
-            }}>
-              <Plus size={16} className="mr-2" /> Log Claim
-            </Button>
-          </div>
-          <Table columns={[
-            { header: 'Category', accessor: 'type' },
-            { header: 'Employee', accessor: 'employeeName' },
-            { header: 'Amount', render: (c) => `₹${c.amount.toLocaleString()}` },
-            { header: 'Status', accessor: 'status' }
-          ]} data={reimbursements} />
-        </Card>
-      )}
-
-      {/* Modals */}
-      <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="Update CTC">
-        <div className="space-y-4">
-          <input type="number" value={ctc} onChange={e => setCtc(e.target.value)} className="w-full p-2 border rounded-xl" placeholder="Annual CTC" />
-          <Button onClick={handleAssignCTC} className="w-full">Save Changes</Button>
+          <Button onClick={handleAssignCTC} className="w-full py-5 text-lg font-black tracking-tight shadow-xl shadow-primary-500/20">Apply New Package</Button>
         </div>
       </Modal>
 
-      <Modal isOpen={showLoanModal} onClose={() => setShowLoanModal(false)} title="Create New Loan Entry">
+      <Modal isOpen={showLoanModal} onClose={() => setShowLoanModal(false)} title="Loan Sanction Request">
         <div className="space-y-4">
-          <select onChange={(e) => setSelectedEmployee(employees.find(emp => emp.id === e.target.value))} className="w-full p-2 border rounded-xl">
-            <option>Select Employee</option>
-            {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+          <select onChange={(e) => setSelectedEmployee(employees.find(emp => emp.id === e.target.value))} className="w-full p-4 bg-gray-50 border-none rounded-[1rem] outline-none font-bold text-sm">
+            <option>Select Beneficiary...</option>{employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
           </select>
-          <input placeholder="Amount" type="number" onChange={e => setNewLoan({ ...newLoan, amount: e.target.value })} className="w-full p-2 border rounded-xl" />
-          <input placeholder="Duration (Months)" type="number" onChange={e => setNewLoan({ ...newLoan, duration: e.target.value })} className="w-full p-2 border rounded-xl" />
-          <Button onClick={handleAddLoan} className="w-full">Sanction Loan</Button>
+          <input placeholder="Principal Amount" type="number" onChange={e => setNewLoan({ ...newLoan, amount: e.target.value })} className="w-full p-4 bg-gray-50 border-none rounded-[1rem] outline-none font-bold" />
+          <input placeholder="Duration (Months)" type="number" value={newLoan.duration} onChange={e => setNewLoan({ ...newLoan, duration: e.target.value })} className="w-full p-4 bg-gray-50 border-none rounded-[1rem] outline-none font-bold" />
+          <Button onClick={handleAddLoan} className="w-full py-4 font-black mt-4">Execute Loan Contract</Button>
         </div>
       </Modal>
 
-      <Modal isOpen={showReimbursementModal} onClose={() => setShowReimbursementModal(false)} title="Log Expense Claim">
+      <Modal isOpen={showReimbursementModal} onClose={() => setShowReimbursementModal(false)} title="Log Payout Request">
         <div className="space-y-4">
-          <select onChange={(e) => setSelectedEmployee(employees.find(emp => emp.id === e.target.value))} className="w-full p-2 border rounded-xl">
-            <option>Select Employee</option>
-            {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+          <select onChange={(e) => setSelectedEmployee(employees.find(emp => emp.id === e.target.value))} className="w-full p-4 bg-gray-50 border-none rounded-[1rem] outline-none font-bold text-sm">
+            <option>Select Employee...</option>{employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
           </select>
-          <input placeholder="Amount" type="number" onChange={e => setNewClaim({ ...newClaim, amount: e.target.value })} className="w-full p-2 border rounded-xl" />
-          <select onChange={e => setNewClaim({ ...newClaim, type: e.target.value })} className="w-full p-2 border rounded-xl">
-            <option>Travel</option><option>Medical</option><option>Mobile</option>
+          <input placeholder="Total Claim Amount" type="number" onChange={e => setNewClaim({ ...newClaim, amount: e.target.value })} className="w-full p-4 bg-gray-50 border-none rounded-[1rem] outline-none font-bold" />
+          <select onChange={e => setNewClaim({ ...newClaim, type: e.target.value })} className="w-full p-4 bg-gray-50 border-none rounded-[1rem] outline-none font-bold text-sm">
+            <option>Travel Expense</option><option>Medical Reimb.</option><option>Connectivity/Mobile</option>
           </select>
-          <Button onClick={handleAddClaim} className="w-full">Submit Claim</Button>
+          <Button onClick={handleAddClaim} className="w-full py-4 font-black">Post to Approvals</Button>
         </div>
       </Modal>
 
-      <Modal isOpen={showTemplateModal} onClose={() => setShowTemplateModal(false)} title="Salary Percentages">
-        <div className="space-y-3">
+      <Modal isOpen={showTemplateModal} onClose={() => setShowTemplateModal(false)} title="Standard Policy Distribution">
+        <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2">
           {Object.keys(template).map(k => (
-            <div key={k}>
-              <label className="text-xs uppercase font-bold">
-                {k.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}%
-              </label>
-              <input
-                type="number"
-                value={template[k]}
-                onChange={e => setTemplate({ ...template, [k]: parseFloat(e.target.value) })}
-                className="w-full p-2 border rounded-xl"
-              />
+            <div key={k} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+              <label className="text-[10px] uppercase font-black text-gray-500 tracking-widest">{k.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}</label>
+              <div className="flex items-center gap-2">
+                <input type="number" value={template[k]} onChange={e => setTemplate({ ...template, [k]: parseFloat(e.target.value) })} className="w-16 bg-transparent border-none text-right font-black text-primary-600 focus:ring-0" />
+                <span className="text-gray-300 font-bold">%</span>
+              </div>
             </div>
           ))}
-          <Button onClick={handleSaveTemplate} className="w-full">Save Policy</Button>
+          <Button onClick={handleSaveTemplate} className="w-full mt-4">Lock Policy Ratios</Button>
         </div>
       </Modal>
 
-      <Modal isOpen={showTaxModal} onClose={() => setShowTaxModal(false)} title="Tax Rules">
-        <div className="space-y-4"><input type="number" value={taxConfig.pfEmployee} onChange={e => setTaxConfig({ ...taxConfig, pfEmployee: parseFloat(e.target.value) })} className="w-full p-2 border rounded-xl" placeholder="PF %" /><Button onClick={handleSaveTaxConfig} className="w-full">Save</Button></div>
-      </Modal>
-
-      <Modal isOpen={showHistoryModal} onClose={() => setShowHistoryModal(false)} title="Adjustments" size="lg">
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <input placeholder="Amount" type="number" value={adjustmentData.amount} onChange={e => setAdjustmentData({ ...adjustmentData, amount: e.target.value })} className="p-2 border rounded-xl" />
-            <select value={adjustmentData.type} onChange={e => setAdjustmentData({ ...adjustmentData, type: e.target.value })} className="p-2 border rounded-xl"><option>Bonus</option><option>Increment</option></select>
-            <input placeholder="Reason" value={adjustmentData.reason} onChange={e => setAdjustmentData({ ...adjustmentData, reason: e.target.value })} className="col-span-2 p-2 border rounded-xl" />
-            <Button onClick={handleAddAdjustment} className="col-span-2">Apply</Button>
+      <Modal isOpen={showHistoryModal} onClose={() => setShowHistoryModal(false)} title="Employee Financial Adjustments" size="lg">
+        <div className="space-y-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-900 p-6 rounded-[1.5rem]">
+            <input placeholder="Adjustment Amount" type="number" value={adjustmentData.amount} onChange={e => setAdjustmentData({ ...adjustmentData, amount: e.target.value })} className="p-3 bg-white/10 border-none rounded-xl text-white outline-none font-bold" />
+            <select value={adjustmentData.type} onChange={e => setAdjustmentData({ ...adjustmentData, type: e.target.value })} className="p-3 bg-white/10 border-none rounded-xl text-white outline-none font-bold"><option className="text-black">Bonus</option><option className="text-black">Increment</option></select>
+            <input placeholder="Specific Reason / Notes" value={adjustmentData.reason} onChange={e => setAdjustmentData({ ...adjustmentData, reason: e.target.value })} className="col-span-2 p-3 bg-white/10 border-none rounded-xl text-white outline-none font-bold" />
+            <Button onClick={handleAddAdjustment} className="col-span-2 bg-primary-600 text-white border-none py-3 font-black">Commit Adjustments</Button>
           </div>
-          <div className="space-y-2">{history.map(h => <div key={h.id} className="p-2 border rounded-xl flex justify-between"><span>{h.type}: ₹{h.amount}</span><span className="text-gray-400">{h.reason}</span></div>)}</div>
+          <div className="space-y-3">
+            <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Ledger History</h4>
+            <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2">
+              {history.length === 0 ? <p className="text-center py-10 text-gray-400 italic text-sm">Empty financial ledger.</p> : history.map(h => (
+                <div key={h.id} className="p-4 border border-gray-100 rounded-2xl flex justify-between items-center hover:border-primary-100 transition-all">
+                  <div><p className="font-black text-gray-900">{h.type}: ₹{h.amount}</p><p className="text-[10px] text-gray-400 mt-0.5">{h.reason}</p></div>
+                  <div className="text-[9px] font-bold text-gray-300 uppercase tracking-tighter">{new Date(h.createdAt?.seconds * 1000).toLocaleDateString()}</div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </Modal>
 
