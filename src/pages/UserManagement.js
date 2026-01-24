@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Card, Button, Modal, Table } from '../components/UI';
+import { Card, Button, Modal, Table, Alert } from '../components/UI';
 import { UserPlus, Trash2, Key, RefreshCw, Search, Shield } from 'lucide-react';
 
 const UserManagement = () => {
