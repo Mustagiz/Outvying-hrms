@@ -324,6 +324,10 @@ const Payroll = () => {
     return depts;
   }, [allUsers]);
 
+  const topCtcData = useMemo(() => {
+    return allUsers.filter(u => u.ctc).sort((a, b) => b.ctc - a.ctc).slice(0, 7);
+  }, [allUsers]);
+
   const stats = useMemo(() => {
     const totalItems = allUsers.length;
     const processed = allUsers.filter(u => u.salaryBreakdown).length;
