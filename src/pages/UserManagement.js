@@ -4,7 +4,7 @@ import { Card, Button, Modal, Table } from '../components/UI';
 import { UserPlus, Trash2, Key, RefreshCw, Search, Shield } from 'lucide-react';
 
 const UserManagement = () => {
-  const { allUsers, addUser, deleteUser, updateUser, resetPassword, updateUserId, repairAdminProfile } = useAuth();
+  const { allUsers, addUser, deleteUser, updateUser, resetPassword, forceUpdatePassword, updateUserId, repairAdminProfile } = useAuth();
   const [alert, setAlert] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showResetModal, setShowResetModal] = useState(false);
@@ -104,9 +104,26 @@ const UserManagement = () => {
     setTimeout(() => setAlert(null), 3000);
   };
 
+  const handleManualPasswordReset = async () => {
+    if (!formData.password || !formData.newPassword) {
+      setAlert({ type: 'error', message: 'Both current (old) password and new password are required.' });
+      return;
+    }
+
+    const result = await forceUpdatePassword(selectedUser.email, formData.password, formData.newPassword);
+    setAlert({ type: result.success ? 'success' : 'error', message: result.message });
+
+    if (result.success) {
+      setShowResetModal(false);
+      setSelectedUser(null);
+      setFormData({ ...formData, password: '', newPassword: '' });
+    }
+    setTimeout(() => setAlert(null), 3000);
+  };
+
   const openResetModal = (user, type) => {
     setSelectedUser({ ...user, resetType: type });
-    setFormData({ ...formData, userId: user.userId || '', password: '' });
+    setFormData({ ...formData, userId: user.userId || '', password: '', newPassword: '' });
     setShowResetModal(true);
   };
 
@@ -287,11 +304,36 @@ const UserManagement = () => {
           ) : (
             <>
               <p className="text-sm text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20 p-2 rounded">
-                This will send an official Firebase password reset link to <strong>{selectedUser?.email}</strong>.
+                Choose an option to reset password for <strong>{selectedUser?.name}</strong>.
               </p>
-              <Button onClick={handleResetPassword} className="w-full">
-                Send Reset Link
-              </Button>
+
+              <div className="space-y-4 pt-2 border-t dark:border-gray-700">
+                <p className="text-xs font-bold text-gray-500 uppercase">Option 1: Manual Overwrite</p>
+                <input
+                  type="password"
+                  placeholder="Old/Current Password of User"
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                />
+                <input
+                  type="password"
+                  placeholder="NEW Password"
+                  value={formData.newPassword}
+                  onChange={(e) => setFormData({ ...formData, newPassword: e.target.value })}
+                  className="w-full px-4 py-2 border border-primary-300 dark:border-primary-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm font-bold"
+                />
+                <Button onClick={handleManualPasswordReset} className="w-full bg-primary-600">
+                  Update Password Manually
+                </Button>
+              </div>
+
+              <div className="pt-4 space-y-2 border-t dark:border-gray-700">
+                <p className="text-xs font-bold text-gray-500 uppercase">Option 2: Email Reset Link</p>
+                <Button onClick={handleResetPassword} variant="secondary" className="w-full">
+                  Send Reset Link to {selectedUser?.email}
+                </Button>
+              </div>
             </>
           )}
         </div>
