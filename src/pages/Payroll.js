@@ -47,6 +47,7 @@ const Payroll = () => {
   const [newLoan, setNewLoan] = useState({ amount: '', duration: '12', reason: '', interest: '0' });
   const [newClaim, setNewClaim] = useState({ amount: '', type: 'Travel', reason: '' });
   const [selectedProcessMonth, setSelectedProcessMonth] = useState('January 2026');
+  const [newComp, setNewComp] = useState({ name: '', value: '' });
   const itemsPerPage = 10;
 
   const [adjustmentData, setAdjustmentData] = useState({
@@ -57,7 +58,7 @@ const Payroll = () => {
   const [template, setTemplate] = useState(() => {
     const saved = localStorage.getItem('salaryTemplate');
     return saved ? JSON.parse(saved) : {
-      basic: 40, hra: 16, medical: 4, transport: 8.6, special: 15.4, shiftAllowance: 8, attendanceAllowance: 8
+      basic: 40, hra: 16, medical: 4, transport: 8.1, shiftAllowance: 8.6, attendanceAllowance: 8.6
     };
   });
 
@@ -82,15 +83,17 @@ const Payroll = () => {
   const calculateBreakdown = (totalCtc) => {
     const annual = parseFloat(totalCtc) || 0;
     const monthly = annual / 12;
-    const basic = monthly * (template.basic / 100);
-    const hra = monthly * (template.hra / 100);
-    const medical = monthly * (template.medical / 100);
-    const transport = monthly * (template.transport / 100);
-    const special = monthly * (template.special / 100);
-    const shiftAllowance = monthly * (template.shiftAllowance / 100);
-    const attendanceAllowance = monthly * (template.attendanceAllowance / 100);
-    const grossSalary = basic + hra + medical + transport + special + shiftAllowance + attendanceAllowance;
-    const pfBasic = Math.min(basic, taxConfig.pfCeiling);
+
+    const components = {};
+    let grossSalary = 0;
+
+    Object.keys(template).forEach(key => {
+      const val = monthly * (template[key] / 100);
+      components[key] = val.toFixed(2);
+      grossSalary += val;
+    });
+
+    const pfBasic = Math.min(parseFloat(components.basic || 0), taxConfig.pfCeiling);
     const pfEmployee = pfBasic * (taxConfig.pfEmployee / 100);
     const pfEmployer = pfBasic * (taxConfig.pfEmployer / 100);
     const esiApplicable = grossSalary <= taxConfig.esiCeiling;
@@ -110,13 +113,22 @@ const Payroll = () => {
     const totalDeductions = pfEmployee + esiEmployee + professionalTax + monthlyTds;
     const netSalary = grossSalary - totalDeductions;
     const employerCost = monthly + pfEmployer + esiEmployer;
+
     return {
-      basic: basic.toFixed(2), hra: hra.toFixed(2), medical: medical.toFixed(2), transport: transport.toFixed(2),
-      special: special.toFixed(2), shiftAllowance: shiftAllowance.toFixed(2), attendanceAllowance: attendanceAllowance.toFixed(2), grossSalary: grossSalary.toFixed(2),
-      pfEmployee: pfEmployee.toFixed(2), pfEmployer: pfEmployer.toFixed(2), esiEmployee: esiEmployee.toFixed(2),
-      esiEmployer: esiEmployer.toFixed(2), professionalTax: professionalTax.toFixed(2), tds: monthlyTds.toFixed(2),
-      totalDeductions: totalDeductions.toFixed(2), netSalary: netSalary.toFixed(2), monthly: monthly.toFixed(2),
-      annual: annual.toFixed(2), employerCost: employerCost.toFixed(2), costToCompany: (employerCost * 12).toFixed(2)
+      ...components,
+      grossSalary: grossSalary.toFixed(2),
+      pfEmployee: pfEmployee.toFixed(2),
+      pfEmployer: pfEmployer.toFixed(2),
+      esiEmployee: esiEmployee.toFixed(2),
+      esiEmployer: esiEmployer.toFixed(2),
+      professionalTax: professionalTax.toFixed(2),
+      tds: monthlyTds.toFixed(2),
+      totalDeductions: totalDeductions.toFixed(2),
+      netSalary: netSalary.toFixed(2),
+      monthly: monthly.toFixed(2),
+      annual: annual.toFixed(2),
+      employerCost: employerCost.toFixed(2),
+      costToCompany: (employerCost * 12).toFixed(2)
     };
   };
 
@@ -130,6 +142,20 @@ const Payroll = () => {
     localStorage.setItem('taxConfig', JSON.stringify(taxConfig));
     setShowTaxModal(false);
     setAlert({ type: 'success', message: 'Statutory rules updated' });
+  };
+
+  const handleDeleteComponent = (key) => {
+    if (['basic'].includes(key)) return;
+    const newTemplate = { ...template };
+    delete newTemplate[key];
+    setTemplate(newTemplate);
+  };
+
+  const handleAddComponent = () => {
+    if (!newComp.name || !newComp.value) return;
+    const key = newComp.name.toLowerCase().replace(/\s+/g, '');
+    setTemplate({ ...template, [key]: parseFloat(newComp.value) });
+    setNewComp({ name: '', value: '' });
   };
 
   const handleAddAdjustment = async () => {
@@ -240,7 +266,10 @@ const Payroll = () => {
     doc.line(20, currentY + 2, 190, currentY + 2); currentY += 8;
     doc.setFontSize(9); doc.text('Description', 22, currentY); doc.text('Full', 70, currentY, { align: 'right' }); doc.text('Actual', 105, currentY, { align: 'right' });
     doc.text('Description', 112, currentY); doc.text('Amount', 188, currentY, { align: 'right' }); currentY += 6;
-    const earnings = [['Basic Salary (BS)', b.basic], ['House Rent Allowance (HRA)', b.hra], ['Medical Allowance', b.medical], ['Transportation Allowance (TA)', b.transport], ['Shift Allowance', b.shiftAllowance], ['Attendance Allowance', b.attendanceAllowance]];
+    const earnings = Object.keys(template).map(k => [
+      k.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()),
+      b[k] || '0.00'
+    ]);
     const deductions = [['Tax (TDS)', b.tds], ['Professional TAX', b.professionalTax], ['ESI', b.esiEmployee]];
     const rowCount = Math.max(earnings.length, deductions.length);
     for (let i = 0; i < rowCount; i++) {
@@ -520,18 +549,41 @@ const Payroll = () => {
         </div>
       </Modal>
 
-      <Modal isOpen={showTemplateModal} onClose={() => setShowTemplateModal(false)} title="Standard Policy Distribution">
-        <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2">
-          {Object.keys(template).map(k => (
-            <div key={k} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
-              <label className="text-[10px] uppercase font-black text-gray-500 tracking-widest">{k.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}</label>
-              <div className="flex items-center gap-2">
-                <input type="number" value={template[k]} onChange={e => setTemplate({ ...template, [k]: parseFloat(e.target.value) })} className="w-16 bg-transparent border-none text-right font-black text-primary-600 focus:ring-0" />
-                <span className="text-gray-300 font-bold">%</span>
-              </div>
+      <Modal isOpen={showTemplateModal} onClose={() => setShowTemplateModal(false)} title="Customize Earnings Structure">
+        <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-2">
+
+          {/* New Component Form */}
+          <div className="p-4 bg-gray-900 rounded-2xl space-y-3">
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Add Custom Earning Section</p>
+            <div className="grid grid-cols-2 gap-3">
+              <input placeholder="e.g. Wellness" value={newComp.name} onChange={e => setNewComp({ ...newComp, name: e.target.value })} className="p-2.5 bg-white/10 border-none rounded-xl text-white text-xs font-bold outline-none" />
+              <input placeholder="Percentage %" type="number" value={newComp.value} onChange={e => setNewComp({ ...newComp, value: e.target.value })} className="p-2.5 bg-white/10 border-none rounded-xl text-white text-xs font-bold outline-none" />
+              <Button onClick={handleAddComponent} className="col-span-2 bg-primary-600 text-white border-none py-2 text-xs font-black">Append to Template</Button>
             </div>
-          ))}
-          <Button onClick={handleSaveTemplate} className="w-full mt-4">Lock Policy Ratios</Button>
+          </div>
+
+          <div className="space-y-3">
+            {Object.keys(template).map(k => (
+              <div key={k} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl group hover:bg-white hover:shadow-md transition-all border border-transparent hover:border-gray-100">
+                <div className="flex flex-col">
+                  <label className="text-[10px] uppercase font-black text-gray-400 tracking-widest">
+                    {k.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
+                  </label>
+                  <div className="flex items-center gap-1 mt-1">
+                    <input type="number" value={template[k]} onChange={e => setTemplate({ ...template, [k]: parseFloat(e.target.value) })} className="w-12 bg-transparent border-none p-0 font-black text-primary-600 focus:ring-0 text-lg" />
+                    <span className="text-gray-300 font-bold">% of CTC</span>
+                  </div>
+                </div>
+                {k !== 'basic' && (
+                  <button onClick={() => handleDeleteComponent(k)} className="p-2 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all">
+                    <TrendingDown size={18} />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <Button onClick={handleSaveTemplate} className="w-full mt-4 py-4 font-black shadow-xl shadow-primary-500/20">Lock Distribution Strategy</Button>
         </div>
       </Modal>
 
