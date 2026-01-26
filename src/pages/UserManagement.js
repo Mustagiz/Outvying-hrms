@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Card, Button, Modal, Table, Alert } from '../components/UI';
+import { Card, Button, Modal, Table, Alert, Pagination } from '../components/UI';
 import { UserPlus, Trash2, Key, RefreshCw, Search, Shield } from 'lucide-react';
 
 const UserManagement = () => {
@@ -15,10 +15,20 @@ const UserManagement = () => {
     name: '', email: '', employeeId: '', designation: '', department: '', role: 'employee', userId: '', password: '', newPassword: '', reportingTo: ''
   });
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
   const filteredUsers = allUsers.filter(u =>
     (u.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
     (u.employeeId || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const paginatedUsers = React.useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return filteredUsers.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredUsers, currentPage]);
+
+  const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
 
   const handleAddUser = async () => {
     try {
@@ -216,7 +226,17 @@ const UserManagement = () => {
           </div>
         </div>
 
-        <Table columns={columns} data={filteredUsers} />
+        <Table columns={columns} data={paginatedUsers} />
+
+        {totalPages > 1 && (
+          <div className="mt-6 flex justify-center">
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={(page) => setCurrentPage(page)}
+            />
+          </div>
+        )}
       </Card>
 
       <Modal isOpen={showAddModal} onClose={() => setShowAddModal(false)} title="Add New User">
