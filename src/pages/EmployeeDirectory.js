@@ -18,10 +18,23 @@ const EmployeeDirectory = () => {
   const [isDeleting, setIsDeleting] = useState(null);
 
   const employees = useMemo(() => {
-    if (currentUser.role === 'manager') {
+    const role = (currentUser.role || '').toLowerCase();
+
+    // Managers only see their direct reports
+    if (role === 'manager') {
       return allUsers.filter(u => u.reportingTo === currentUser.name);
     }
-    return allUsers.filter(u => u.role === 'employee' || u.role === 'hr' || u.role === 'manager');
+
+    // Admins and Super Admins see everyone
+    if (role === 'admin' || role === 'super_admin') {
+      return allUsers;
+    }
+
+    // Default: Show common employee roles
+    return allUsers.filter(u => {
+      const uRole = (u.role || '').toLowerCase();
+      return uRole === 'employee' || uRole === 'hr' || uRole === 'manager';
+    });
   }, [allUsers, currentUser]);
 
   const filteredEmployees = useMemo(() => {
