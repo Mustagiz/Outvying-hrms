@@ -179,8 +179,8 @@ const Dashboard = () => {
 
       {/* Main Grid: Clock/Featured + Stats */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-        {/* Clock Section - Priority for Employees */}
-        {currentUser.role === 'employee' && (
+        {/* Clock Section - Priority for Employees and HR */}
+        {(currentUser.role === 'employee' || currentUser.role === 'hr') && (
           <div className="xl:col-span-12">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <Card className="relative overflow-hidden border-primary-500/20 dark:border-primary-500/10 shadow-2xl shadow-primary-500/5 group">

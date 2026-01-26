@@ -46,6 +46,7 @@ const Layout = ({ children }) => {
       { path: '/onboarding', icon: UserPlus, label: 'Onboarding' },
       { path: '/payslips', icon: DollarSign, label: 'Payslips' },
       { path: '/roster', icon: Calendar, label: 'Roster' },
+      { path: '/bank-account', icon: DollarSign, label: 'Bank Account Management' },
       { path: '/attendance-regularization', icon: CheckSquare, label: 'Regularization' },
       { path: '/reports', icon: BarChart2, label: 'Reports' }
     ],

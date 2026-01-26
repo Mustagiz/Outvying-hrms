@@ -135,13 +135,13 @@ const BankAccount = () => {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-gray-800 dark:text-white">Bank Account Details</h1>
         <div className="flex gap-2">
-          {currentUser.role === 'admin' && (
+          {(currentUser.role === 'admin' || currentUser.role === 'hr') && (
             <Button onClick={downloadCSV} variant="secondary">
               <Download size={18} className="inline mr-2" />
               Download CSV
             </Button>
           )}
-          {!isEditing && (currentUser.role === 'employee' || currentUser.role === 'admin') && selectedEmployee && (
+          {!isEditing && (currentUser.role === 'employee' || currentUser.role === 'admin' || currentUser.role === 'hr') && selectedEmployee && (
             <Button onClick={() => setIsEditing(true)}>Edit Details</Button>
           )}
         </div>
@@ -149,7 +149,7 @@ const BankAccount = () => {
 
       {alert && <Alert type={alert.type} message={alert.message} onClose={() => setAlert(null)} />}
 
-      {currentUser.role === 'admin' && (
+      {(currentUser.role === 'admin' || currentUser.role === 'hr') && (
         <Card className="mb-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
