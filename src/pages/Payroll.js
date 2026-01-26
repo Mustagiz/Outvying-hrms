@@ -83,61 +83,47 @@ const Payroll = () => {
   const paginatedEmployees = filteredEmployees.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   const getEmployeeWorkDays = (empId, monthStr) => {
-    const [monthName, year] = monthStr.split(' ');
-    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-    const monthNum = months.indexOf(monthName);
-
-    // Total days in month
-    const totalDays = new Date(year, monthNum + 1, 0).getDate();
-
-    // Filter attendance for this employee and month
-    const records = attendance.filter(a => {
-      if (!a.date) return false;
-      const d = new Date(a.date);
-      return String(a.employeeId) === String(empId) && d.getMonth() === monthNum && d.getFullYear() === parseInt(year);
-    });
-
-    // If no records found, assume 0 for safety (or user can manually adjust)
-    // BUT common HRMS logic: if they have a roster but no swipe, they are absent.
-    // If they have NO records at all for the month, it depends on policy.
-    // We'll calculate based on what's found.
-    const effectiveDays = records.reduce((sum, rec) => {
-      if (rec.status === 'Present') return sum + 1;
-      if (rec.status === 'Late') return sum + 1;
-      if (rec.status === 'Half Day') return sum + 0.5;
-      return sum;
-    }, 0);
-
-    return { effectiveDays, totalDays, recordCount: records.length };
-  };
-
-  const calculateTotalWorkingDays = (empId, monthStr) => {
     const [monthName, yearStr] = monthStr.split(' ');
     const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
     const monthNum = months.indexOf(monthName);
     const year = parseInt(yearStr);
 
-    // 1. Try to find defined rosters for this employee/month
+    // 1. Calculate Total Working Days for the month (Denominator)
+    // Priority 1: Check if employee has assigned rosters
     const empRosters = rosters.filter(r => {
       const d = new Date(r.date);
       return String(r.employeeId) === String(empId) && d.getMonth() === monthNum && d.getFullYear() === year;
     });
 
-    if (empRosters.length > 0) {
-      return empRosters.length;
-    }
+    let totalWorkingDays = empRosters.length > 0 ? empRosters.length : 0;
 
-    // 2. Fallback: Count Weekdays (Mon-Fri) in the month
-    let weekdays = 0;
-    const daysInMonth = new Date(year, monthNum + 1, 0).getDate();
-    for (let day = 1; day <= daysInMonth; day++) {
-      const date = new Date(year, monthNum, day);
-      const dayOfWeek = date.getDay();
-      if (dayOfWeek !== 0 && dayOfWeek !== 6) { // Not Sat/Sun
-        weekdays++;
+    // Priority 2: Fallback to Mon-Fri weekday count
+    if (totalWorkingDays === 0) {
+      const daysInMonth = new Date(year, monthNum + 1, 0).getDate();
+      for (let day = 1; day <= daysInMonth; day++) {
+        const date = new Date(year, monthNum, day);
+        const dayOfWeek = date.getDay();
+        if (dayOfWeek !== 0 && dayOfWeek !== 6) { // Not Sat/Sun
+          totalWorkingDays++;
+        }
       }
     }
-    return weekdays;
+
+    // 2. Calculate Effective Worked Days (Numerator)
+    const records = attendance.filter(a => {
+      if (!a.date) return false;
+      const d = new Date(a.date);
+      return String(a.employeeId) === String(empId) && d.getMonth() === monthNum && d.getFullYear() === year;
+    });
+
+    const effectiveDays = records.reduce((sum, rec) => {
+      if (rec.status === 'Present') return sum + 1;
+      if (rec.status === 'Late') return sum + 1;
+      if (rec.status === 'Half Day') return sum + 0.5;
+      return sum; // Absent, LWP, etc. are 0
+    }, 0);
+
+    return { effectiveDays, totalDays: totalWorkingDays, recordCount: records.length };
   };
 
   const calculateBreakdown = (totalCtc, toggles = { pf: true, esi: true, tds: true, pt: true }, attendanceStats = null) => {
@@ -586,18 +572,14 @@ const Payroll = () => {
                 <Button onClick={async () => {
                   setIsProcessing(true);
                   const batch = employees.map(emp => {
-                    const statistics = getEmployeeWorkDays(emp.id, selectedProcessMonth);
-                    const workingDaysCount = calculateTotalWorkingDays(emp.id, selectedProcessMonth);
-                    const breakdown = calculateBreakdown(emp.ctc || 0, emp.deductionToggles, {
-                      effectiveDays: statistics.effectiveDays,
-                      totalDays: workingDaysCount
-                    });
+                    const stats = getEmployeeWorkDays(emp.id, selectedProcessMonth);
+                    const breakdown = calculateBreakdown(emp.ctc || 0, emp.deductionToggles, stats);
                     return {
                       employeeId: emp.id,
                       employeeName: emp.name,
                       monthYear: selectedProcessMonth,
-                      effectiveDays: statistics.effectiveDays,
-                      totalDays: workingDaysCount,
+                      effectiveDays: stats.effectiveDays,
+                      totalDays: stats.totalDays,
                       grossEarned: breakdown.actualGrossSalary,
                       statutoryDeductions: breakdown.totalDeductions,
                       netPayable: breakdown.netSalary,
@@ -618,16 +600,12 @@ const Payroll = () => {
                 {
                   header: 'Actual (Mo)',
                   render: (u) => {
-                    const statistics = getEmployeeWorkDays(u.id, selectedProcessMonth);
-                    const workingDaysCount = calculateTotalWorkingDays(u.id, selectedProcessMonth);
-                    const breakdown = calculateBreakdown(u.ctc || 0, u.deductionToggles, {
-                      effectiveDays: statistics.effectiveDays,
-                      totalDays: workingDaysCount
-                    });
+                    const stats = getEmployeeWorkDays(u.id, selectedProcessMonth);
+                    const breakdown = calculateBreakdown(u.ctc || 0, u.deductionToggles, stats);
                     return (
                       <div>
                         <p className="font-bold">₹{parseFloat(breakdown.actualGrossSalary).toLocaleString()}</p>
-                        <p className="text-[10px] text-gray-400">{statistics.effectiveDays} / {workingDaysCount} Working Days</p>
+                        <p className="text-[10px] text-gray-400">{stats.effectiveDays} / {stats.totalDays} Working Days</p>
                       </div>
                     );
                   }
@@ -635,12 +613,8 @@ const Payroll = () => {
                 {
                   header: 'Statutory Deds',
                   render: (u) => {
-                    const statistics = getEmployeeWorkDays(u.id, selectedProcessMonth);
-                    const workingDaysCount = calculateTotalWorkingDays(u.id, selectedProcessMonth);
-                    const breakdown = calculateBreakdown(u.ctc || 0, u.deductionToggles, {
-                      effectiveDays: statistics.effectiveDays,
-                      totalDays: workingDaysCount
-                    });
+                    const stats = getEmployeeWorkDays(u.id, selectedProcessMonth);
+                    const breakdown = calculateBreakdown(u.ctc || 0, u.deductionToggles, stats);
                     return (
                       <div className="group relative cursor-help" onClick={() => { setSelectedEmployee({ ...u, salaryBreakdown: breakdown }); setShowDeductionModal(true); }}>
                         <span className="text-red-400 font-medium underline decoration-dotted">₹{parseFloat(breakdown.totalDeductions).toLocaleString()}</span>
@@ -651,12 +625,8 @@ const Payroll = () => {
                 {
                   header: 'Payout',
                   render: (u) => {
-                    const statistics = getEmployeeWorkDays(u.id, selectedProcessMonth);
-                    const workingDaysCount = calculateTotalWorkingDays(u.id, selectedProcessMonth);
-                    const breakdown = calculateBreakdown(u.ctc || 0, u.deductionToggles, {
-                      effectiveDays: statistics.effectiveDays,
-                      totalDays: workingDaysCount
-                    });
+                    const stats = getEmployeeWorkDays(u.id, selectedProcessMonth);
+                    const breakdown = calculateBreakdown(u.ctc || 0, u.deductionToggles, stats);
                     return <span className="font-black text-emerald-600">₹{parseFloat(breakdown.netSalary).toLocaleString()}</span>;
                   }
                 }
