@@ -101,58 +101,76 @@ const Attendance = () => {
   };
 
   const handleFixRecords = async () => {
-    if (!window.confirm("This will recalculate status and work hours for ALL attendance records using the latest rules. Proceed?")) return;
+    if (!window.confirm("This will fix ALL rosters AND attendance records. This will:\n1. Update all rosters to IST timezone\n2. Set grace period to 5 mins\n3. Recalculate all attendance\n\nProceed?")) return;
     setIsSyncing(true);
-    let count = 0;
+    let rosterCount = 0;
+    let attendanceCount = 0;
+
     try {
-      // 1. First, try to update the default Attendance Rule in Firestore to 5 mins if it exists
+      // STEP 1: Fix ALL rosters in database first
+      const rostersRef = collection(db, 'rosters');
+      const rostersSnap = await getDocs(rostersRef);
+
+      for (const rosterDoc of rostersSnap.docs) {
+        const rosterData = rosterDoc.data();
+        const needsUpdate = rosterData.timezone !== 'Asia/Kolkata' || Number(rosterData.gracePeriod || 0) >= 10;
+
+        if (needsUpdate) {
+          await updateDoc(rosterDoc.ref, {
+            timezone: 'Asia/Kolkata',
+            gracePeriod: 5,
+            updatedAt: serverTimestamp()
+          });
+          rosterCount++;
+        }
+      }
+
+      // STEP 2: Update default Attendance Rule
       const rulesRef = collection(db, 'attendanceRules');
       const rulesSnap = await getDocs(query(rulesRef, where('isDefault', '==', true)));
       if (!rulesSnap.empty) {
         const defaultRuleDoc = rulesSnap.docs[0];
         if (defaultRuleDoc.data().gracePeriodMins > 5) {
-          console.log("Updating default rule grace period to 5 mins in database...");
           await updateDoc(defaultRuleDoc.ref, { gracePeriodMins: 5, updatedAt: serverTimestamp() });
         }
       }
 
-      // 2. Recalculate all attendance records
+      // STEP 3: Recalculate all attendance records with FRESH roster data
       const recordsToScan = attendance.filter(a => a.clockIn);
       for (const record of recordsToScan) {
+        // Find roster with IST timezone (should be updated now)
         const roster = rosters.find(r => String(r.employeeId) === String(record.employeeId) && r.date === record.date);
 
-        // --- POWER FIX: Overwrite problematic defaults ---
-        // 1. Force grace period to 5 if it's 15 or missing
-        // 2. If it's a "Night Shift" or "Late Shift" but set to US timezone, force it to IST
-        const forceIST = roster && (roster.shiftName === 'Night Shift' || roster.shiftName === 'Late Shift') && (roster.timezone !== 'Asia/Kolkata');
-
+        // Force IST and 5 mins for calculation
         const effectiveRoster = roster ? {
           ...roster,
-          gracePeriod: (Number(roster.gracePeriod || 0) >= 15 ? 5 : roster.gracePeriod),
-          timezone: forceIST ? 'Asia/Kolkata' : roster.timezone
+          gracePeriod: 5,
+          timezone: 'Asia/Kolkata'
         } : null;
 
         const result = calculateAttendanceStatus(record.clockIn, record.clockOut, record.date, effectiveRoster, attendanceRules);
 
         const ref = doc(db, 'attendance', record.id);
-        const updates = {
+        await updateDoc(ref, {
           workHours: result.workHours,
           workingDays: result.workingDays,
           overtime: result.overtime,
           status: result.status,
           ruleApplied: result.ruleApplied
-        };
-
-        await updateDoc(ref, updates);
-        count++;
+        });
+        attendanceCount++;
       }
-      setAlert({ type: 'success', message: `Recalculated ${count} records. Standardized Timezones & 5-min grace applied.` });
+
+      setAlert({
+        type: 'success',
+        message: `✅ Fixed ${rosterCount} rosters + ${attendanceCount} attendance records. Please refresh the page!`
+      });
     } catch (err) {
       console.error(err);
       setAlert({ type: 'error', message: 'Fix failed: ' + err.message });
     }
     setIsSyncing(false);
-    setTimeout(() => setAlert(null), 5000);
+    setTimeout(() => setAlert(null), 10000);
   };
 
   const handleManualSubmit = async () => {
