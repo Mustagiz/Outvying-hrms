@@ -253,7 +253,7 @@ const Payslips = () => {
       isRightSide = !isRightSide;
     });
 
-    yPos = currentY + 4;
+    let yPos = currentY + 4;
 
     yPos += 10;
 
