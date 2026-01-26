@@ -68,6 +68,10 @@ export const AuthProvider = ({ children }) => {
   const [regularizationRequests, setRegularizationRequests] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [attendanceRules, setAttendanceRules] = useState([]);
+  const [payrollSettings, setPayrollSettings] = useState({
+    template: { basic: 40, hra: 16, medical: 4, transport: 8.1, shiftAllowance: 8.6, attendanceAllowance: 8.6 },
+    tax: { pfEmployee: 12, pfEmployer: 12, pfCeiling: 15000, esiEmployee: 0.75, esiEmployer: 3.25, esiCeiling: 21000, professionalTax: 200, tdsEnabled: true }
+  });
 
   // Local State
   const [theme, setTheme] = useState('light');
@@ -169,9 +173,17 @@ export const AuthProvider = ({ children }) => {
       setAttendanceRules(rulesData);
     });
 
+    // Subscribe to Payroll Settings
+    const unsubscribePayroll = onSnapshot(doc(db, 'settings', 'payroll'), (doc) => {
+      if (doc.exists()) {
+        setPayrollSettings(doc.data());
+      }
+    });
+
     return () => {
       unsubscribeAuth();
       unsubRules();
+      unsubscribePayroll();
     };
   }, []);
 
@@ -1112,11 +1124,9 @@ export const AuthProvider = ({ children }) => {
     syncBiometric,
     applyLeave,
     updateLeaveStatus,
+    payrollSettings,
     commitPayroll: async (payrollBatch) => {
       try {
-        const batchId = payrollBatch[0]?.monthYear.replace(/\s+/g, '-').toLowerCase() || 'unknown';
-        // Use a generic collection or sub-collection logic
-        // For simplicity, we'll add individual docs to a 'processedPayroll' collection
         const promises = payrollBatch.map(record =>
           addDoc(collection(db, 'processedPayroll'), {
             ...record,
@@ -1129,6 +1139,14 @@ export const AuthProvider = ({ children }) => {
       } catch (e) {
         console.error("Commit Payroll Error:", e);
         return { success: false, message: 'Commit failed: ' + e.message };
+      }
+    },
+    updatePayrollSettings: async (newSettings) => {
+      try {
+        await setDoc(doc(db, 'settings', 'payroll'), newSettings, { merge: true });
+        return { success: true };
+      } catch (e) {
+        return { success: false, message: e.message };
       }
     },
     uploadDocument,

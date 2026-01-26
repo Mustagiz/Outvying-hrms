@@ -28,7 +28,7 @@ ChartJS.register(
 );
 
 const Payroll = () => {
-  const { allUsers, updateUser, currentUser, allBankAccounts, attendance, commitPayroll, rosters } = useAuth();
+  const { allUsers, updateUser, currentUser, allBankAccounts, attendance, commitPayroll, rosters, payrollSettings, updatePayrollSettings } = useAuth();
   const [activeTab, setActiveTab] = useState('employees');
   const [showModal, setShowModal] = useState(false);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
@@ -57,21 +57,16 @@ const Payroll = () => {
   });
   const [history, setHistory] = useState([]);
 
-  const [template, setTemplate] = useState(() => {
-    const saved = localStorage.getItem('salaryTemplate');
-    return saved ? JSON.parse(saved) : {
-      basic: 40, hra: 16, medical: 4, transport: 8.1, shiftAllowance: 8.6, attendanceAllowance: 8.6
-    };
-  });
+  const [template, setTemplate] = useState(payrollSettings.template);
+  const [taxConfig, setTaxConfig] = useState(payrollSettings.tax);
 
-  const [taxConfig, setTaxConfig] = useState(() => {
-    const saved = localStorage.getItem('taxConfig');
-    return saved ? JSON.parse(saved) : {
-      pfEmployee: 12, pfEmployer: 12, pfCeiling: 15000,
-      esiEmployee: 0.75, esiEmployer: 3.25, esiCeiling: 21000,
-      professionalTax: 200, tdsEnabled: true
-    };
-  });
+  // Sync with Database when settings change globally
+  useEffect(() => {
+    if (payrollSettings) {
+      setTemplate(payrollSettings.template);
+      setTaxConfig(payrollSettings.tax);
+    }
+  }, [payrollSettings]);
 
   const employees = allUsers.filter(u => u.role === 'employee' || u.role === 'hr');
   const filteredEmployees = employees.filter(e =>
@@ -193,16 +188,24 @@ const Payroll = () => {
     };
   };
 
-  const handleSaveTemplate = () => {
-    localStorage.setItem('salaryTemplate', JSON.stringify(template));
-    setShowTemplateModal(false);
-    setAlert({ type: 'success', message: 'Template saved' });
+  const handleSaveTemplate = async () => {
+    const result = await updatePayrollSettings({ template });
+    if (result.success) {
+      setShowTemplateModal(false);
+      setAlert({ type: 'success', message: 'Earnings Structure synced to cloud' });
+    } else {
+      setAlert({ type: 'error', message: result.message });
+    }
   };
 
-  const handleSaveTaxConfig = () => {
-    localStorage.setItem('taxConfig', JSON.stringify(taxConfig));
-    setShowTaxModal(false);
-    setAlert({ type: 'success', message: 'Statutory rules updated' });
+  const handleSaveTaxConfig = async () => {
+    const result = await updatePayrollSettings({ tax: taxConfig });
+    if (result.success) {
+      setShowTaxModal(false);
+      setAlert({ type: 'success', message: 'Statutory Rules synced to cloud' });
+    } else {
+      setAlert({ type: 'error', message: result.message });
+    }
   };
 
   const handleDeleteComponent = (key) => {
@@ -371,7 +374,6 @@ const Payroll = () => {
     doc.line(20, currentY - 2, 190, currentY - 2); doc.setFont('helvetica', 'bold'); doc.text('Total Earnings', 22, currentY); doc.text(parseFloat(finalEarnings).toFixed(2), 105, currentY, { align: 'right' }); doc.text('Total Deduction', 112, currentY); doc.text(parseFloat(totalDeds).toFixed(2), 188, currentY, { align: 'right' });
     currentY += 10; doc.setFontSize(11); doc.text(`Net Pay for the month (Total Earnings - Total Dedutions):`, 22, currentY); doc.setFontSize(14);
     const net = actualBreakdown.netSalary; doc.text(`₹ ${parseFloat(net).toLocaleString()}`, 188, currentY, { align: 'right' });
-    doc.save(`Payslip_${emp.employeeId}_${monthName}.pdf`);
     doc.save(`Payslip_${emp.employeeId}_${monthName}.pdf`);
   };
 
