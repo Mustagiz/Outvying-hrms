@@ -22,12 +22,6 @@ const Payslips = () => {
   const [customDeduction, setCustomDeduction] = useState(0);
   const [deductionReason, setDeductionReason] = useState('LOP (Loss of Pay)');
 
-  const [showViewOptions, setShowViewOptions] = useState(false);
-  const [privacySettings, setPrivacySettings] = useState({
-    grossPay: true,
-    deductions: true,
-    netPay: true
-  });
 
   const deductionReasons = [
     'LOP (Loss of Pay)', 'Income Tax / TDS', 'Professional Tax', 'Provident Fund',
@@ -460,33 +454,6 @@ const Payslips = () => {
     <div>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-gray-800 dark:text-white">Salary Slips</h1>
-        <div className="relative">
-          {currentUser.role === 'admin' && (
-            <Button variant="secondary" onClick={openSettings}>
-              <Settings size={18} className="inline mr-2" />
-              Settings
-            </Button>
-          )}
-
-          {showViewOptions && (
-            <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-10 p-2">
-              <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2 px-2 uppercase">Toggle Visibility</p>
-              {['grossPay', 'deductions', 'netPay'].map(key => (
-                <label key={key} className="flex items-center gap-2 p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={privacySettings[key]}
-                    onChange={() => setPrivacySettings(prev => ({ ...prev, [key]: !prev[key] }))}
-                    className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                  />
-                  <span className="text-sm text-gray-700 dark:text-gray-300 capitalize">
-                    {key.replace(/([A-Z])/g, ' $1')}
-                  </span>
-                </label>
-              ))}
-            </div>
-          )}
-        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
@@ -690,7 +657,7 @@ const Payslips = () => {
             );
           })()
         }
-      </Card >
+      </Card>
 
       <Modal isOpen={showPreview} onClose={() => setShowPreview(false)} title="Payslip Preview" size="lg">
         {previewData && (
@@ -796,9 +763,7 @@ const Payslips = () => {
           </div>
         )}
       </Modal>
-
-      {/* Settings Modal Removed - Refactor Complete */}
-    </div >
+    </div>
   );
 };
 
