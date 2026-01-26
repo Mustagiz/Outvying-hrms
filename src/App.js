@@ -33,6 +33,7 @@ import IPAccessLogs from './pages/IPAccessLogs';
 import Profile from './pages/Profile';
 import Roster from './pages/Roster';
 import AttendanceDebug from './pages/AttendanceDebug';
+import RosterFix from './pages/RosterFix';
 import { Spinner } from './components/UI';
 
 const PrivateRoute = ({ children }) => {
@@ -348,6 +349,26 @@ const AppRoutes = () => {
           <PrivateRoute>
             <Layout>
               <IPAccessLogs />
+            </Layout>
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/attendance-debug"
+        element={
+          <PrivateRoute>
+            <Layout>
+              <AttendanceDebug />
+            </Layout>
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/roster-fix"
+        element={
+          <PrivateRoute>
+            <Layout>
+              <RosterFix />
             </Layout>
           </PrivateRoute>
         }
