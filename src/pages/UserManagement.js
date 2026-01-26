@@ -105,6 +105,23 @@ const UserManagement = () => {
     setTimeout(() => setAlert(null), 3000);
   };
 
+  const handleManualPasswordReset = async () => {
+    if (!formData.password || !formData.newPassword) {
+      setAlert({ type: 'error', message: 'Both current (old) password and new password are required.' });
+      return;
+    }
+
+    const result = await forceUpdatePassword(selectedUser.email, formData.password, formData.newPassword);
+    setAlert({ type: result.success ? 'success' : 'error', message: result.message });
+
+    if (result.success) {
+      setShowResetModal(false);
+      setSelectedUser(null);
+      setFormData({ ...formData, password: '', newPassword: '' });
+    }
+    setTimeout(() => setAlert(null), 3000);
+  };
+
   const handleUpdateRole = async () => {
     if (!formData.role) {
       setAlert({ type: 'error', message: 'Please select a role' });
