@@ -102,10 +102,17 @@ export const AuthProvider = ({ children }) => {
 
           if (userSnap.exists()) {
             const userData = userSnap.data();
+            // Check for explicit deletion flag if we decide to use one, or just proceed
+            if (userData.isDeleted) {
+              console.warn("Account marked as deleted. Logging out.");
+              await signOut(auth);
+              setCurrentUser(null);
+              return;
+            }
+
             // Force Admin Role for specific email even if DB is wrong
             const normalizedEmail = user.email ? user.email.toLowerCase().trim() : '';
             if (normalizedEmail === 'admin@hrmspro.com') {
-              console.log("Forcing Admin Role for: ", user.email);
               userData.role = 'admin';
             }
 
@@ -113,33 +120,34 @@ export const AuthProvider = ({ children }) => {
             setCurrentUser({
               ...userData,
               uid: user.uid,
-              id: user.uid, // Always use UID as the primary ID for database consistency
-              email: user.email,
-              legacyId: userData.id // Preserve legacy ID if needed
+              id: user.uid,
+              email: user.email
             });
           } else {
-            // Fallback: If user exists in Auth but not in Firestore (should not happen in prod)
-            // Fix for Admin Access: Check email to assign admin role if doc is missing
+            // Master Admin Fallback: allow login even if doc is missing
             const normalizedEmail = user.email ? user.email.toLowerCase().trim() : '';
-            const role = normalizedEmail === 'admin@hrmspro.com' ? 'admin' : 'employee';
-            if (role === 'admin') console.log("Forcing Admin Role (No Doc) for: ", user.email);
-
-            setCurrentUser({
-              uid: user.uid,
-              id: user.uid, // Polyfill
-              email: user.email,
-              name: user.email ? user.email.split('@')[0] : 'User',
-              role
-            });
+            if (normalizedEmail === 'admin@hrmspro.com') {
+              setCurrentUser({
+                uid: user.uid,
+                id: user.uid,
+                email: user.email,
+                name: 'Master Admin',
+                role: 'admin'
+              });
+            } else {
+              // FORBIDDEN: User exists in Auth but has no Firestore profile (DELETED ghost)
+              console.error("No profile found for user:", user.email, ". Forcing logout.");
+              await signOut(auth);
+              setCurrentUser(null);
+            }
           }
         } catch (error) {
           console.error("Error fetching user profile:", error);
-          // Fallback: Hardcode admin role for admin email if DB fails
-          const normalizedEmail = user.email ? user.email.toLowerCase().trim() : '';
-          if (normalizedEmail === 'admin@hrmspro.com') {
+          if (user.email === 'admin@hrmspro.com') {
             setCurrentUser({ uid: user.uid, email: user.email, role: 'admin' });
           } else {
-            setCurrentUser({ uid: user.uid, email: user.email, role: 'employee' });
+            await signOut(auth);
+            setCurrentUser(null);
           }
         }
       } else {
