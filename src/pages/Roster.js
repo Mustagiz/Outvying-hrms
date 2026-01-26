@@ -179,8 +179,8 @@ const Roster = () => {
     const shifts = [
         { name: 'Morning Shift', startTime: '09:00', endTime: '18:00', fullDayHours: 8.0, halfDayHours: 4.0, timezone: 'Asia/Kolkata', color: 'bg-blue-100 text-blue-800 border-blue-200' },
         { name: 'Evening Shift', startTime: '14:00', endTime: '23:00', fullDayHours: 8.0, halfDayHours: 4.0, timezone: 'Asia/Kolkata', color: 'bg-purple-100 text-purple-800 border-purple-200' },
-        { name: 'Night Shift', startTime: '22:00', endTime: '07:00', fullDayHours: 8.0, halfDayHours: 4.0, timezone: 'America/New_York', color: 'bg-indigo-100 text-indigo-800 border-indigo-200' },
-        { name: 'Late Shift', startTime: '11:00', endTime: '20:00', fullDayHours: 8.0, halfDayHours: 4.0, timezone: 'America/Los_Angeles', color: 'bg-orange-100 text-orange-800 border-orange-200' },
+        { name: 'Night Shift', startTime: '22:00', endTime: '07:00', fullDayHours: 8.0, halfDayHours: 4.0, timezone: 'Asia/Kolkata', color: 'bg-indigo-100 text-indigo-800 border-indigo-200' },
+        { name: 'Late Shift', startTime: '11:00', endTime: '20:00', fullDayHours: 8.0, halfDayHours: 4.0, timezone: 'Asia/Kolkata', color: 'bg-orange-100 text-orange-800 border-orange-200' },
         { name: 'Weekly Off', startTime: '00:00', endTime: '00:00', fullDayHours: 0, halfDayHours: 0, timezone: 'Asia/Kolkata', color: 'bg-gray-100 text-gray-800 border-gray-200' },
         { name: 'Holiday', startTime: '00:00', endTime: '00:00', fullDayHours: 0, halfDayHours: 0, timezone: 'Asia/Kolkata', color: 'bg-green-100 text-green-800 border-green-200' }
     ];
