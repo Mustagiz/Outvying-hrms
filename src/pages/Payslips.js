@@ -235,22 +235,19 @@ const Payslips = () => {
     let isRightSide = false;
 
     headerFields.forEach(field => {
-      // Default true if not explicitly disabled in a potential UI side-channel
-      if (field.alwaysShow) {
-        if (!isRightSide) {
-          doc.setFont(undefined, 'bold');
-          doc.text(field.label, 20, currentY);
-          doc.setFont(undefined, 'normal');
-          doc.text(field.value || '', 60, currentY);
-        } else {
-          doc.setFont(undefined, 'bold');
-          doc.text(field.label, 110, currentY);
-          doc.setFont(undefined, 'normal');
-          doc.text(field.value || '', 150, currentY);
-          currentY += 6;
-        }
-        isRightSide = !isRightSide;
+      if (!isRightSide) {
+        doc.setFont(undefined, 'bold');
+        doc.text(field.label, 20, currentY);
+        doc.setFont(undefined, 'normal');
+        doc.text(field.value || '-', 60, currentY);
+      } else {
+        doc.setFont(undefined, 'bold');
+        doc.text(field.label, 110, currentY);
+        doc.setFont(undefined, 'normal');
+        doc.text(field.value || '-', 150, currentY);
+        currentY += 6;
       }
+      isRightSide = !isRightSide;
     });
 
     // Ensure yPos is updated if loop ended on left side
