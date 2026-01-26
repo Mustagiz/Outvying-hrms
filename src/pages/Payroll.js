@@ -306,13 +306,9 @@ const Payroll = () => {
     if (!b) return alert('No salary breakdown assigned!');
     const bank = allBankAccounts.find(ba => String(ba.userId) === String(emp.id)) || {};
     const statistics = getEmployeeWorkDays(emp.id, `${monthName} ${year}`);
-    const workingDaysCount = calculateTotalWorkingDays(emp.id, `${monthName} ${year}`);
-    const actualBreakdown = calculateBreakdown(emp.ctc || 0, emp.deductionToggles, {
-      effectiveDays: statistics.effectiveDays,
-      totalDays: workingDaysCount
-    });
+    const actualBreakdown = calculateBreakdown(emp.ctc || 0, emp.deductionToggles, statistics);
 
-    const workDays = statistics.effectiveDays || workingDaysCount;
+    const workDays = statistics.effectiveDays || statistics.totalDays;
 
     doc.setFont('helvetica', 'bold'); doc.setFontSize(22); doc.setTextColor(0);
     doc.text('Outvying Media Solution Pvt Ltd.', 105, 20, { align: 'center' });
@@ -331,7 +327,7 @@ const Payroll = () => {
       ['Bank Name', bank.bankName || '-', 'Bank Account No.', bank.accountNumber || '-'],
       ['IFSC Code', bank.ifscCode || '-', 'ESI No.', '-'],
       ['PAN Number', emp.panNumber || 'ABCDE1234F'],
-      ['Total Working Days', workingDaysCount.toString(), 'Effective Work Days', workDays.toString()]
+      ['Total Working Days', statistics.totalDays.toString(), 'Effective Work Days', workDays.toString()]
     ];
     infoFields.forEach((row) => {
       doc.setFont('helvetica', 'bold'); doc.text(row[0], leftX, currentY);
