@@ -102,7 +102,7 @@ export const calculateAttendanceStatus = (clockIn, clockOut, date = null, roster
     overtime = workHours > overtimeThreshold ? Math.round((workHours - overtimeThreshold) * 100) / 100 : 0;
   }
 
-  const diag = ` (In:${clockInInMinutes}, Thr:${lateThreshold})`;
+  const diag = ` (In:${clockIn}, Start:${shiftStartTime}, Grace:${gracePeriod}m, ThrMins:${lateThreshold})`;
   return {
     status,
     workHours: Math.round(workHours * 100) / 100,

@@ -92,7 +92,7 @@ const Roster = () => {
         shiftName: 'Morning Shift',
         startTime: '09:00',
         endTime: '18:00',
-        gracePeriod: 15,
+        gracePeriod: 5,
         fullDayHours: 8.0,
         halfDayHours: 4.0,
         timezone: 'Asia/Kolkata'
@@ -317,7 +317,7 @@ const Roster = () => {
             shiftName: 'Morning Shift',
             startTime: '09:00',
             endTime: '18:00',
-            gracePeriod: 15,
+            gracePeriod: 5,
             fullDayHours: 8.0,
             halfDayHours: 4.0,
             timezone: 'Asia/Kolkata'
