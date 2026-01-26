@@ -307,7 +307,7 @@ const Payroll = () => {
     const workDays = statistics.effectiveDays || statistics.totalDays;
 
     doc.setFont('helvetica', 'bold'); doc.setFontSize(22); doc.setTextColor(0);
-    doc.text('Outvying Media Solution Pvt Ltd.', 105, 20, { align: 'center' });
+    doc.text('Outvying Media', 105, 20, { align: 'center' });
     doc.setFontSize(9); doc.setFont('helvetica', 'normal');
     doc.text('A-106, 1st floor, Town Square, New Airport Road, Viman Nagar, Pune, Maharashtra 411014', 105, 26, { align: 'center' });
     doc.text(`Email: hr@outvying.com | Website: www.Outvying.com`, 105, 31, { align: 'center' });
@@ -321,8 +321,9 @@ const Payroll = () => {
       ['Designation', emp.designation || 'N/A', 'Business Unit', emp.department || 'N/A'],
       ['Date Of Joining', emp.dateOfJoining || '-', 'Location', 'Pune'],
       ['Bank Name', bank.bankName || '-', 'Bank Account No.', bank.accountNumber || '-'],
-      ['IFSC Code', bank.ifscCode || '-', 'ESI No.', '-'],
-      ['PAN Number', emp.panNumber || 'ABCDE1234F'],
+      ['IFSC Code', bank.ifscCode || '-', 'ESI No.', emp.esiNumber || '-'],
+      ['PF No.', emp.pfNumber || '-', 'UAN No.', emp.uanNumber || '-'],
+      ['PAN Number', emp.panNumber || '-'],
       ['Total Working Days', statistics.totalDays.toString(), 'Effective Work Days', workDays.toString()]
     ];
     infoFields.forEach((row) => {

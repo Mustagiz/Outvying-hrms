@@ -197,7 +197,7 @@ const Payslips = () => {
     doc.setFontSize(16);
     doc.setFont(undefined, 'bold');
     doc.setTextColor(0, 0, 0);
-    doc.text('Outvying Media Solution Pvt Ltd.', 105, 15, { align: 'center' });
+    doc.text('Outvying Media', 105, 15, { align: 'center' });
 
     doc.setFontSize(8);
     doc.setFont(undefined, 'normal');
@@ -216,19 +216,19 @@ const Payslips = () => {
     doc.setFont(undefined, 'normal');
     // Dynamic Header Fields based on Config
     const headerFields = [
-      { key: 'employeeId', label: 'Employee ID', value: payslipData.employee.employeeId },
-      { key: 'name', label: 'Employee Name', value: payslipData.employee.name, alwaysShow: true },
-      { key: 'designation', label: 'Designation', value: payslipData.employee.designation },
-      { key: 'department', label: 'Business Unit', value: payslipData.employee.department },
-      { key: 'dateOfJoining', label: 'Date Of Joining', value: payslipData.employee.dateOfJoining },
+      { key: 'employeeId', label: 'Employee ID', value: payslipData.employee?.employeeId || 'N/A' },
+      { key: 'name', label: 'Employee Name', value: payslipData.employee?.name || 'N/A', alwaysShow: true },
+      { key: 'designation', label: 'Designation', value: payslipData.employee?.designation || 'N/A' },
+      { key: 'department', label: 'Business Unit', value: payslipData.employee?.department || 'N/A' },
+      { key: 'dateOfJoining', label: 'Date Of Joining', value: payslipData.employee?.dateOfJoining || '-' },
       { key: 'location', label: 'Location', value: 'Pune' },
-      { key: 'bankName', label: 'Bank Name', value: payslipData.employee.bankName || 'Federal Bank' },
-      { key: 'bankAccount', label: 'Bank Account No.', value: payslipData.employee.bankAccount || 'XXXXXXXXXXXX' },
-      { key: 'ifscCode', label: 'IFSC Code', value: payslipData.employee.ifscCode || '-' },
-      { key: 'pfNo', label: 'PF No.', value: '-' },
-      { key: 'uanNo', label: 'UAN No.', value: '-' },
-      { key: 'esiNo', label: 'ESI No.', value: '-' },
-      { key: 'panNumber', label: 'PAN Number', value: payslipData.employee.panNumber || 'FTZPBXXXXN' },
+      { key: 'bankName', label: 'Bank Name', value: payslipData.employee?.bankName || '-' },
+      { key: 'bankAccount', label: 'Bank Account No.', value: payslipData.employee?.bankAccount || '-' },
+      { key: 'ifscCode', label: 'IFSC Code', value: payslipData.employee?.ifscCode || '-' },
+      { key: 'pfNo', label: 'PF No.', value: payslipData.employee?.pfNumber || '-' },
+      { key: 'uanNo', label: 'UAN No.', value: payslipData.employee?.uanNumber || '-' },
+      { key: 'esiNo', label: 'ESI No.', value: payslipData.employee?.esiNumber || '-' },
+      { key: 'panNumber', label: 'PAN Number', value: payslipData.employee?.panNumber || '-' },
     ];
 
     let currentY = 45;
