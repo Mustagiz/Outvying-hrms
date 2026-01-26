@@ -216,19 +216,22 @@ const Payslips = () => {
     doc.setFont(undefined, 'normal');
     // Dynamic Header Fields based on Config
     const headerFields = [
-      { key: 'employeeId', label: 'Employee ID', value: payslipData.employee?.employeeId || 'N/A' },
-      { key: 'name', label: 'Employee Name', value: payslipData.employee?.name || 'N/A', alwaysShow: true },
-      { key: 'designation', label: 'Designation', value: payslipData.employee?.designation || 'N/A' },
-      { key: 'department', label: 'Business Unit', value: payslipData.employee?.department || 'N/A' },
-      { key: 'dateOfJoining', label: 'Date Of Joining', value: payslipData.employee?.dateOfJoining || '-' },
-      { key: 'location', label: 'Location', value: 'Pune' },
-      { key: 'bankName', label: 'Bank Name', value: payslipData.employee?.bankName || '-' },
-      { key: 'bankAccount', label: 'Bank Account No.', value: payslipData.employee?.bankAccount || '-' },
-      { key: 'ifscCode', label: 'IFSC Code', value: payslipData.employee?.ifscCode || '-' },
-      { key: 'pfNo', label: 'PF No.', value: payslipData.employee?.pfNumber || '-' },
-      { key: 'uanNo', label: 'UAN No.', value: payslipData.employee?.uanNumber || '-' },
-      { key: 'esiNo', label: 'ESI No.', value: payslipData.employee?.esiNumber || '-' },
-      { key: 'panNumber', label: 'PAN Number', value: payslipData.employee?.panNumber || '-' },
+      { label: 'Employee ID', value: payslipData.employee?.employeeId || '-' },
+      { label: 'Employee Name', value: payslipData.employee?.name || '-' },
+      { label: 'Designation', value: payslipData.employee?.designation || '-' },
+      { label: 'Business Unit', value: payslipData.employee?.department || '-' },
+      { label: 'Date Of Joining', value: payslipData.employee?.dateOfJoining || '-' },
+      { label: 'Location', value: 'Pune' },
+      { label: 'Bank Name', value: payslipData.employee?.bankName || '-' },
+      { label: 'Bank Account No.', value: payslipData.employee?.bankAccount || '-' },
+      { label: 'IFSC Code', value: payslipData.employee?.ifscCode || '-' },
+      { label: 'ESI No.', value: payslipData.employee?.esiNumber || '-' },
+      { label: 'PF Number', value: payslipData.employee?.pfNumber || '-' },
+      { label: 'UAN Number', value: payslipData.employee?.uanNumber || '-' },
+      { label: 'PAN Number', value: payslipData.employee?.panNumber || '-' },
+      { label: '', value: '' }, // Spacer
+      { label: 'Days In Month', value: payslipData.daysInMonth.toString() },
+      { label: 'Effective Work Days', value: payslipData.effectiveDays.toString() },
     ];
 
     let currentY = 45;
@@ -250,18 +253,7 @@ const Payslips = () => {
       isRightSide = !isRightSide;
     });
 
-    // Ensure yPos is updated if loop ended on left side
-    if (isRightSide) currentY += 6;
-    let yPos = currentY;
-    doc.setFont(undefined, 'bold');
-    doc.text('Days In Month', 20, yPos);
-    doc.setFont(undefined, 'normal');
-    doc.text(payslipData.daysInMonth.toString(), 60, yPos);
-
-    doc.setFont(undefined, 'bold');
-    doc.text('Effective Work Days', 110, yPos);
-    doc.setFont(undefined, 'normal');
-    doc.text(payslipData.effectiveDays.toString(), 150, yPos);
+    yPos = currentY + 4;
 
     yPos += 10;
 

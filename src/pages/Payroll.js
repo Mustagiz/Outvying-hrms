@@ -317,14 +317,14 @@ const Payroll = () => {
     doc.setFontSize(10); doc.setTextColor(0);
     const leftX = 20, midX = 110; let currentY = 55; const lineGap = 7;
     const infoFields = [
-      ['Employee ID', emp.employeeId || 'N/A', 'Employee Name', emp.name || 'N/A'],
-      ['Designation', emp.designation || 'N/A', 'Business Unit', emp.department || 'N/A'],
+      ['Employee ID', emp.employeeId || '-', 'Employee Name', emp.name || '-'],
+      ['Designation', emp.designation || '-', 'Business Unit', emp.department || '-'],
       ['Date Of Joining', emp.dateOfJoining || '-', 'Location', 'Pune'],
       ['Bank Name', bank.bankName || '-', 'Bank Account No.', bank.accountNumber || '-'],
       ['IFSC Code', bank.ifscCode || '-', 'ESI No.', emp.esiNumber || '-'],
-      ['PF No.', emp.pfNumber || '-', 'UAN No.', emp.uanNumber || '-'],
-      ['PAN Number', emp.panNumber || '-'],
-      ['Total Working Days', statistics.totalDays.toString(), 'Effective Work Days', workDays.toString()]
+      ['PF Number', emp.pfNumber || '-', 'UAN Number', emp.uanNumber || '-'],
+      ['PAN Number', emp.panNumber || '-', '', ''],
+      ['Days In Month', statistics.totalDays.toString(), 'Effective Work Days', workDays.toString()]
     ];
     infoFields.forEach((row) => {
       doc.setFont('helvetica', 'bold'); doc.text(row[0], leftX, currentY);
