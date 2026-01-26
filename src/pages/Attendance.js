@@ -68,10 +68,15 @@ const Attendance = () => {
 
   const today = getTodayLocal();
   const activeAttendance = useMemo(() => {
-    // 1. Find ANY open session (Logical priority)
-    const openSession = attendance.find(a => String(a.employeeId) === String(currentUser.id) && !a.clockOut);
-    if (openSession) return openSession;
-    // 2. Fallback to today's completed record
+    // 1. Prefer today's open session
+    const todayOpen = attendance.find(a => String(a.employeeId) === String(currentUser.id) && !a.clockOut && a.date === today);
+    if (todayOpen) return todayOpen;
+
+    // 2. Otherwise look for ANY open session (Logical priority)
+    const anyOpen = attendance.find(a => String(a.employeeId) === String(currentUser.id) && !a.clockOut);
+    if (anyOpen) return anyOpen;
+
+    // 3. Fallback to today's completed record
     return attendance.find(a => String(a.employeeId) === String(currentUser.id) && a.date === today);
   }, [attendance, currentUser, today]);
 

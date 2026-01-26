@@ -19,9 +19,16 @@ const Dashboard = () => {
   }, []);
 
   const activeAttendance = useMemo(() => {
-    const openSession = attendance.find(a => String(a.employeeId) === String(currentUser.id) && !a.clockOut);
-    if (openSession) return openSession;
     const today = getTodayLocal();
+    // 1. Prefer today's open session
+    const todayOpen = attendance.find(a => String(a.employeeId) === String(currentUser.id) && !a.clockOut && a.date === today);
+    if (todayOpen) return todayOpen;
+
+    // 2. Otherwise look for ANY open session (e.g. from yesterday)
+    const anyOpen = attendance.find(a => String(a.employeeId) === String(currentUser.id) && !a.clockOut);
+    if (anyOpen) return anyOpen;
+
+    // 3. Fallback to today's completed record
     return attendance.find(a => String(a.employeeId) === String(currentUser.id) && a.date === today);
   }, [attendance, currentUser]);
 
@@ -298,13 +305,13 @@ const Dashboard = () => {
                       </div>
                       <p className="text-xs text-gray-500 dark:text-gray-400 font-medium truncate mb-2">{activity.details}</p>
                       <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest shadow-sm ${activity.status === 'Present' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' :
-                          activity.status === 'Pending' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400' :
-                            activity.status === 'Late' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400' :
-                              'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400'
+                        activity.status === 'Pending' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400' :
+                          activity.status === 'Late' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400' :
+                            'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400'
                         }`}>
                         <div className={`w-1 h-1 rounded-full ${activity.status === 'Present' ? 'bg-green-500' :
-                            activity.status === 'Pending' ? 'bg-yellow-500' :
-                              activity.status === 'Late' ? 'bg-orange-500' : 'bg-blue-500'
+                          activity.status === 'Pending' ? 'bg-yellow-500' :
+                            activity.status === 'Late' ? 'bg-orange-500' : 'bg-blue-500'
                           }`} />
                         {activity.status}
                       </span>

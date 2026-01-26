@@ -62,10 +62,10 @@ const EmployeeDirectory = () => {
     { header: 'Department', accessor: 'department' },
     { header: 'Designation', accessor: 'designation' },
     {
-      header: 'Status',
+      header: 'Account Status',
       render: (row) => (
         <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-          Active
+          Active Account
         </span>
       )
     },

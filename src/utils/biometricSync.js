@@ -37,7 +37,7 @@ export const calculateAttendanceStatus = (clockIn, clockOut, date = null, roster
     return { status: 'Absent', workHours: 0, workingDays: 0 };
   }
 
-  const defaultRule = rules.find(r => r.isDefault) || { fullDayHours: 8.0, halfDayHours: 4.0, minPresentHours: 1.0, gracePeriodMins: 15 };
+  const defaultRule = rules.find(r => r.isDefault) || { fullDayHours: 8.0, halfDayHours: 4.0, minPresentHours: 1.0, gracePeriodMins: 5 };
 
   const timezone = roster?.timezone || 'Asia/Kolkata';
   const workDate = roster?.date || getEffectiveWorkDate(clockIn, istDate, timezone);

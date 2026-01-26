@@ -500,10 +500,10 @@ export const AuthProvider = ({ children }) => {
     const targetRoster = findRosterMatch();
     const effectiveDate = targetRoster?.date || today;
 
-    // 1. Critical Session Check: Prevent multiple open sessions
-    const openSession = attendance.find(a => String(a.employeeId) === String(employeeId) && !a.clockOut);
+    // 1. Critical Session Check: Prevent multiple open sessions for the SAME business day
+    const openSession = attendance.find(a => String(a.employeeId) === String(employeeId) && !a.clockOut && a.date === effectiveDate);
     if (openSession) {
-      return { success: false, message: `Found an active session from ${openSession.date}. Please clock out of it first.` };
+      return { success: false, message: `Found an active session for the same date: ${openSession.date}. Please clock out first.` };
     }
 
     // 2. Already clocked in for this specific day? (Safety check)
