@@ -36,21 +36,8 @@ const Payslips = () => {
 
   // Using centralized payrollSettings instead of local state
 
+  // Using centralized payrollSettings instead of local state
   const [showSettings, setShowSettings] = useState(false);
-  const [tempConfig, setTempConfig] = useState(null);
-
-  const saveConfig = () => {
-    if (tempConfig) {
-      setPayslipConfig(tempConfig);
-      localStorage.setItem('payslipConfig', JSON.stringify(tempConfig));
-      setShowSettings(false);
-    }
-  };
-
-  const openSettings = () => {
-    setTempConfig(JSON.parse(JSON.stringify(payslipConfig)));
-    setShowSettings(true);
-  };
 
   const isPayslipReleased = (month, year, employeeId) => {
     return releasedPayslips.some(p => p.month === month && p.year === year && (p.employeeId === employeeId || p.allReleased));
@@ -175,7 +162,6 @@ const Payslips = () => {
     const extraDeduction = releaseInfo?.customDeduction || (employeeId === selectedEmployee ? customDeduction : 0);
     const totalDeductions = parseFloat(extraDeduction || 0) + computedDeductions.reduce((sum, d) => sum + parseFloat(d.amount), 0);
     const netPay = grossEarningsActual - totalDeductions;
-
     return {
       employee,
       month,
@@ -194,34 +180,12 @@ const Payslips = () => {
       computedEarnings,
       computedDeductions
     };
-
-    return {
-      employee,
-      month,
-      year,
-      daysInMonth,
-      workingDaysInMonth,
-      workingDays,
-      dailyRate: dailyRate.toFixed(2),
-      baseSalary: empBaseSalary,
-      earnedBasic: earnedBasic.toFixed(2),
-      grossPay: grossPay.toFixed(2),
-      tax: '0.00', // Explicitly zero as it's removed
-      pf: '0.00', // Legacy field, now handled in custom deductions
-      customDeduction: parseFloat(extraDeduction || 0).toFixed(2),
-      deductionReason: releaseInfo?.deductionReason || (employeeId === selectedEmployee ? deductionReason : ''),
-      totalDeductions: totalDeductions.toFixed(2),
-      netPay: netPay.toFixed(2),
-      released: !!releaseInfo,
-      computedCustomEarnings,
-      computedCustomDeductions
-    };
   };
 
   const currentPayslip = useMemo(() => {
     const empId = currentUser.role === 'employee' ? currentUser.id : selectedEmployee;
     return calculatePayslip(empId, selectedMonth, selectedYear);
-  }, [selectedEmployee, selectedMonth, selectedYear, attendance, currentUser, releasedPayslips, payslipConfig]);
+  }, [selectedEmployee, selectedMonth, selectedYear, attendance, currentUser, releasedPayslips, payrollSettings]);
 
   const downloadPDF = (payslipData) => {
     if (!canViewPayslip(payslipData.month, payslipData.year)) {
@@ -277,7 +241,8 @@ const Payslips = () => {
     let isRightSide = false;
 
     headerFields.forEach(field => {
-      if (field.alwaysShow || payslipConfig.components.header[field.key] !== false) { // Default true if not found/custom keys
+      // Default true if not explicitly disabled in a potential UI side-channel
+      if (field.alwaysShow) {
         if (!isRightSide) {
           doc.setFont(undefined, 'bold');
           doc.text(field.label, 20, currentY);
@@ -288,7 +253,7 @@ const Payslips = () => {
           doc.text(field.label, 110, currentY);
           doc.setFont(undefined, 'normal');
           doc.text(field.value || '', 150, currentY);
-          currentY += 6; // Move to next row after right side
+          currentY += 6;
         }
         isRightSide = !isRightSide;
       }
@@ -305,7 +270,7 @@ const Payslips = () => {
     doc.setFont(undefined, 'bold');
     doc.text('Effective Work Days', 110, yPos);
     doc.setFont(undefined, 'normal');
-    doc.text(payslipData.workingDays.toString(), 150, yPos);
+    doc.text(payslipData.effectiveDays.toString(), 150, yPos);
 
     yPos += 10;
 
@@ -375,23 +340,17 @@ const Payslips = () => {
     yPos += 6;
     doc.setFont(undefined, 'bold');
     doc.text('Total Earnings', 20, yPos);
-    if (payslipConfig.visibility?.grossPay !== false) {
-      doc.text(payslipData.grossPay, 100, yPos, { align: 'right' });
-    }
+    doc.text(payslipData.grossPay, 100, yPos, { align: 'right' });
     doc.text('Total Deduction', 110, yPos);
-    if (payslipConfig.visibility?.deductions !== false) {
-      doc.text(payslipData.totalDeductions, 185, yPos, { align: 'right' });
-    }
+    doc.text(payslipData.totalDeductions, 185, yPos, { align: 'right' });
 
     yPos += 2;
     doc.line(15, yPos, 195, yPos);
 
     yPos += 8;
-    if (payslipConfig.visibility?.netPay !== false) {
-      doc.setFontSize(10);
-      doc.text('Net Pay for the month (Total Earnings - Total Dedutions):', 20, yPos);
-      doc.text('₹' + payslipData.netPay, 185, yPos, { align: 'right' });
-    }
+    doc.setFontSize(10);
+    doc.text('Net Pay for the month (Total Earnings - Total Dedutions):', 20, yPos);
+    doc.text('₹' + payslipData.netPay, 185, yPos, { align: 'right' });
 
     yPos += 2;
     doc.line(15, yPos, 195, yPos);
@@ -443,7 +402,7 @@ const Payslips = () => {
         return `${monthNames[row.month]} ${row.year}`;
       }
     },
-    { header: 'Working Days', accessor: 'workingDays' },
+    { header: 'Working Days', render: (row) => row.effectiveDays },
     { header: 'Gross Pay', render: (row) => `₹${row.grossPay}` },
     { header: 'Deductions', render: (row) => `₹${row.totalDeductions}` },
     { header: 'Net Pay', render: (row) => `₹${row.netPay}` },
@@ -535,68 +494,54 @@ const Payslips = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Working Days</p>
-              <p className="text-3xl font-bold text-gray-800 dark:text-white">{currentPayslip.workingDays}</p>
+              <p className="text-3xl font-bold text-gray-800 dark:text-white">{currentPayslip.effectiveDays}</p>
             </div>
             <Calendar className="text-primary-600" size={32} />
           </div>
         </Card>
 
-        {payslipConfig.visibility?.grossPay !== false && privacySettings.grossPay && (
-          <Card>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Gross Pay</p>
-                <p className="text-3xl font-bold text-green-600">₹{currentPayslip.grossPay}</p>
-              </div>
-              {/* <DollarSign className="text-green-600" size={32} /> Removed per user request */}
+        <Card>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Gross Pay</p>
+              <p className="text-3xl font-bold text-green-600">₹{currentPayslip.grossPay}</p>
             </div>
-          </Card>
-        )}
+          </div>
+        </Card>
 
-        {payslipConfig.visibility?.deductions !== false && privacySettings.deductions && (
-          <Card>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Deductions</p>
-                <p className="text-3xl font-bold text-red-600">₹{currentPayslip.totalDeductions}</p>
-                <div className="text-xs text-gray-500 dark:text-gray-400 mt-2 space-y-0.5">
-                  <div className="flex justify-between w-full gap-4">
-                    {/* Tax Display Removed */}
-                  </div>
-
-                  {payslipData.computedDeductions
-                    .map(cd => (
-                      <div key={cd.id} className="flex justify-between w-full gap-4 text-gray-600 dark:text-gray-300">
-                        <span>{cd.name}:</span>
-                        <span>₹{cd.amount}</span>
-                      </div>
-                    ))}
-
-                  {parseFloat(currentPayslip.customDeduction) > 0 && (
-                    <div className="flex justify-between w-full gap-4 text-red-500 font-medium">
-                      <span>{currentPayslip.deductionReason || 'Manual Deduction'}:</span>
-                      <span>₹{currentPayslip.customDeduction}</span>
+        <Card>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Deductions</p>
+              <p className="text-3xl font-bold text-red-600">₹{currentPayslip.totalDeductions}</p>
+              <div className="text-xs text-gray-500 dark:text-gray-400 mt-2 space-y-0.5">
+                {currentPayslip.computedDeductions
+                  .map(cd => (
+                    <div key={cd.id} className="flex justify-between w-full gap-4 text-gray-600 dark:text-gray-300">
+                      <span>{cd.name}:</span>
+                      <span>₹{cd.amount}</span>
                     </div>
-                  )}
+                  ))}
 
-                </div>
+                {parseFloat(currentPayslip.customDeduction) > 0 && (
+                  <div className="flex justify-between w-full gap-4 text-red-500 font-medium">
+                    <span>{currentPayslip.deductionReason || 'Manual Deduction'}:</span>
+                    <span>₹{currentPayslip.customDeduction}</span>
+                  </div>
+                )}
               </div>
-              {/* <DollarSign className="text-red-600" size={32} /> Removed per user request */}
             </div>
-          </Card>
-        )}
+          </div>
+        </Card>
 
-        {payslipConfig.visibility?.netPay !== false && privacySettings.netPay && (
-          <Card>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Net Pay</p>
-                <p className="text-3xl font-bold text-blue-600">₹{currentPayslip.netPay}</p>
-              </div>
-              {/* <DollarSign className="text-blue-600" size={32} /> Removed per user request */}
+        <Card>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Net Pay</p>
+              <p className="text-3xl font-bold text-blue-600">₹{currentPayslip.netPay}</p>
             </div>
-          </Card>
-        )}
+          </div>
+        </Card>
       </div>
 
       <Card title="Current Month Payslip" className="mb-6">
@@ -627,7 +572,7 @@ const Payslips = () => {
           <div className="mb-4">
             <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
               <p className="text-sm text-gray-600 dark:text-gray-400">Working Days</p>
-              <p className="text-xl font-bold text-gray-800 dark:text-white">{currentPayslip.workingDays} / {currentPayslip.workingDaysInMonth}</p>
+              <p className="text-xl font-bold text-gray-800 dark:text-white">{currentPayslip.effectiveDays} / {currentPayslip.workingDaysInMonth}</p>
             </div>
           </div>
         ) : (
@@ -765,12 +710,10 @@ const Payslips = () => {
                 designation: { label: 'Designation', value: previewData.employee?.designation || 'N/A' },
                 department: { label: 'Department', value: previewData.employee?.department || 'N/A' }
               }).map(([key, field]) => (
-                (key === 'name' || payslipConfig.components.header[key] !== false) && (
-                  <div key={key}>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">{field.label}</p>
-                    <p className="font-semibold text-gray-800 dark:text-white">{field.value}</p>
-                  </div>
-                )
+                <div key={key}>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">{field.label}</p>
+                  <p className="font-semibold text-gray-800 dark:text-white">{field.value}</p>
+                </div>
               ))}
             </div>
 
@@ -787,7 +730,7 @@ const Payslips = () => {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600 dark:text-gray-400">Actual Working Days</span>
-                  <span className="font-semibold text-gray-800 dark:text-white">{previewData.workingDays}</span>
+                  <span className="font-semibold text-gray-800 dark:text-white">{previewData.effectiveDays}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600 dark:text-gray-400">Daily Rate</span>
@@ -805,16 +748,16 @@ const Payslips = () => {
                   <span className="font-semibold text-gray-800 dark:text-white">₹{previewData.earnedBasic}</span>
                 </div>
 
-                {/* Custom Earnings in Preview */}
-                {previewData.computedCustomEarnings?.map((ce, idx) => (
+                {/* Earnings in Preview */}
+                {previewData.computedEarnings?.map((ce, idx) => (
                   <div key={ce?.id || idx} className="flex justify-between">
                     <span className="text-gray-600 dark:text-gray-400">{ce?.name || 'Unknown'}</span>
-                    <span className="font-semibold text-gray-800 dark:text-white">₹{ce?.amount || '0.00'}</span>
+                    <span className="font-semibold text-gray-800 dark:text-white">₹{ce?.actual || '0.00'}</span>
                   </div>
                 ))}
 
                 <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">Gross Pay ({previewData.workingDays} days)</span>
+                  <span className="text-gray-600 dark:text-gray-400">Gross Pay ({previewData.effectiveDays} days)</span>
                   <span className="font-semibold text-green-600">₹{previewData.grossPay}</span>
                 </div>
               </div>
@@ -826,7 +769,7 @@ const Payslips = () => {
                 {/* Deductions */}
                 {/* Tax removed from hardcoded list */}
 
-                {previewData.computedCustomDeductions?.map((cd, idx) => (
+                {previewData.computedDeductions?.map((cd, idx) => (
                   <div key={cd?.id || idx} className="flex justify-between">
                     <span className="text-gray-600 dark:text-gray-400">{cd?.name || 'Unknown'}</span>
                     <span className="font-semibold text-gray-800 dark:text-white">₹{cd?.amount || '0.00'}</span>
@@ -854,203 +797,7 @@ const Payslips = () => {
         )}
       </Modal>
 
-      {/* Settings Modal */}
-      <Modal isOpen={showSettings} onClose={() => setShowSettings(false)} title="Payslip Configuration" size="lg">
-        {tempConfig && (
-          <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-2">
-
-            {/* Header Section */}
-            <div>
-              <h3 className="font-semibold text-lg mb-3 border-b pb-2">Header Fields</h3>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                {Object.entries(tempConfig.components.header).map(([key, active]) => (
-                  <label key={key} className="flex items-center gap-2 p-2 border rounded hover:bg-gray-50 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={active}
-                      onChange={(e) => setTempConfig(prev => ({
-                        ...prev,
-                        components: {
-                          ...prev.components,
-                          header: { ...prev.components.header, [key]: e.target.checked }
-                        }
-                      }))}
-                      className="rounded text-primary-600"
-                    />
-                    <span className="capitalize text-sm">{key.replace(/([A-Z])/g, ' $1')}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            {/* Earnings Section */}
-            <div>
-              <h3 className="font-semibold text-lg mb-3 border-b pb-2">Earnings</h3>
-
-              <div className="space-y-4">
-                <p className="text-sm font-medium">Earnings Components</p>
-                {tempConfig.customComponents.earnings.map((ce, idx) => (
-                  <div key={ce.id} className="flex gap-2 items-center flex-wrap md:flex-nowrap border p-2 rounded">
-                    <input
-                      type="text"
-                      value={ce.name}
-                      onChange={(e) => {
-                        const newEarnings = [...tempConfig.customComponents.earnings];
-                        newEarnings[idx].name = e.target.value;
-                        setTempConfig({ ...tempConfig, customComponents: { ...tempConfig.customComponents, earnings: newEarnings } });
-                      }}
-                      className="border p-1 rounded text-sm flex-1 min-w-[120px]"
-                      placeholder="Earning Name"
-                    />
-                    <select
-                      value={ce.type || 'fixed'}
-                      onChange={(e) => {
-                        const newEarnings = [...tempConfig.customComponents.earnings];
-                        newEarnings[idx].type = e.target.value;
-                        setTempConfig({ ...tempConfig, customComponents: { ...tempConfig.customComponents, earnings: newEarnings } });
-                      }}
-                      className="border p-1 rounded text-sm w-32"
-                    >
-                      <option value="fixed">Fixed (₹)</option>
-                      <option value="percentage_basic">% of Basic</option>
-                    </select>
-                    <input
-                      type="number"
-                      value={ce.value || 0}
-                      onChange={(e) => {
-                        const newEarnings = [...tempConfig.customComponents.earnings];
-                        newEarnings[idx].value = e.target.value;
-                        setTempConfig({ ...tempConfig, customComponents: { ...tempConfig.customComponents, earnings: newEarnings } });
-                      }}
-                      className="border p-1 rounded text-sm w-20"
-                      placeholder="Value"
-                    />
-                    <label className="flex items-center gap-1">
-                      <input
-                        type="checkbox"
-                        checked={ce.active}
-                        onChange={(e) => {
-                          const newEarnings = [...tempConfig.customComponents.earnings];
-                          newEarnings[idx].active = e.target.checked;
-                          setTempConfig({ ...tempConfig, customComponents: { ...tempConfig.customComponents, earnings: newEarnings } });
-                        }}
-                      />
-                      <span className="text-xs">Active</span>
-                    </label>
-                    <Button
-                      variant="danger"
-                      className="p-1 px-2 text-xs"
-                      onClick={() => {
-                        const newEarnings = tempConfig.customComponents.earnings.filter((_, i) => i !== idx);
-                        setTempConfig({ ...tempConfig, customComponents: { ...tempConfig.customComponents, earnings: newEarnings } });
-                      }}
-                    >X</Button>
-                  </div>
-                ))}
-                <Button
-                  variant="secondary"
-                  className="w-full text-xs"
-                  onClick={() => {
-                    setTempConfig({
-                      ...tempConfig,
-                      customComponents: {
-                        ...tempConfig.customComponents,
-                        earnings: [...tempConfig.customComponents.earnings, { id: Date.now(), name: 'New Earning', active: true, type: 'fixed', value: 0 }]
-                      }
-                    });
-                  }}
-                >+ Add Custom Earning</Button>
-              </div>
-            </div>
-
-            {/* Deductions Section */}
-            <div>
-              <h3 className="font-semibold text-lg mb-3 border-b pb-2">Deductions</h3>
-
-              <div className="space-y-2">
-                <p className="text-sm font-medium">Deductions Components</p>
-                {tempConfig.customComponents.deductions.map((cd, idx) => (
-                  <div key={cd.id} className="flex gap-2 items-center flex-wrap md:flex-nowrap border p-2 rounded">
-                    <input
-                      type="text"
-                      value={cd.name}
-                      onChange={(e) => {
-                        const newDeductions = [...tempConfig.customComponents.deductions];
-                        newDeductions[idx].name = e.target.value;
-                        setTempConfig({ ...tempConfig, customComponents: { ...tempConfig.customComponents, deductions: newDeductions } });
-                      }}
-                      className="border p-1 rounded text-sm flex-1 min-w-[120px]"
-                      placeholder="Deduction Name"
-                    />
-                    <select
-                      value={cd.type || 'fixed'}
-                      onChange={(e) => {
-                        const newDeductions = [...tempConfig.customComponents.deductions];
-                        newDeductions[idx].type = e.target.value;
-                        setTempConfig({ ...tempConfig, customComponents: { ...tempConfig.customComponents, deductions: newDeductions } });
-                      }}
-                      className="border p-1 rounded text-sm w-32"
-                    >
-                      <option value="fixed">Fixed (₹)</option>
-                      <option value="percentage_basic">% of Basic</option>
-                      <option value="percentage_gross">% of Gross</option>
-                    </select>
-                    <input
-                      type="number"
-                      value={cd.value || 0}
-                      onChange={(e) => {
-                        const newDeductions = [...tempConfig.customComponents.deductions];
-                        newDeductions[idx].value = e.target.value;
-                        setTempConfig({ ...tempConfig, customComponents: { ...tempConfig.customComponents, deductions: newDeductions } });
-                      }}
-                      className="border p-1 rounded text-sm w-20"
-                      placeholder="Value"
-                    />
-                    <label className="flex items-center gap-1">
-                      <input
-                        type="checkbox"
-                        checked={cd.active}
-                        onChange={(e) => {
-                          const newDeductions = [...tempConfig.customComponents.deductions];
-                          newDeductions[idx].active = e.target.checked;
-                          setTempConfig({ ...tempConfig, customComponents: { ...tempConfig.customComponents, deductions: newDeductions } });
-                        }}
-                      />
-                      <span className="text-xs">Active</span>
-                    </label>
-                    <Button
-                      variant="danger"
-                      className="p-1 px-2 text-xs"
-                      onClick={() => {
-                        const newDeductions = tempConfig.customComponents.deductions.filter((_, i) => i !== idx);
-                        setTempConfig({ ...tempConfig, customComponents: { ...tempConfig.customComponents, deductions: newDeductions } });
-                      }}
-                    >X</Button>
-                  </div>
-                ))}
-                <Button
-                  variant="secondary"
-                  className="w-full text-xs"
-                  onClick={() => {
-                    setTempConfig({
-                      ...tempConfig,
-                      customComponents: {
-                        ...tempConfig.customComponents,
-                        deductions: [...tempConfig.customComponents.deductions, { id: Date.now(), name: 'New Deduction', active: true, type: 'fixed', value: 0 }]
-                      }
-                    });
-                  }}
-                >+ Add Custom Deduction</Button>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-3 pt-4 border-t">
-              <Button variant="secondary" onClick={() => setShowSettings(false)}>Cancel</Button>
-              <Button onClick={saveConfig}>Save Configuration</Button>
-            </div>
-          </div>
-        )}
-      </Modal>
+      {/* Settings Modal Removed - Refactor Complete */}
     </div >
   );
 };
