@@ -528,6 +528,7 @@ const Attendance = () => {
     { value: 9, label: 'October' }, { value: 10, label: 'November' }, { value: 11, label: 'December' }
   ];
 
+  const yearOptions = getYearOptions();
   const employeeOptions = [
     { value: 'all', label: 'All Employees' },
     ...allUsers.filter(u => {
