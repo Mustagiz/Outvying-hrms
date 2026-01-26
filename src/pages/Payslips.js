@@ -6,7 +6,7 @@ import jsPDF from 'jspdf';
 import { getYearOptions } from '../utils/helpers';
 
 const Payslips = () => {
-  const { currentUser, attendance, allUsers } = useAuth();
+  const { currentUser, attendance, allUsers, payrollSettings } = useAuth();
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedEmployee, setSelectedEmployee] = useState(currentUser.id);
@@ -34,42 +34,7 @@ const Payslips = () => {
     'Advance Recovery', 'Loan EMI', 'Other'
   ];
 
-  // Configuration State for Salary Slip Components
-  const [payslipConfig, setPayslipConfig] = useState(() => {
-    const saved = localStorage.getItem('payslipConfig');
-    // Migration: If we have old config structure, we might want to reset or migrate it.
-    // For now, let's assume if it has the new structure we use it, otherwise default.
-    const isNewStructure = saved && JSON.parse(saved).customComponents?.earnings?.some(e => e.name === 'House Rent Allowance (HRA)');
-
-    if (saved && isNewStructure) {
-      return JSON.parse(saved);
-    }
-
-    return {
-      visibility: { grossPay: true, deductions: true, netPay: true },
-      components: {
-        header: {
-          employeeId: true, designation: true, department: true, dateOfJoining: true,
-          location: true, bankName: true, bankAccount: true, ifscCode: true,
-          pfNo: false, uanNo: false, esiNo: true, panNumber: true
-        }
-      },
-      customComponents: {
-        earnings: [
-          { id: 'hra', name: 'House Rent Allowance (HRA)', active: true, type: 'fixed', value: 0 },
-          { id: 'medical', name: 'Medical Allowance', active: true, type: 'fixed', value: 0 },
-          { id: 'transport', name: 'Transportation Allowance (TA)', active: true, type: 'fixed', value: 0 },
-          { id: 'shift', name: 'Shift Allowance', active: true, type: 'fixed', value: 0 },
-          { id: 'attendance_allowance', name: 'Attendance Allowance', active: true, type: 'fixed', value: 0 }
-        ],
-        deductions: [
-          { id: 'pt', name: 'Professional TAX', active: true, type: 'fixed', value: 200 },
-          { id: 'pf', name: 'Provident Fund (PF)', active: false, type: 'percentage_basic', value: 12 }, // Defaulting PF to 12% of Basic as per standard
-          { id: 'esi', name: 'ESI', active: true, type: 'fixed', value: 0 }
-        ]
-      }
-    };
-  });
+  // Using centralized payrollSettings instead of local state
 
   const [showSettings, setShowSettings] = useState(false);
   const [tempConfig, setTempConfig] = useState(null);
@@ -156,80 +121,79 @@ const Payslips = () => {
       return a.employeeId === employeeId && date.getMonth() === month && date.getFullYear() === year;
     });
 
-    const workingDays = monthAttendance.filter(a => a.status === 'Present' || a.status === 'Late').length;
+    const statistics = {
+      effectiveDays: monthAttendance.reduce((sum, rec) => {
+        if (rec.status === 'Present' || rec.status === 'Late') return sum + 1;
+        if (rec.status === 'Half Day') return sum + 0.5;
+        return sum;
+      }, 0),
+      totalDays: workingDaysInMonth
+    };
 
-    // Standard Gross components (simplified for now as basic salary)
-    // In a real scenario, HRA, Medical etc would proceed from CTC structure.
-    // Here we assume Base Salary IS the standard Gross before custom additions.
-    let earnedBasic = dailyRate * workingDays;
+    // Use common pro-ratio
+    const ratio = statistics.effectiveDays / statistics.totalDays;
 
-    // Calculate Custom Earnings
-    let totalCustomEarnings = 0;
-    const computedCustomEarnings = payslipConfig.customComponents.earnings
-      .filter(e => e.active)
-      .map(e => {
-        let amount = 0;
-        const val = parseFloat(e.value || 0);
-        if (e.type === 'percentage_basic') {
-          // Percentage of Base Salary (CTC/12)
-          amount = (val / 100) * empBaseSalary;
-        } else {
-          // Fixed Amount
-          amount = val;
-        }
-        totalCustomEarnings += amount;
-        return { ...e, amount: amount.toFixed(2) };
-      });
+    // Map components from central template
+    const template = payrollSettings?.template || { basic: 40, hra: 16 };
+    let grossEarningsFull = 0;
+    let grossEarningsActual = 0;
 
-    const grossPay = earnedBasic + totalCustomEarnings;
+    const computedEarnings = Object.keys(template).map(key => {
+      const fullVal = empBaseSalary * (template[key] / 100);
+      const actualVal = fullVal * ratio;
+      grossEarningsFull += fullVal;
+      grossEarningsActual += actualVal;
+      return {
+        id: key,
+        name: key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()),
+        full: fullVal.toFixed(2),
+        actual: actualVal.toFixed(2)
+      };
+    });
 
-    // Tax is no longer hardcoded. Admin can add it as a custom deduction (% of Gross or Fixed)
-    const tax = 0;
+    // 2. STATUTORY DEDUCTIONS (Matched with Payroll.js logic)
+    const taxRules = payrollSettings?.tax || { pfEmployee: 12, esiEmployee: 0.75, pfCeiling: 15000, esiCeiling: 21000, professionalTax: 200 };
 
-    // PF is now in computedCustomDeductions
-    // const pf = ... (Removed legacy hardcode)
+    // PF 
+    const basicEarned = parseFloat(computedEarnings.find(e => e.id === 'basic')?.actual || 0);
+    const pfBasic = Math.min(basicEarned, taxRules.pfCeiling);
+    const pfVal = (employee?.deductionToggles?.pf !== false) ? (pfBasic * (taxRules.pfEmployee / 100)) : 0;
 
-    let extraDeduction = releaseInfo?.customDeduction || (employeeId === selectedEmployee ? customDeduction : 0);
+    // ESI
+    const esiApplicable = grossEarningsActual <= taxRules.esiCeiling;
+    const esiVal = (employee?.deductionToggles?.esi !== false && esiApplicable) ? (grossEarningsActual * (taxRules.esiEmployee / 100)) : 0;
 
-    // Calculate LWP and UPL days based on attendance status
-    const lwpDays = monthAttendance.filter(a => a.status === 'LWP').length;
-    const uplDays = monthAttendance.filter(a => a.status === 'UPL').length; // Assuming 'UPL' is a valid status
-    const totalUnpaidDays = lwpDays + uplDays;
-    const unpaidLeaveDeduction = totalUnpaidDays * dailyRate;
+    // PT
+    const ptVal = (employee?.deductionToggles?.pt !== false) ? taxRules.professionalTax : 0;
 
-    // Calculate Custom Deductions
-    let totalCustomDeductions = 0;
-    const computedCustomDeductions = payslipConfig.customComponents.deductions
-      .filter(d => d.active)
-      .map(d => {
-        let amount = 0;
-        const val = parseFloat(d.value || 0);
-        if (d.type === 'percentage_basic') {
-          amount = (val / 100) * empBaseSalary;
-        } else if (d.type === 'percentage_gross') {
-          amount = (val / 100) * grossPay;
-        } else {
-          amount = val;
-        }
-        totalCustomDeductions += amount;
-        return { ...d, amount: amount.toFixed(2) };
-      });
+    const computedDeductions = [
+      { id: 'pf', name: 'Provident Fund (PF)', amount: pfVal.toFixed(2) },
+      { id: 'esi', name: 'ESI', amount: esiVal.toFixed(2) },
+      { id: 'pt', name: 'Professional Tax', amount: ptVal.toFixed(2) }
+    ].filter(d => parseFloat(d.amount) > 0);
 
-    // Add LWP/UPL as an automatic deduction if applicable
-    if (unpaidLeaveDeduction > 0) {
-      computedCustomDeductions.push({
-        id: 'auto_lwp_upl',
-        name: `LWP / UPL (${totalUnpaidDays} Days)`,
-        type: 'fixed',
-        amount: unpaidLeaveDeduction.toFixed(2)
-      });
-      totalCustomDeductions += unpaidLeaveDeduction;
-    }
+    const extraDeduction = releaseInfo?.customDeduction || (employeeId === selectedEmployee ? customDeduction : 0);
+    const totalDeductions = parseFloat(extraDeduction || 0) + computedDeductions.reduce((sum, d) => sum + parseFloat(d.amount), 0);
+    const netPay = grossEarningsActual - totalDeductions;
 
-    const extraDeductionTotal = parseFloat(extraDeduction || 0) + totalCustomDeductions;
-
-    const totalDeductions = extraDeductionTotal;
-    const netPay = grossPay - totalDeductions;
+    return {
+      employee,
+      month,
+      year,
+      daysInMonth,
+      workingDaysInMonth,
+      effectiveDays: statistics.effectiveDays,
+      dailyRate: dailyRate.toFixed(2),
+      baseSalary: empBaseSalary,
+      grossPay: grossEarningsActual.toFixed(2),
+      customDeduction: parseFloat(extraDeduction || 0).toFixed(2),
+      deductionReason: releaseInfo?.deductionReason || (employeeId === selectedEmployee ? deductionReason : ''),
+      totalDeductions: totalDeductions.toFixed(2),
+      netPay: netPay.toFixed(2),
+      released: !!releaseInfo,
+      computedEarnings,
+      computedDeductions
+    };
 
     return {
       employee,
@@ -373,60 +337,35 @@ const Payslips = () => {
     yPos += 5;
     doc.setFont(undefined, 'normal');
 
-    // Earnings
-    const earnings = [
-      { key: 'basic', label: 'Basic Salary (BS)', full: payslipData.baseSalary, arrear: '0.00', actual: payslipData.earnedBasic }
-    ];
+    // Earnings loop
+    payslipData.computedEarnings.forEach(earn => {
+      doc.text(earn.name, 20, yPos);
+      doc.text(earn.full, 70, yPos, { align: 'right' });
+      doc.text('0.00', 85, yPos, { align: 'right' }); // Arrear stays 0 for now
+      doc.text(earn.actual, 100, yPos, { align: 'right' });
 
-    // Add Custom Earnings
-    payslipData.computedCustomEarnings.forEach(ce => {
-      earnings.push({
-        key: `custom_${ce.id}`,
-        label: ce.name,
-        full: '0.00',
-        arrear: '0.00',
-        actual: ce.amount
-      });
+      // Find matching deduction for same row if it exists
+      const ded = payslipData.computedDeductions[payslipData.computedEarnings.indexOf(earn)];
+      if (ded) {
+        doc.text(ded.name, 110, yPos);
+        doc.text(ded.amount, 185, yPos, { align: 'right' });
+      }
+      yPos += 5;
     });
 
-    const activeEarnings = earnings;
-
-    const deductions = [
-      { key: 'tax', label: 'Tax (TDS)', amount: payslipData.tax },
-    ];
-
-    // Add Custom Deductions
-    payslipData.computedCustomDeductions.forEach(cd => {
-      deductions.push({
-        key: `custom_${cd.id}`,
-        label: cd.name,
-        amount: cd.amount
-      });
-    });
-
-    const activeDeductions = deductions;
-
-    if (parseFloat(payslipData.customDeduction) > 0) {
-      activeDeductions.push({ key: 'adhoc', label: payslipData.deductionReason || 'Other Deduction', amount: payslipData.customDeduction });
+    // Pick up any leftover deductions
+    if (payslipData.computedDeductions.length > payslipData.computedEarnings.length) {
+      for (let i = payslipData.computedEarnings.length; i < payslipData.computedDeductions.length; i++) {
+        const ded = payslipData.computedDeductions[i];
+        doc.text(ded.name, 110, yPos);
+        doc.text(ded.amount, 185, yPos, { align: 'right' });
+        yPos += 5;
+      }
     }
 
-    const maxRows = Math.max(activeEarnings.length, activeDeductions.length);
-
-    for (let i = 0; i < maxRows; i++) {
-      const earn = activeEarnings[i];
-      const ded = activeDeductions[i];
-
-      if (earn) {
-        doc.text(earn.label, 20, yPos);
-        doc.text(earn.full.toString(), 70, yPos, { align: 'right' });
-        doc.text(earn.arrear, 85, yPos, { align: 'right' });
-        doc.text(earn.actual.toString(), 100, yPos, { align: 'right' });
-      }
-
-      if (ded) {
-        doc.text(ded.label, 110, yPos);
-        doc.text(ded.amount.toString(), 185, yPos, { align: 'right' });
-      }
+    if (parseFloat(payslipData.customDeduction) > 0) {
+      doc.text(payslipData.deductionReason || 'Adhoc Deduction', 110, yPos);
+      doc.text(payslipData.customDeduction, 185, yPos, { align: 'right' });
       yPos += 5;
     }
 
@@ -625,10 +564,9 @@ const Payslips = () => {
                     {/* Tax Display Removed */}
                   </div>
 
-                  {currentPayslip.computedCustomDeductions
-                    .filter(cd => parseFloat(cd.amount) > 0)
+                  {payslipData.computedDeductions
                     .map(cd => (
-                      <div key={cd.name} className="flex justify-between w-full gap-4 text-gray-600 dark:text-gray-300">
+                      <div key={cd.id} className="flex justify-between w-full gap-4 text-gray-600 dark:text-gray-300">
                         <span>{cd.name}:</span>
                         <span>₹{cd.amount}</span>
                       </div>
