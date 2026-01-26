@@ -32,12 +32,18 @@ const UserManagement = () => {
 
   const handleAddUser = async () => {
     try {
-      // Basic Validation
-      const emailToUse = (formData.email || formData.userId).trim();
+      // Basic Validation & Auto-complete
+      let emailToUse = (formData.email || formData.userId || '').trim();
+
+      // If no @ is present, assume it's a username and append @outvying.com
+      if (emailToUse && !emailToUse.includes('@')) {
+        emailToUse = `${emailToUse}@outvying.com`;
+      }
+
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
       if (!emailToUse || !emailRegex.test(emailToUse)) {
-        setAlert({ type: 'error', message: 'A valid email address is required for account creation. Firebase does not support usernames.' });
+        setAlert({ type: 'error', message: 'A valid email address is required. Tip: Type a username and we will auto-add @outvying.com' });
         return;
       }
 
@@ -49,8 +55,8 @@ const UserManagement = () => {
       // Ensure email is populated for Auth
       const finalData = {
         ...formData,
-        email: (formData.email || formData.userId).trim(),
-        userId: (formData.userId || formData.email).trim()
+        email: emailToUse,
+        userId: emailToUse
       };
 
       const result = await addUser(finalData);
@@ -255,6 +261,9 @@ const UserManagement = () => {
             onChange={(e) => setFormData({ ...formData, email: e.target.value })}
             className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
           />
+          <p className="text-[10px] text-gray-500 mt-1 ml-1 italic">
+            Tip: You can use a username and we will auto-add @outvying.com
+          </p>
           <input
             type="text"
             placeholder="Employee ID"
