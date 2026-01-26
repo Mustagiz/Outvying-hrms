@@ -392,11 +392,22 @@ const Attendance = () => {
   };
 
   const filteredAttendance = useMemo(() => {
+    const role = (currentUser.role || '').toLowerCase();
     const teamUserIds = new Set(
       allUsers
-        .filter(u => currentUser.role === 'manager' ? u.reportingTo === currentUser.name : true)
+        .filter(u => {
+          if (role === 'manager') {
+            // Direct reports check (case-insensitive name comparison)
+            return (u.reportingTo || '').toLowerCase() === (currentUser.name || '').toLowerCase();
+          }
+          return true;
+        })
         .map(u => String(u.id))
     );
+
+    // Always include self in the viewable list
+    teamUserIds.add(String(currentUser.id));
+
     let records = attendance.filter(a => teamUserIds.has(String(a.employeeId)));
     const today = new Date().toISOString().split('T')[0];
 
@@ -444,11 +455,9 @@ const Attendance = () => {
       } else {
         if (date.getMonth() !== appliedFilters.month || date.getFullYear() !== appliedFilters.year) return false;
       }
-      const matchesEmployee = currentUser.role === 'employee'
-        ? String(a.employeeId) === String(currentUser.id)
-        : appliedFilters.employee === 'all'
-          ? (currentUser.role === 'manager' ? teamUserIds.has(String(a.employeeId)) : true)
-          : String(a.employeeId) === String(appliedFilters.employee);
+      const matchesEmployee = (role === 'employee' || !appliedFilters.employee || appliedFilters.employee === 'all')
+        ? (role === 'employee' ? String(a.employeeId) === String(currentUser.id) : teamUserIds.has(String(a.employeeId)))
+        : String(a.employeeId) === String(appliedFilters.employee);
       const matchesStatus = appliedFilters.status === 'all' ? true : a.status === appliedFilters.status;
       return matchesEmployee && matchesStatus;
     }).sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -519,10 +528,17 @@ const Attendance = () => {
     { value: 9, label: 'October' }, { value: 10, label: 'November' }, { value: 11, label: 'December' }
   ];
 
-  const yearOptions = getYearOptions();
   const employeeOptions = [
     { value: 'all', label: 'All Employees' },
-    ...allUsers.filter(u => u.role === 'employee').map(u => ({ value: String(u.id), label: u.name }))
+    ...allUsers.filter(u => {
+      const role = (currentUser.role || '').toLowerCase();
+      if (role === 'manager') {
+        // Show direct reports + self
+        return (u.reportingTo || '').toLowerCase() === (currentUser.name || '').toLowerCase() || String(u.id) === String(currentUser.id);
+      }
+      // Admins/HR see everyone with an employee role (or all registered if needed, but keeping existing filter)
+      return true;
+    }).map(u => ({ value: String(u.id), label: u.name }))
   ];
   const statusOptions = [
     { value: 'all', label: 'All Status' },
