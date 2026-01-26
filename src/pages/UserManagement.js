@@ -8,6 +8,7 @@ const UserManagement = () => {
   const [alert, setAlert] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showResetModal, setShowResetModal] = useState(false);
+  const [showRoleModal, setShowRoleModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [formData, setFormData] = useState({
@@ -104,19 +105,18 @@ const UserManagement = () => {
     setTimeout(() => setAlert(null), 3000);
   };
 
-  const handleManualPasswordReset = async () => {
-    if (!formData.password || !formData.newPassword) {
-      setAlert({ type: 'error', message: 'Both current (old) password and new password are required.' });
+  const handleUpdateRole = async () => {
+    if (!formData.role) {
+      setAlert({ type: 'error', message: 'Please select a role' });
       return;
     }
 
-    const result = await forceUpdatePassword(selectedUser.email, formData.password, formData.newPassword);
+    const result = await updateUser(selectedUser.id, { role: formData.role });
     setAlert({ type: result.success ? 'success' : 'error', message: result.message });
 
     if (result.success) {
-      setShowResetModal(false);
+      setShowRoleModal(false);
       setSelectedUser(null);
-      setFormData({ ...formData, password: '', newPassword: '' });
     }
     setTimeout(() => setAlert(null), 3000);
   };
@@ -125,6 +125,12 @@ const UserManagement = () => {
     setSelectedUser({ ...user, resetType: type });
     setFormData({ ...formData, userId: user.userId || '', password: '', newPassword: '' });
     setShowResetModal(true);
+  };
+
+  const openRoleModal = (user) => {
+    setSelectedUser(user);
+    setFormData({ ...formData, role: user.role });
+    setShowRoleModal(true);
   };
 
   const columns = [
@@ -138,6 +144,9 @@ const UserManagement = () => {
       header: 'Actions',
       render: (row) => (
         <div className="flex gap-2">
+          <Button onClick={() => openRoleModal(row)} variant="secondary" className="text-xs py-1 px-2 border-primary-200 text-primary-600">
+            <Shield size={14} className="inline mr-1" /> Role
+          </Button>
           <Button onClick={() => openResetModal(row, 'userId')} variant="secondary" className="text-xs py-1 px-2">
             <RefreshCw size={14} className="inline mr-1" /> User ID
           </Button>
@@ -338,6 +347,48 @@ const UserManagement = () => {
               </div>
             </>
           )}
+        </div>
+      </Modal>
+
+      <Modal isOpen={showRoleModal} onClose={() => setShowRoleModal(false)} title="Update User Role">
+        <div className="space-y-6">
+          <div className="flex items-center gap-4 p-4 bg-primary-50 dark:bg-primary-900/20 rounded-2xl border border-primary-100 dark:border-primary-800">
+            <div className="w-12 h-12 rounded-full bg-primary-100 dark:bg-primary-800 flex items-center justify-center text-primary-600">
+              <Shield size={24} />
+            </div>
+            <div>
+              <p className="text-sm text-gray-500 uppercase font-bold tracking-wider">Current User</p>
+              <h3 className="font-bold text-gray-900 dark:text-white">{selectedUser?.name}</h3>
+              <p className="text-xs text-gray-400">{selectedUser?.email}</p>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-gray-500 uppercase px-1">Select New Role</label>
+            <select
+              value={formData.role}
+              onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+              className="w-full px-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 outline-none transition-all"
+            >
+              <option value="employee">Employee</option>
+              <option value="manager">Manager</option>
+              <option value="hr">HR Manager</option>
+              <option value="admin">Admin</option>
+              <option value="super_admin">Super Admin</option>
+            </select>
+          </div>
+
+          <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-xl border border-yellow-100 dark:border-yellow-800 flex gap-3">
+            <Shield size={20} className="text-yellow-600 shrink-0 mt-0.5" />
+            <p className="text-xs text-yellow-700 dark:text-yellow-400 leading-relaxed">
+              <strong>Warning:</strong> Changing a user's role affects their system permissions immediately. Ensure you have properly authorized this change.
+            </p>
+          </div>
+
+          <div className="flex gap-3">
+            <Button onClick={() => setShowRoleModal(false)} variant="secondary" className="flex-1 rounded-xl">Cancel</Button>
+            <Button onClick={handleUpdateRole} variant="primary" className="flex-1 rounded-xl shadow-lg shadow-primary-500/20">Update Role</Button>
+          </div>
         </div>
       </Modal>
     </div>
