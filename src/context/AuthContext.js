@@ -86,6 +86,13 @@ export const AuthProvider = ({ children }) => {
     const savedTheme = localStorage.getItem('theme') || 'light';
     setTheme(savedTheme);
 
+    // Apply Theme to Document root
+    if (savedTheme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+
     // IP Initialization
     getCurrentIP().then(ip => {
       setCurrentIP(ip);
@@ -469,6 +476,13 @@ export const AuthProvider = ({ children }) => {
     const newTheme = theme === 'light' ? 'dark' : 'light';
     setTheme(newTheme);
     localStorage.setItem('theme', newTheme);
+
+    // Apply immediately to the DOM
+    if (newTheme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
   };
 
   // MODULE ACCESS HELPER
