@@ -46,22 +46,8 @@ export const calculateAttendanceStatus = (clockIn, clockOut, date = null, roster
   const shiftStartInMinutes = timeToMinutes(shiftStartTime);
   const gracePeriod = Number(roster?.gracePeriod ?? defaultRule.gracePeriodMins);
 
-  let clockInInMinutes = timeToMinutes(clockIn);
-
-  // Timezone adjustment for non-IST
-  if (timezone && timezone !== 'Asia/Kolkata') {
-    try {
-      const parts = clockIn.split(':');
-      const normalizedClockIn = parts.length > 2 ? parts.slice(0, 2).join(':') : clockIn;
-      const istTimestamp = new Date(`${istDate}T${normalizedClockIn}:00+05:30`);
-      const formatter = new Intl.DateTimeFormat('en-GB', { timeZone: timezone, hour: '2-digit', minute: '2-digit', hour12: false });
-      const timeStr = formatter.format(istTimestamp);
-      clockInInMinutes = timeToMinutes(timeStr);
-    } catch (e) {
-      console.warn("Timezone error:", e);
-    }
-  }
-
+  // All times are in IST - no conversion needed
+  const clockInInMinutes = timeToMinutes(clockIn);
   const lateThreshold = shiftStartInMinutes + gracePeriod;
   let status = clockInInMinutes > lateThreshold ? 'Late' : 'Present';
 
@@ -102,7 +88,7 @@ export const calculateAttendanceStatus = (clockIn, clockOut, date = null, roster
     overtime = workHours > overtimeThreshold ? Math.round((workHours - overtimeThreshold) * 100) / 100 : 0;
   }
 
-  const diag = ` (In:${clockIn}, Start:${shiftStartTime}, Grace:${gracePeriod}m, ThrMins:${lateThreshold})`;
+  const diag = ` (In:${clockIn}, Start:${shiftStartTime}, Grace:${gracePeriod}m, ThrMins:${lateThreshold}, AllIST)`;
   return {
     status,
     workHours: Math.round(workHours * 100) / 100,
