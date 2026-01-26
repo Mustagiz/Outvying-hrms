@@ -1098,6 +1098,25 @@ export const AuthProvider = ({ children }) => {
     syncBiometric,
     applyLeave,
     updateLeaveStatus,
+    commitPayroll: async (payrollBatch) => {
+      try {
+        const batchId = payrollBatch[0]?.monthYear.replace(/\s+/g, '-').toLowerCase() || 'unknown';
+        // Use a generic collection or sub-collection logic
+        // For simplicity, we'll add individual docs to a 'processedPayroll' collection
+        const promises = payrollBatch.map(record =>
+          addDoc(collection(db, 'processedPayroll'), {
+            ...record,
+            committedAt: serverTimestamp(),
+            committedBy: currentUser.id
+          })
+        );
+        await Promise.all(promises);
+        return { success: true, message: 'Payroll committed successfully' };
+      } catch (e) {
+        console.error("Commit Payroll Error:", e);
+        return { success: false, message: 'Commit failed: ' + e.message };
+      }
+    },
     uploadDocument,
     updateBankAccount,
     updateDocumentStatus,

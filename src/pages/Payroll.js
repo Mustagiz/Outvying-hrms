@@ -28,7 +28,7 @@ ChartJS.register(
 );
 
 const Payroll = () => {
-  const { allUsers, updateUser, currentUser, allBankAccounts, attendance } = useAuth();
+  const { allUsers, updateUser, currentUser, allBankAccounts, attendance, commitPayroll } = useAuth();
   const [activeTab, setActiveTab] = useState('employees');
   const [showModal, setShowModal] = useState(false);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
@@ -92,11 +92,15 @@ const Payroll = () => {
 
     // Filter attendance for this employee and month
     const records = attendance.filter(a => {
+      if (!a.date) return false;
       const d = new Date(a.date);
       return String(a.employeeId) === String(empId) && d.getMonth() === monthNum && d.getFullYear() === parseInt(year);
     });
 
-    // Calculate effective days
+    // If no records found, assume 0 for safety (or user can manually adjust)
+    // BUT common HRMS logic: if they have a roster but no swipe, they are absent.
+    // If they have NO records at all for the month, it depends on policy.
+    // We'll calculate based on what's found.
     const effectiveDays = records.reduce((sum, rec) => {
       if (rec.status === 'Present') return sum + 1;
       if (rec.status === 'Late') return sum + 1;
@@ -104,7 +108,7 @@ const Payroll = () => {
       return sum;
     }, 0);
 
-    return { effectiveDays, totalDays };
+    return { effectiveDays, totalDays, recordCount: records.length };
   };
 
   const calculateBreakdown = (totalCtc, toggles = { pf: true, esi: true, tds: true, pt: true }) => {
@@ -285,7 +289,7 @@ const Payroll = () => {
     const infoFields = [
       ['Employee ID', emp.employeeId || 'N/A', 'Employee Name', emp.name || 'N/A'],
       ['Designation', emp.designation || 'N/A', 'Business Unit', emp.department || 'N/A'],
-      ['Date Of Joining', emp.joiningDate || '-', 'Location', 'Pune'],
+      ['Date Of Joining', emp.dateOfJoining || '-', 'Location', 'Pune'],
       ['Bank Name', bank.bankName || '-', 'Bank Account No.', bank.accountNumber || '-'],
       ['IFSC Code', bank.ifscCode || '-', 'ESI No.', '-'],
       ['PAN Number', emp.panNumber || 'ABCDE1234F'],
@@ -504,11 +508,35 @@ const Payroll = () => {
               <div className="flex justify-between items-center">
                 <div className="flex items-center gap-4">
                   <select value={selectedProcessMonth} onChange={(e) => setSelectedProcessMonth(e.target.value)} className="bg-gray-100 border-none rounded-xl px-4 py-3 font-bold text-sm outline-none">
-                    <option>January 2026</option><option>February 2026</option>
+                    <option>January 2026</option><option>February 2026</option><option>December 2025</option>
                   </select>
                   <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">Active Processing Period</p>
                 </div>
-                <Button><Calculator size={18} className="mr-2" /> Commit Salaries</Button>
+                <Button onClick={async () => {
+                  setIsProcessing(true);
+                  const batch = employees.map(emp => {
+                    const { effectiveDays, totalDays } = getEmployeeWorkDays(emp.id, selectedProcessMonth);
+                    const breakdown = emp.salaryBreakdown || calculateBreakdown(emp.ctc || 0, emp.deductionToggles);
+                    const gross = (parseFloat(breakdown.grossSalary || 0) * (effectiveDays / totalDays));
+                    const net = (gross - parseFloat(breakdown.totalDeductions || 0));
+                    return {
+                      employeeId: emp.id,
+                      employeeName: emp.name,
+                      monthYear: selectedProcessMonth,
+                      effectiveDays,
+                      totalDays,
+                      grossEarned: gross.toFixed(2),
+                      statutoryDeductions: breakdown.totalDeductions,
+                      netPayable: net.toFixed(2),
+                      status: 'Committed'
+                    };
+                  });
+                  const result = await commitPayroll(batch);
+                  setAlert({ type: result.success ? 'success' : 'error', message: result.message });
+                  setIsProcessing(false);
+                }} disabled={isProcessing}>
+                  {isProcessing ? 'Saving...' : <><Calculator size={18} className="mr-2" /> Commit Salaries</>}
+                </Button>
               </div>
             </Card>
             <Card title="Monthly Batch Review" className="border-none shadow-lg">
