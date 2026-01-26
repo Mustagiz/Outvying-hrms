@@ -89,27 +89,20 @@ const Payroll = () => {
     const year = parseInt(yearStr);
 
     // 1. Calculate Total Working Days for the month (Denominator)
-    // Priority 1: Check if employee has assigned rosters
-    const empRosters = rosters.filter(r => {
-      const d = new Date(r.date);
-      return String(r.employeeId) === String(empId) && d.getMonth() === monthNum && d.getFullYear() === year;
-    });
-
-    let totalWorkingDays = empRosters.length > 0 ? empRosters.length : 0;
-
-    // Priority 2: Fallback to Mon-Fri weekday count
-    if (totalWorkingDays === 0) {
-      const daysInMonth = new Date(year, monthNum + 1, 0).getDate();
-      for (let day = 1; day <= daysInMonth; day++) {
-        const date = new Date(year, monthNum, day);
-        const dayOfWeek = date.getDay();
-        if (dayOfWeek !== 0 && dayOfWeek !== 6) { // Not Sat/Sun
-          totalWorkingDays++;
-        }
+    // As per user requirement: Always base on calendar weekdays (Mon-Fri)
+    let totalWorkingDays = 0;
+    const daysInMonth = new Date(year, monthNum + 1, 0).getDate();
+    for (let day = 1; day <= daysInMonth; day++) {
+      const date = new Date(year, monthNum, day);
+      const dayOfWeek = date.getDay();
+      if (dayOfWeek !== 0 && dayOfWeek !== 6) { // Not Sat/Sun
+        totalWorkingDays++;
       }
     }
 
     // 2. Calculate Effective Worked Days (Numerator)
+    // Count days where employee was Present or Late (1.0) or Half Day (0.5)
+    // Note: Absent, LWP, UPL, etc. are correctly excluded (valued at 0)
     const records = attendance.filter(a => {
       if (!a.date) return false;
       const d = new Date(a.date);
@@ -120,7 +113,7 @@ const Payroll = () => {
       if (rec.status === 'Present') return sum + 1;
       if (rec.status === 'Late') return sum + 1;
       if (rec.status === 'Half Day') return sum + 0.5;
-      return sum; // Absent, LWP, etc. are 0
+      return sum;
     }, 0);
 
     return { effectiveDays, totalDays: totalWorkingDays, recordCount: records.length };
