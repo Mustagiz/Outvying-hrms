@@ -32,6 +32,7 @@ import IPRestrictions from './pages/IPRestrictions';
 import IPAccessLogs from './pages/IPAccessLogs';
 import Profile from './pages/Profile';
 import Roster from './pages/Roster';
+import AttendanceDebug from './pages/AttendanceDebug';
 import { Spinner } from './components/UI';
 
 const PrivateRoute = ({ children }) => {
