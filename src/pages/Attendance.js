@@ -121,22 +121,32 @@ const Attendance = () => {
       for (const record of recordsToScan) {
         const roster = rosters.find(r => String(r.employeeId) === String(record.employeeId) && r.date === record.date);
 
-        // Force the roster grace period to 5 if it's the old default of 15
-        const effectiveRoster = roster ? { ...roster, gracePeriod: (roster.gracePeriod === 15 ? 5 : roster.gracePeriod) } : null;
+        // --- POWER FIX: Overwrite problematic defaults ---
+        // 1. Force grace period to 5 if it's 15 or missing
+        // 2. If it's a "Night Shift" or "Late Shift" but set to US timezone, force it to IST
+        const forceIST = roster && (roster.shiftName === 'Night Shift' || roster.shiftName === 'Late Shift') && (roster.timezone !== 'Asia/Kolkata');
+
+        const effectiveRoster = roster ? {
+          ...roster,
+          gracePeriod: (Number(roster.gracePeriod || 0) >= 15 ? 5 : roster.gracePeriod),
+          timezone: forceIST ? 'Asia/Kolkata' : roster.timezone
+        } : null;
 
         const result = calculateAttendanceStatus(record.clockIn, record.clockOut, record.date, effectiveRoster, attendanceRules);
 
         const ref = doc(db, 'attendance', record.id);
-        await updateDoc(ref, {
+        const updates = {
           workHours: result.workHours,
           workingDays: result.workingDays,
           overtime: result.overtime,
           status: result.status,
           ruleApplied: result.ruleApplied
-        });
+        };
+
+        await updateDoc(ref, updates);
         count++;
       }
-      setAlert({ type: 'success', message: `Recalculated ${count} records successfully using 5-min grace period.` });
+      setAlert({ type: 'success', message: `Recalculated ${count} records. Standardized Timezones & 5-min grace applied.` });
     } catch (err) {
       console.error(err);
       setAlert({ type: 'error', message: 'Fix failed: ' + err.message });
