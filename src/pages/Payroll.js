@@ -111,47 +111,66 @@ const Payroll = () => {
     return { effectiveDays, totalDays, recordCount: records.length };
   };
 
-  const calculateBreakdown = (totalCtc, toggles = { pf: true, esi: true, tds: true, pt: true }) => {
+  const calculateBreakdown = (totalCtc, toggles = { pf: true, esi: true, tds: true, pt: true }, attendanceStats = null) => {
     const annual = parseFloat(totalCtc) || 0;
-    const monthly = annual / 12;
+    const baseMonthly = annual / 12;
+
+    // Pro-ratio factor (default to 1 if no attendance data)
+    let ratio = 1;
+    if (attendanceStats && attendanceStats.totalDays > 0) {
+      ratio = attendanceStats.effectiveDays / attendanceStats.totalDays;
+    }
 
     const components = {};
     let grossSalary = 0;
+    let actualGrossSalary = 0;
 
     Object.keys(template).forEach(key => {
-      const val = monthly * (template[key] / 100);
-      components[key] = val.toFixed(2);
-      grossSalary += val;
+      const monthlyVal = baseMonthly * (template[key] / 100);
+      components[key] = monthlyVal.toFixed(2);
+
+      const actualVal = monthlyVal * ratio;
+      components[`actual_${key}`] = actualVal.toFixed(2);
+
+      grossSalary += monthlyVal;
+      actualGrossSalary += actualVal;
     });
 
-    const pfBasic = Math.min(parseFloat(components.basic || 0), taxConfig.pfCeiling);
+    // STATUTORY DEDUCTIONS - Re-calculate based on ACTUAL EARNED gross
+    // PF Calculation
+    const pfBasic = Math.min(parseFloat(components.actual_basic || 0), taxConfig.pfCeiling);
     const pfEmployee = (toggles.pf !== false) ? pfBasic * (taxConfig.pfEmployee / 100) : 0;
     const pfEmployer = (toggles.pf !== false) ? pfBasic * (taxConfig.pfEmployer / 100) : 0;
 
-    const esiApplicable = grossSalary <= taxConfig.esiCeiling;
-    const esiEmployee = (toggles.esi !== false && esiApplicable) ? (grossSalary * (taxConfig.esiEmployee / 100)) : 0;
-    const esiEmployer = (toggles.esi !== false && esiApplicable) ? (grossSalary * (taxConfig.esiEmployer / 100)) : 0;
+    // ESI Calculation
+    const esiApplicable = actualGrossSalary <= taxConfig.esiCeiling;
+    const esiEmployee = (toggles.esi !== false && esiApplicable) ? (actualGrossSalary * (taxConfig.esiEmployee / 100)) : 0;
+    const esiEmployer = (toggles.esi !== false && esiApplicable) ? (actualGrossSalary * (taxConfig.esiEmployer / 100)) : 0;
 
+    // PT - Always fixed as per requirement
     const professionalTax = (toggles.pt !== false) ? taxConfig.professionalTax : 0;
 
-    const annualGross = grossSalary * 12;
-    const taxableIncome = annualGross - (pfEmployee * 12) - 50000;
-    let tds = 0;
-    if (taxableIncome > 1500000) tds = (taxableIncome - 1500000) * 0.30 + 187500;
-    else if (taxableIncome > 1200000) tds = (taxableIncome - 1200000) * 0.20 + 127500;
-    else if (taxableIncome > 900000) tds = (taxableIncome - 900000) * 0.15 + 82500;
-    else if (taxableIncome > 600000) tds = (taxableIncome - 600000) * 0.10 + 52500;
-    else if (taxableIncome > 300000) tds = (taxableIncome - 300000) * 0.05 + 12500;
-    else if (taxableIncome > 250000) tds = (taxableIncome - 250000) * 0.05;
+    // TDS - Calculate based on projected annual income using this month's actual as a base
+    const annualActualGross = actualGrossSalary * 12;
+    const taxableIncome = annualActualGross - (pfEmployee * 12) - 50000;
+    let tdsAnnual = 0;
+    if (taxableIncome > 1500000) tdsAnnual = (taxableIncome - 1500000) * 0.30 + 187500;
+    else if (taxableIncome > 1200000) tdsAnnual = (taxableIncome - 1200000) * 0.20 + 127500;
+    else if (taxableIncome > 900000) tdsAnnual = (taxableIncome - 900000) * 0.15 + 82500;
+    else if (taxableIncome > 600000) tdsAnnual = (taxableIncome - 600000) * 0.10 + 52500;
+    else if (taxableIncome > 300000) tdsAnnual = (taxableIncome - 300000) * 0.05 + 12500;
+    else if (taxableIncome > 250000) tdsAnnual = (taxableIncome - 250000) * 0.05;
 
-    const monthlyTds = (toggles.tds !== false && taxConfig.tdsEnabled) ? (tds / 12) : 0;
+    const monthlyTds = (toggles.tds !== false && taxConfig.tdsEnabled) ? (tdsAnnual / 12) : 0;
+
+    // Final Tally
     const totalDeductions = pfEmployee + esiEmployee + professionalTax + monthlyTds;
-    const netSalary = grossSalary - totalDeductions;
-    const employerCost = monthly + pfEmployer + esiEmployer;
+    const netSalary = actualGrossSalary - totalDeductions;
+    const actualEmployerCost = actualGrossSalary + pfEmployer + esiEmployer;
 
     return {
       ...components,
-      grossSalary: grossSalary.toFixed(2),
+      actualGrossSalary: actualGrossSalary.toFixed(2),
       pfEmployee: pfEmployee.toFixed(2),
       pfEmployer: pfEmployer.toFixed(2),
       esiEmployee: esiEmployee.toFixed(2),
@@ -160,10 +179,9 @@ const Payroll = () => {
       tds: monthlyTds.toFixed(2),
       totalDeductions: totalDeductions.toFixed(2),
       netSalary: netSalary.toFixed(2),
-      monthly: monthly.toFixed(2),
+      monthly: baseMonthly.toFixed(2),
       annual: annual.toFixed(2),
-      employerCost: employerCost.toFixed(2),
-      costToCompany: (employerCost * 12).toFixed(2)
+      employerCost: actualEmployerCost.toFixed(2)
     };
   };
 
@@ -273,8 +291,10 @@ const Payroll = () => {
     if (!b) return alert('No salary breakdown assigned!');
     const bank = allBankAccounts.find(ba => String(ba.userId) === String(emp.id)) || {};
     const daysInMonth = new Date(year, ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].indexOf(monthName) + 1, 0).getDate();
-    const { effectiveDays } = getEmployeeWorkDays(emp.id, `${monthName} ${year}`);
-    const workDays = effectiveDays || daysInMonth;
+    const statistics = getEmployeeWorkDays(emp.id, `${monthName} ${year}`);
+    const actualBreakdown = calculateBreakdown(emp.ctc || 0, emp.deductionToggles, statistics);
+
+    const workDays = statistics.effectiveDays || daysInMonth;
 
     doc.setFont('helvetica', 'bold'); doc.setFontSize(22); doc.setTextColor(0);
     doc.text('Outvying Media Solution Pvt Ltd.', 105, 20, { align: 'center' });
@@ -306,26 +326,45 @@ const Payroll = () => {
     doc.line(20, currentY + 2, 190, currentY + 2); currentY += 8;
     doc.setFontSize(9); doc.text('Description', 22, currentY); doc.text('Full', 70, currentY, { align: 'right' }); doc.text('Actual', 105, currentY, { align: 'right' });
     doc.text('Description', 112, currentY); doc.text('Amount', 188, currentY, { align: 'right' }); currentY += 6;
-    const earnings = Object.keys(template).map(k => [
-      k.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()),
-      b[k] || '0.00'
-    ]);
-    const deductions = [['Tax (TDS)', b.tds], ['Professional TAX', b.professionalTax], ['ESI', b.esiEmployee]];
+
+    // Earnings mapping
+    const earnings = Object.keys(template).map(k => {
+      const full = actualBreakdown[k];
+      const actual = actualBreakdown[`actual_${k}`];
+      return [
+        k.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()),
+        full,
+        actual
+      ];
+    });
+
+    const deductions = [
+      ['Tax (TDS)', actualBreakdown.tds],
+      ['Professional TAX', actualBreakdown.professionalTax],
+      ['ESI Contribution', actualBreakdown.esiEmployee],
+      ['PF Contribution', actualBreakdown.pfEmployee]
+    ];
+
     const rowCount = Math.max(earnings.length, deductions.length);
     for (let i = 0; i < rowCount; i++) {
       if (earnings[i]) {
         doc.text(earnings[i][0], 22, currentY);
-        const actualVal = (parseFloat(earnings[i][1] || 0) * (workDays / daysInMonth)).toFixed(2);
-        doc.text(actualVal, 105, currentY, { align: 'right' });
+        doc.text(parseFloat(earnings[i][1]).toFixed(2), 70, currentY, { align: 'right' });
+        doc.text(parseFloat(earnings[i][2]).toFixed(2), 105, currentY, { align: 'right' });
       }
-      if (deductions[i]) { doc.text(deductions[i][0], 112, currentY); doc.text(parseFloat(deductions[i][1]).toFixed(2), 188, currentY, { align: 'right' }); }
+      if (deductions[i]) {
+        doc.text(deductions[i][0], 112, currentY);
+        doc.text(parseFloat(deductions[i][1]).toFixed(2), 188, currentY, { align: 'right' });
+      }
       currentY += lineGap;
     }
-    const finalEarnings = (parseFloat(b.grossSalary) * (workDays / daysInMonth)).toFixed(2);
-    const totalDeds = parseFloat(b.totalDeductions).toFixed(2);
-    doc.line(20, currentY - 2, 190, currentY - 2); doc.setFont('helvetica', 'bold'); doc.text('Total Earnings', 22, currentY); doc.text(finalEarnings, 105, currentY, { align: 'right' }); doc.text('Total Deduction', 112, currentY); doc.text(totalDeds, 188, currentY, { align: 'right' });
+
+    const finalEarnings = actualBreakdown.actualGrossSalary;
+    const totalDeds = actualBreakdown.totalDeductions;
+    doc.line(20, currentY - 2, 190, currentY - 2); doc.setFont('helvetica', 'bold'); doc.text('Total Earnings', 22, currentY); doc.text(parseFloat(finalEarnings).toFixed(2), 105, currentY, { align: 'right' }); doc.text('Total Deduction', 112, currentY); doc.text(parseFloat(totalDeds).toFixed(2), 188, currentY, { align: 'right' });
     currentY += 10; doc.setFontSize(11); doc.text(`Net Pay for the month (Total Earnings - Total Dedutions):`, 22, currentY); doc.setFontSize(14);
-    const net = (parseFloat(finalEarnings) - parseFloat(totalDeds)).toFixed(2); doc.text(`₹ ${net}`, 188, currentY, { align: 'right' });
+    const net = actualBreakdown.netSalary; doc.text(`₹ ${parseFloat(net).toLocaleString()}`, 188, currentY, { align: 'right' });
+    doc.save(`Payslip_${emp.employeeId}_${monthName}.pdf`);
     doc.save(`Payslip_${emp.employeeId}_${monthName}.pdf`);
   };
 
@@ -515,19 +554,17 @@ const Payroll = () => {
                 <Button onClick={async () => {
                   setIsProcessing(true);
                   const batch = employees.map(emp => {
-                    const { effectiveDays, totalDays } = getEmployeeWorkDays(emp.id, selectedProcessMonth);
-                    const breakdown = emp.salaryBreakdown || calculateBreakdown(emp.ctc || 0, emp.deductionToggles);
-                    const gross = (parseFloat(breakdown.grossSalary || 0) * (effectiveDays / totalDays));
-                    const net = (gross - parseFloat(breakdown.totalDeductions || 0));
+                    const statistics = getEmployeeWorkDays(emp.id, selectedProcessMonth);
+                    const breakdown = calculateBreakdown(emp.ctc || 0, emp.deductionToggles, statistics);
                     return {
                       employeeId: emp.id,
                       employeeName: emp.name,
                       monthYear: selectedProcessMonth,
-                      effectiveDays,
-                      totalDays,
-                      grossEarned: gross.toFixed(2),
+                      effectiveDays: statistics.effectiveDays,
+                      totalDays: statistics.totalDays,
+                      grossEarned: breakdown.actualGrossSalary,
                       statutoryDeductions: breakdown.totalDeductions,
-                      netPayable: net.toFixed(2),
+                      netPayable: breakdown.netSalary,
                       status: 'Committed'
                     };
                   });
@@ -545,31 +582,34 @@ const Payroll = () => {
                 {
                   header: 'Actual (Mo)',
                   render: (u) => {
-                    const { effectiveDays, totalDays } = getEmployeeWorkDays(u.id, selectedProcessMonth);
-                    const val = (parseFloat(u.salaryBreakdown?.grossSalary || 0) * (effectiveDays / totalDays)).toFixed(2);
+                    const statistics = getEmployeeWorkDays(u.id, selectedProcessMonth);
+                    const breakdown = calculateBreakdown(u.ctc || 0, u.deductionToggles, statistics);
                     return (
                       <div>
-                        <p className="font-bold">₹{parseFloat(val).toLocaleString()}</p>
-                        <p className="text-[10px] text-gray-400">{effectiveDays} / {totalDays} Days</p>
+                        <p className="font-bold">₹{parseFloat(breakdown.actualGrossSalary).toLocaleString()}</p>
+                        <p className="text-[10px] text-gray-400">{statistics.effectiveDays} / {statistics.totalDays} Days</p>
                       </div>
                     );
                   }
                 },
                 {
                   header: 'Statutory Deds',
-                  render: (u) => (
-                    <div className="group relative cursor-help" onClick={() => { setSelectedEmployee(u); setShowDeductionModal(true); }}>
-                      <span className="text-red-400 font-medium underline decoration-dotted">₹{parseFloat(u.salaryBreakdown?.totalDeductions || 0).toLocaleString()}</span>
-                    </div>
-                  )
+                  render: (u) => {
+                    const statistics = getEmployeeWorkDays(u.id, selectedProcessMonth);
+                    const breakdown = calculateBreakdown(u.ctc || 0, u.deductionToggles, statistics);
+                    return (
+                      <div className="group relative cursor-help" onClick={() => { setSelectedEmployee({ ...u, salaryBreakdown: breakdown }); setShowDeductionModal(true); }}>
+                        <span className="text-red-400 font-medium underline decoration-dotted">₹{parseFloat(breakdown.totalDeductions).toLocaleString()}</span>
+                      </div>
+                    );
+                  }
                 },
                 {
                   header: 'Payout',
                   render: (u) => {
-                    const { effectiveDays, totalDays } = getEmployeeWorkDays(u.id, selectedProcessMonth);
-                    const gross = (parseFloat(u.salaryBreakdown?.grossSalary || 0) * (effectiveDays / totalDays));
-                    const net = (gross - parseFloat(u.salaryBreakdown?.totalDeductions || 0)).toFixed(2);
-                    return <span className="font-black text-emerald-600">₹{parseFloat(net).toLocaleString()}</span>;
+                    const statistics = getEmployeeWorkDays(u.id, selectedProcessMonth);
+                    const breakdown = calculateBreakdown(u.ctc || 0, u.deductionToggles, statistics);
+                    return <span className="font-black text-emerald-600">₹{parseFloat(breakdown.netSalary).toLocaleString()}</span>;
                   }
                 }
               ]} data={filteredEmployees} />
