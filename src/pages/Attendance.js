@@ -12,6 +12,11 @@ const Attendance = () => {
   const { currentUser, attendance, rosters, clockIn, clockOut, syncBiometric, allUsers, attendanceRules } = useAuth();
   const [alert, setAlert] = useState(null);
   const [isSyncing, setIsSyncing] = useState(false);
+
+  // Stats Date Filter (for the cards)
+  const today = getTodayLocal();
+  const [statsDate, setStatsDate] = useState(today);
+
   // Applied Filters (used for data fetching)
   const [appliedFilters, setAppliedFilters] = useState({
     month: new Date().getMonth(),
@@ -464,15 +469,18 @@ const Attendance = () => {
   }, [filteredAttendance, currentPage]);
 
   const attendanceStats = useMemo(() => {
-    const present = filteredAttendance.filter(a => (a.status === 'Present' || a.status === 'Late' || !a.clockOut) && a.status !== 'Absent' && a.status !== 'LWP').length;
-    const late = filteredAttendance.filter(a => a.status === 'Late').length;
-    const halfDay = filteredAttendance.filter(a => a.status === 'Half Day').length;
-    const lwp = filteredAttendance.filter(a => a.status === 'LWP').length;
-    const totalHours = filteredAttendance.reduce((sum, a) => sum + parseFloat(a.workHours || 0), 0);
-    const totalOvertime = filteredAttendance.reduce((sum, a) => sum + parseFloat(a.overtime || 0), 0);
-    const workingDays = filteredAttendance.reduce((sum, a) => sum + parseFloat(a.workingDays || 0), 0);
+    // Filter attendance for the selected stats date
+    const dailyAttendance = attendance.filter(a => a.date === statsDate);
+
+    const present = dailyAttendance.filter(a => (a.status === 'Present' || a.status === 'Late' || !a.clockOut) && a.status !== 'Absent' && a.status !== 'LWP').length;
+    const late = dailyAttendance.filter(a => a.status === 'Late').length;
+    const halfDay = dailyAttendance.filter(a => a.status === 'Half Day').length;
+    const lwp = dailyAttendance.filter(a => a.status === 'LWP').length;
+    const totalHours = dailyAttendance.reduce((sum, a) => sum + parseFloat(a.workHours || 0), 0);
+    const totalOvertime = dailyAttendance.reduce((sum, a) => sum + parseFloat(a.overtime || 0), 0);
+    const workingDays = dailyAttendance.reduce((sum, a) => sum + parseFloat(a.workingDays || 0), 0);
     return { present, late, halfDay, lwp, totalHours: totalHours.toFixed(1), totalOvertime: totalOvertime.toFixed(1), workingDays: workingDays.toFixed(1) };
-  }, [filteredAttendance]);
+  }, [attendance, statsDate]);
 
   const columns = [
     { header: 'Date', accessor: 'date', render: (row) => formatDate(row.date) },
@@ -580,7 +588,28 @@ const Attendance = () => {
           </Card>
         )}
 
-        <Card title="Monthly Statistics Overview" className={`${currentUser.role !== 'manager' ? 'w-full' : ''} border-gray-100 dark:border-gray-800/50`}>
+        <Card title="Daily Attendance Statistics" className={`${currentUser.role !== 'manager' ? 'w-full' : ''} border-gray-100 dark:border-gray-800/50`}>
+          {/* Date Filter for Stats */}
+          <div className="mb-4 flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-900/40 rounded-xl border border-gray-200 dark:border-gray-700">
+            <label className="text-sm font-semibold text-gray-700 dark:text-gray-300">View Stats for:</label>
+            <input
+              type="date"
+              value={statsDate}
+              max={today}
+              onChange={(e) => setStatsDate(e.target.value)}
+              className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium focus:ring-2 focus:ring-primary-500 outline-none"
+            />
+            <button
+              onClick={() => setStatsDate(today)}
+              className="px-4 py-2 bg-primary-600 text-white text-sm font-semibold rounded-lg hover:bg-primary-700 transition-colors"
+            >
+              Today
+            </button>
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              Showing data for: <span className="font-bold text-gray-700 dark:text-white">{formatDate(statsDate)}</span>
+            </span>
+          </div>
+
           <div className={`grid grid-cols-1 sm:grid-cols-2 ${currentUser.role !== 'manager' ? 'lg:grid-cols-3' : 'lg:grid-cols-2'} gap-4`}>
             <div className="group p-5 bg-gradient-to-br from-green-50 to-white dark:from-green-900/10 dark:to-gray-800 rounded-2xl border border-green-100 dark:border-green-900/30 hover:shadow-md transition-all">
               <div className="flex items-center justify-between mb-3">
@@ -590,7 +619,7 @@ const Attendance = () => {
                 </div>
               </div>
               <p className="text-3xl font-extrabold text-green-700 dark:text-green-300">{attendanceStats.present}</p>
-              <p className="text-[10px] text-green-600/60 mt-1 italic">Days recorded this month</p>
+              <p className="text-[10px] text-green-600/60 mt-1 italic">Employees present today</p>
             </div>
 
             <div className="group p-5 bg-gradient-to-br from-yellow-50 to-white dark:from-yellow-900/10 dark:to-gray-800 rounded-2xl border border-yellow-100 dark:border-yellow-900/30 hover:shadow-md transition-all">
@@ -601,7 +630,7 @@ const Attendance = () => {
                 </div>
               </div>
               <p className="text-3xl font-extrabold text-yellow-700 dark:text-yellow-300">{attendanceStats.late}</p>
-              <p className="text-[10px] text-yellow-600/60 mt-1 italic">Tardy arrivals detected</p>
+              <p className="text-[10px] text-yellow-600/60 mt-1 italic">Late arrivals today</p>
             </div>
 
             <div className="group p-5 bg-gradient-to-br from-orange-50 to-white dark:from-orange-900/10 dark:to-gray-800 rounded-2xl border border-orange-100 dark:border-orange-900/30 hover:shadow-md transition-all">
@@ -612,7 +641,7 @@ const Attendance = () => {
                 </div>
               </div>
               <p className="text-3xl font-extrabold text-orange-700 dark:text-orange-300">{attendanceStats.halfDay}</p>
-              <p className="text-[10px] text-orange-600/60 mt-1 italic">Partial working days</p>
+              <p className="text-[10px] text-orange-600/60 mt-1 italic">Half day attendance</p>
             </div>
 
             <div className="group p-5 bg-gradient-to-br from-red-50 to-white dark:from-red-900/10 dark:to-gray-800 rounded-2xl border border-red-100 dark:border-red-900/30 hover:shadow-md transition-all">
@@ -623,7 +652,7 @@ const Attendance = () => {
                 </div>
               </div>
               <p className="text-3xl font-extrabold text-red-700 dark:text-red-300">{attendanceStats.lwp}</p>
-              <p className="text-[10px] text-red-600/60 mt-1 italic">Unpaid leave or no-shows</p>
+              <p className="text-[10px] text-red-600/60 mt-1 italic">Leave without pay today</p>
             </div>
 
             <div className="group p-5 bg-gradient-to-br from-blue-50 to-white dark:from-blue-900/10 dark:to-gray-800 rounded-2xl border border-blue-100 dark:border-blue-900/30 hover:shadow-md transition-all">
@@ -637,7 +666,7 @@ const Attendance = () => {
                 <p className="text-3xl font-extrabold text-blue-700 dark:text-blue-300">{attendanceStats.totalHours}</p>
                 <span className="text-xs font-bold text-blue-500/60">HRS</span>
               </div>
-              <p className="text-[10px] text-blue-600/60 mt-1 italic">Net productive time</p>
+              <p className="text-[10px] text-blue-600/60 mt-1 italic">Total hours worked today</p>
             </div>
 
             <div className="group p-5 bg-gradient-to-br from-purple-50 to-white dark:from-purple-900/10 dark:to-gray-800 rounded-2xl border border-purple-100 dark:border-purple-900/30 hover:shadow-md transition-all">
@@ -648,7 +677,7 @@ const Attendance = () => {
                 </div>
               </div>
               <p className="text-3xl font-extrabold text-purple-700 dark:text-purple-300">{attendanceStats.workingDays}</p>
-              <p className="text-[10px] text-purple-600/60 mt-1 italic">Total billable work days</p>
+              <p className="text-[10px] text-purple-600/60 mt-1 italic">Billable days count</p>
             </div>
           </div>
         </Card>
