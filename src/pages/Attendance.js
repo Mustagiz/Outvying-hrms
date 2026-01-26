@@ -101,34 +101,48 @@ const Attendance = () => {
   };
 
   const handleFixRecords = async () => {
-    if (!window.confirm("This will recalculate work hours for all records with negative hours. Proceed?")) return;
+    if (!window.confirm("This will recalculate status and work hours for ALL attendance records using the latest rules. Proceed?")) return;
     setIsSyncing(true);
     let count = 0;
     try {
-      const recordsToScan = attendance.filter(a => a.clockIn);
-      for (const record of recordsToScan) {
-        if (record.clockIn) {
-          const roster = rosters.find(r => String(r.employeeId) === String(record.employeeId) && r.date === record.date);
-          const result = calculateAttendanceStatus(record.clockIn, record.clockOut, record.date, roster, attendanceRules);
-
-          const ref = doc(db, 'attendance', record.id);
-          await updateDoc(ref, {
-            workHours: result.workHours,
-            workingDays: result.workingDays,
-            overtime: result.overtime,
-            status: result.status,
-            ruleApplied: result.ruleApplied
-          });
-          count++;
+      // 1. First, try to update the default Attendance Rule in Firestore to 5 mins if it exists
+      const rulesRef = collection(db, 'attendanceRules');
+      const rulesSnap = await getDocs(query(rulesRef, where('isDefault', '==', true)));
+      if (!rulesSnap.empty) {
+        const defaultRuleDoc = rulesSnap.docs[0];
+        if (defaultRuleDoc.data().gracePeriodMins > 5) {
+          console.log("Updating default rule grace period to 5 mins in database...");
+          await updateDoc(defaultRuleDoc.ref, { gracePeriodMins: 5, updatedAt: serverTimestamp() });
         }
       }
-      setAlert({ type: 'success', message: `Fixed ${count} invalid records successfully.` });
+
+      // 2. Recalculate all attendance records
+      const recordsToScan = attendance.filter(a => a.clockIn);
+      for (const record of recordsToScan) {
+        const roster = rosters.find(r => String(r.employeeId) === String(record.employeeId) && r.date === record.date);
+
+        // Force the roster grace period to 5 if it's the old default of 15
+        const effectiveRoster = roster ? { ...roster, gracePeriod: (roster.gracePeriod === 15 ? 5 : roster.gracePeriod) } : null;
+
+        const result = calculateAttendanceStatus(record.clockIn, record.clockOut, record.date, effectiveRoster, attendanceRules);
+
+        const ref = doc(db, 'attendance', record.id);
+        await updateDoc(ref, {
+          workHours: result.workHours,
+          workingDays: result.workingDays,
+          overtime: result.overtime,
+          status: result.status,
+          ruleApplied: result.ruleApplied
+        });
+        count++;
+      }
+      setAlert({ type: 'success', message: `Recalculated ${count} records successfully using 5-min grace period.` });
     } catch (err) {
       console.error(err);
       setAlert({ type: 'error', message: 'Fix failed: ' + err.message });
     }
     setIsSyncing(false);
-    setTimeout(() => setAlert(null), 3000);
+    setTimeout(() => setAlert(null), 5000);
   };
 
   const handleManualSubmit = async () => {
