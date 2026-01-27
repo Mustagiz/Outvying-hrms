@@ -517,14 +517,19 @@ export const AuthProvider = ({ children }) => {
 
   // CLOCK IN
   const clockIn = async (employeeId) => {
+    console.log("Starting Clock In Process for:", employeeId);
+
     // IP Check
     if (checkAccess('attendance') && !ipValidation.allowed) {
+      console.warn("Clock In Blocked by IP:", ipValidation);
       return { success: false, message: ipValidation.message };
     }
 
     const today = getTodayLocal();
     const now = new Date();
     const clockInTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+    console.log("Clock In - Local Time:", clockInTime, "Today:", today);
 
     // Intelligent Roster Matching (Business Day Logic)
     const findRosterMatch = () => {
@@ -547,15 +552,21 @@ export const AuthProvider = ({ children }) => {
     const targetRoster = findRosterMatch();
     const effectiveDate = targetRoster?.date || today;
 
+    console.log("Clock In - Roster Match:", targetRoster ? "Found" : "None", "Effective Date:", effectiveDate);
+
     // 1. Critical Session Check: Prevent multiple open sessions for the SAME business day
     const openSession = attendance.find(a => String(a.employeeId) === String(employeeId) && !a.clockOut && a.date === effectiveDate);
     if (openSession) {
+      console.warn("Clock In Failed: Active session exists", openSession);
       return { success: false, message: `Found an active session for the same date: ${openSession.date}. Please clock out first.` };
     }
 
     // 2. Already clocked in for this specific day? (Safety check)
+    // Note: This logic prevents re-clocking in if they already have a completed session for the day.
+    // Ensure this is desired behavior. If multiple shifts per day are allowed, this needs relaxation.
     const existingInState = attendance.find(a => String(a.employeeId) === String(employeeId) && a.date === effectiveDate);
     if (existingInState && existingInState.clockIn) {
+      console.warn("Clock In Failed: Record exists for date", existingInState);
       return { success: false, message: `Already clocked in for Work Date: ${effectiveDate}` };
     }
 
@@ -564,6 +575,7 @@ export const AuthProvider = ({ children }) => {
 
     try {
       const result = calculateAttendanceStatus(clockInTime, null, today, targetRoster, attendanceRules);
+      console.log("Clock In - Status Calculation:", result);
 
       const newRecord = {
         employeeId,
@@ -578,7 +590,10 @@ export const AuthProvider = ({ children }) => {
         createdAt: serverTimestamp()
       };
 
+      console.log("Clock In - Writing to Firestore:", docId, newRecord);
       await setDoc(docRef, newRecord);
+      console.log("Clock In - Write Success");
+
       return { success: true, message: `Clocked in for Work Date: ${effectiveDate}`, time: clockInTime };
     } catch (error) {
       console.error("ClockIn Error:", error);
@@ -588,6 +603,8 @@ export const AuthProvider = ({ children }) => {
 
   // CLOCK OUT
   const clockOut = async (employeeId) => {
+    console.log("Starting Clock Out Process for:", employeeId);
+
     // IP Check
     if (checkAccess('attendance') && !ipValidation.allowed) {
       return { success: false, message: ipValidation.message };
@@ -597,24 +614,30 @@ export const AuthProvider = ({ children }) => {
     const now = new Date();
     const clockOutTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 
+    console.log("Clock Out - Local Time:", clockOutTime, "Today:", today);
+
     // Find the active record for this employee
     // Enhanced: Look for ANY open session, regardless of date boundaries
     const findActiveRecord = () => {
-      return [...attendance]
-        .filter(a => String(a.employeeId) === String(employeeId) && !a.clockOut)
-        .sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+      const allOpen = attendance.filter(a => String(a.employeeId) === String(employeeId) && !a.clockOut);
+      console.log("Clock Out - Open Sessions Found:", allOpen);
+      return allOpen.sort((a, b) => new Date(b.date) - new Date(a.date))[0];
     };
 
     const record = findActiveRecord();
 
     if (!record || !record.clockIn) {
+      console.warn("Clock Out Failed: No active logic found.");
       return { success: false, message: 'No active clock-in found to clock out from' };
     }
 
     try {
       // Ensure we match with the correct roster for rules
       const roster = rosters.find(r => String(r.employeeId) === String(employeeId) && r.date === record.date);
+      console.log("Clock Out - Matching Roster:", roster ? "Found" : "None");
+
       const result = calculateAttendanceStatus(record.clockIn, clockOutTime, record.istDate, roster, attendanceRules);
+      console.log("Clock Out - Status Calculation:", result);
 
       const updates = {
         clockOut: clockOutTime,
@@ -625,7 +648,7 @@ export const AuthProvider = ({ children }) => {
         overtime: result.overtime
       };
 
-      console.log("Attempting Clock Out - Doc ID:", record.id, "updates:", updates);
+      console.log("Clock Out - Writing to Firestore:", record.id, updates);
       const docRef = doc(db, 'attendance', record.id);
       await updateDoc(docRef, updates);
       console.log("Clock Out Success");

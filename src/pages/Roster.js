@@ -46,6 +46,9 @@ const DateRosterGroup = React.memo(({ date, rosters, columns }) => {
     );
 });
 
+const ROSTERABLE_ROLES = ['employee', 'hr', 'manager', 'admin', 'super_admin'];
+
+
 const Roster = () => {
     const { currentUser, rosters, allUsers, assignRoster, deleteRoster, updateRoster } = useAuth();
     const [showModal, setShowModal] = useState(false);
@@ -281,7 +284,7 @@ const Roster = () => {
 
     const handleSelectAll = (e) => {
         if (e.target.checked) {
-            const allEmployeeIds = allUsers.filter(u => u.role === 'employee').map(u => u.id);
+            const allEmployeeIds = allUsers.filter(u => ROSTERABLE_ROLES.includes(u.role)).map(u => u.id);
             setFormData(prev => ({ ...prev, selectedEmployees: allEmployeeIds }));
         } else {
             setFormData(prev => ({ ...prev, selectedEmployees: [] }));
@@ -729,7 +732,7 @@ const Roster = () => {
                                         <button
                                             type="button"
                                             onClick={() => {
-                                                const allEmpIds = allUsers.filter(u => u.role === 'employee').map(u => u.id);
+                                                const allEmpIds = allUsers.filter(u => ROSTERABLE_ROLES.includes(u.role)).map(u => u.id);
                                                 setFilters(prev => ({
                                                     ...prev,
                                                     employees: prev.employees.length === allEmpIds.length ? [] : allEmpIds
@@ -737,11 +740,11 @@ const Roster = () => {
                                             }}
                                             className="text-xs text-primary-600 hover:text-primary-700 dark:text-primary-400 font-medium"
                                         >
-                                            {filters.employees.length === allUsers.filter(u => u.role === 'employee').length ? 'Deselect All' : 'Select All'}
+                                            {filters.employees.length === allUsers.filter(u => ROSTERABLE_ROLES.includes(u.role)).length ? 'Deselect All' : 'Select All'}
                                         </button>
                                     </div>
                                     <div className="border border-gray-300 dark:border-gray-600 rounded-lg max-h-40 overflow-y-auto p-2 bg-white dark:bg-gray-700 custom-scrollbar">
-                                        {allUsers.filter(u => u.role === 'employee')
+                                        {allUsers.filter(u => ROSTERABLE_ROLES.includes(u.role))
                                             .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
                                             .map(u => (
                                                 <label
@@ -1112,13 +1115,13 @@ const Roster = () => {
                                         type="checkbox"
                                         className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                                         onChange={handleSelectAll}
-                                        checked={allUsers.filter(u => u.role === 'employee').length > 0 && formData.selectedEmployees.length === allUsers.filter(u => u.role === 'employee').length}
+                                        checked={allUsers.filter(u => ROSTERABLE_ROLES.includes(u.role)).length > 0 && formData.selectedEmployees.length === allUsers.filter(u => ROSTERABLE_ROLES.includes(u.role)).length}
                                     />
                                     <span>Select All</span>
                                 </label>
                             </div>
                             <div className="border border-gray-300 dark:border-gray-600 rounded-lg max-h-48 overflow-y-auto p-2 bg-white dark:bg-gray-700">
-                                {allUsers.filter(u => u.role === 'employee').map(u => (
+                                {allUsers.filter(u => ROSTERABLE_ROLES.includes(u.role)).map(u => (
                                     <label key={u.id} className="flex items-center space-x-3 p-2 hover:bg-gray-50 dark:hover:bg-gray-600 rounded cursor-pointer transition-colors border-b border-gray-100 dark:border-gray-600 last:border-0">
                                         <input
                                             type="checkbox"
@@ -1126,11 +1129,11 @@ const Roster = () => {
                                             onChange={() => handleEmployeeToggle(u.id)}
                                             className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                                         />
-                                        <span className="text-sm text-gray-700 dark:text-gray-200 font-medium">{u.name} <span className="text-xs text-gray-500 dark:text-gray-400 font-normal">({u.employeeId})</span></span>
+                                        <span className="text-sm text-gray-700 dark:text-gray-200 font-medium">{u.name} <span className="text-xs text-gray-500 dark:text-gray-400 font-normal">({u.role === 'employee' ? u.employeeId : u.role})</span></span>
                                     </label>
                                 ))}
-                                {allUsers.filter(u => u.role === 'employee').length === 0 && (
-                                    <p className="text-sm text-gray-500 text-center py-2">No employees found</p>
+                                {allUsers.filter(u => ROSTERABLE_ROLES.includes(u.role)).length === 0 && (
+                                    <p className="text-sm text-gray-500 text-center py-2">No users found</p>
                                 )}
                             </div>
                             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 text-right">
@@ -1287,7 +1290,7 @@ const Roster = () => {
                                         if (e.target.checked) {
                                             const visibleUsers = allUsers.filter(u => {
                                                 if (currentUser.role === 'manager') return u.reportingTo === currentUser.name;
-                                                return u.role === 'employee' || u.role === 'hr' || u.role === 'manager';
+                                                return ROSTERABLE_ROLES.includes(u.role);
                                             });
                                             setHolidayFormData(prev => ({ ...prev, selectedEmployees: visibleUsers.map(u => u.id) }));
                                         } else {
@@ -1296,7 +1299,7 @@ const Roster = () => {
                                     }}
                                     checked={holidayFormData.selectedEmployees.length > 0 && holidayFormData.selectedEmployees.length === allUsers.filter(u => {
                                         if (currentUser.role === 'manager') return u.reportingTo === currentUser.name;
-                                        return u.role === 'employee' || u.role === 'hr' || u.role === 'manager';
+                                        return ROSTERABLE_ROLES.includes(u.role);
                                     }).length}
                                 />
                                 <span>Select All</span>
@@ -1308,7 +1311,7 @@ const Roster = () => {
                                     if (currentUser.role === 'manager') {
                                         return u.reportingTo === currentUser.name;
                                     }
-                                    return u.role === 'employee' || u.role === 'hr' || u.role === 'manager'; // HR/Admin see all valid staff
+                                    return ROSTERABLE_ROLES.includes(u.role); // HR/Admin see all valid staff
                                 })
                                 .map(u => (
                                     <label key={u.id} className="flex items-center space-x-3 p-2 hover:bg-gray-50 dark:hover:bg-gray-600 rounded cursor-pointer transition-colors border-b border-gray-100 dark:border-gray-600 last:border-0">

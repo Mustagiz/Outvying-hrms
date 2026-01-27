@@ -36,7 +36,7 @@ ChartJS.register(
 
 
 const Dashboard = () => {
-  const { currentUser, allUsers, attendance, leaves, leaveBalances, currentIP, ipValidation, ipSettings, clockIn, clockOut } = useAuth();
+  const { currentUser, allUsers, attendance, leaves, leaveBalances, currentIP, ipValidation, ipSettings, clockIn, clockOut, rosters } = useAuth();
   const navigate = useNavigate();
   const [alert, setAlert] = useState(null);
   const [auditLogs, setAuditLogs] = useState([]);
@@ -598,25 +598,60 @@ const Dashboard = () => {
         {/* Global Quick Actions Section - Column style for balance */}
         <div className="xl:col-span-4 space-y-6">
           {currentUser.role !== 'employee' && (
-            <Card title="Management Tools" className="border-primary-500/10 dark:border-primary-500/5 shadow-xl shadow-primary-500/5 rounded-[2.5rem]">
-              <div className="grid grid-cols-1 gap-3">
-                {quickActions.map((action, i) => (
-                  <button
-                    key={i}
-                    onClick={() => navigate(action.path)}
-                    className="group flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-700/50 hover:border-primary-500 transition-all hover:bg-white dark:hover:bg-gray-800 shadow-sm"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className={`p-2.5 rounded-xl ${action.color} transition-transform group-hover:scale-110`}>
-                        <action.icon size={20} />
+            <>
+              <Card title="Management Tools" className="border-primary-500/10 dark:border-primary-500/5 shadow-xl shadow-primary-500/5 rounded-[2.5rem]">
+                <div className="grid grid-cols-1 gap-3">
+                  {quickActions.map((action, i) => (
+                    <button
+                      key={i}
+                      onClick={() => navigate(action.path)}
+                      className="group flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-700/50 hover:border-primary-500 transition-all hover:bg-white dark:hover:bg-gray-800 shadow-sm"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className={`p-2.5 rounded-xl ${action.color} transition-transform group-hover:scale-110`}>
+                          <action.icon size={20} />
+                        </div>
+                        <span className="text-sm font-black text-gray-800 dark:text-white uppercase tracking-tight">{action.label}</span>
                       </div>
-                      <span className="text-sm font-black text-gray-800 dark:text-white uppercase tracking-tight">{action.label}</span>
+                      <ArrowRight size={18} className="text-gray-300 group-hover:text-primary-600 group-hover:translate-x-1 transition-all" />
+                    </button>
+                  ))}
+                </div>
+              </Card>
+
+              {/* System Health Diagnostic (Admin Only) */}
+              <div className="pt-4">
+                <details className="group">
+                  <summary className="flex items-center gap-2 cursor-pointer text-xs font-bold text-gray-400 uppercase tracking-widest hover:text-primary-500 transition-colors select-none">
+                    <ShieldCheck size={14} /> System Health
+                  </summary>
+                  <div className="mt-3 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-700/50 text-xs font-mono space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Client Date:</span>
+                      <span className="text-gray-900 dark:text-gray-200 font-bold">{getTodayLocal()}</span>
                     </div>
-                    <ArrowRight size={18} className="text-gray-300 group-hover:text-primary-600 group-hover:translate-x-1 transition-all" />
-                  </button>
-                ))}
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Total Users:</span>
+                      <span className="text-gray-900 dark:text-gray-200">{allUsers?.length || 0}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Attendance Loaded:</span>
+                      <span className="text-gray-900 dark:text-gray-200">{attendance?.length || 0}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Rosters Loaded:</span>
+                      <span className="text-gray-900 dark:text-gray-200">{rosters?.length || 0}</span>
+                    </div>
+                    <div className="pt-2 border-t border-gray-200 dark:border-gray-700 mt-2">
+                      <span className="block text-gray-500 mb-1">IP Validation:</span>
+                      <pre className="text-[10px] text-gray-600 dark:text-gray-400 overflow-x-auto whitespace-pre-wrap">
+                        {JSON.stringify(ipValidation, null, 2)}
+                      </pre>
+                    </div>
+                  </div>
+                </details>
               </div>
-            </Card>
+            </>
           )}
 
           <Card title="Company Bulletin" className="bg-gradient-to-br from-indigo-600 to-indigo-800 text-white border-transparent shadow-xl shadow-indigo-500/20 rounded-[2.5rem] relative overflow-hidden group">
