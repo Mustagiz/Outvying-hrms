@@ -34,6 +34,7 @@ const Payslips = () => {
 
   // Using centralized payrollSettings instead of local state
   const [showSettings, setShowSettings] = useState(false);
+  const [showCards, setShowCards] = useState(true);
 
   const isPayslipReleased = (month, year, employeeId) => {
     return releasedPayslips.some(p => p.month === month && p.year === year && (p.employeeId === employeeId || p.allReleased));
@@ -475,62 +476,72 @@ const Payslips = () => {
     <div>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-gray-800 dark:text-white">Salary Slips</h1>
+        <Button
+          variant="secondary"
+          onClick={() => setShowCards(!showCards)}
+          className="flex items-center gap-2"
+        >
+          {showCards ? <EyeOff size={18} /> : <Eye size={18} />}
+          {showCards ? 'Hide Cards' : 'Show Cards'}
+        </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <Card>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Working Days</p>
-              <p className="text-3xl font-bold text-gray-800 dark:text-white">{currentPayslip.effectiveDays}</p>
+      {showCards && (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <Card>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Working Days</p>
+                <p className="text-3xl font-bold text-gray-800 dark:text-white">{currentPayslip.effectiveDays}</p>
+              </div>
+              <Calendar className="text-primary-600" size={32} />
             </div>
-            <Calendar className="text-primary-600" size={32} />
-          </div>
-        </Card>
+          </Card>
 
-        <Card>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Gross Pay</p>
-              <p className="text-3xl font-bold text-green-600">₹{currentPayslip.grossPay}</p>
-            </div>
-          </div>
-        </Card>
-
-        <Card>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Deductions</p>
-              <p className="text-3xl font-bold text-red-600">₹{currentPayslip.totalDeductions}</p>
-              <div className="text-xs text-gray-500 dark:text-gray-400 mt-2 space-y-0.5">
-                {currentPayslip.computedDeductions
-                  .map(cd => (
-                    <div key={cd.id} className="flex justify-between w-full gap-4 text-gray-600 dark:text-gray-300">
-                      <span>{cd.name}:</span>
-                      <span>₹{cd.amount}</span>
-                    </div>
-                  ))}
-
-                {parseFloat(currentPayslip.customDeduction) > 0 && (
-                  <div className="flex justify-between w-full gap-4 text-red-500 font-medium">
-                    <span>{currentPayslip.deductionReason || 'Manual Deduction'}:</span>
-                    <span>₹{currentPayslip.customDeduction}</span>
-                  </div>
-                )}
+          <Card>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Gross Pay</p>
+                <p className="text-3xl font-bold text-green-600">₹{currentPayslip.grossPay}</p>
               </div>
             </div>
-          </div>
-        </Card>
+          </Card>
 
-        <Card>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Net Pay</p>
-              <p className="text-3xl font-bold text-blue-600">₹{currentPayslip.netPay}</p>
+          <Card>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Deductions</p>
+                <p className="text-3xl font-bold text-red-600">₹{currentPayslip.totalDeductions}</p>
+                <div className="text-xs text-gray-500 dark:text-gray-400 mt-2 space-y-0.5">
+                  {currentPayslip.computedDeductions
+                    .map(cd => (
+                      <div key={cd.id} className="flex justify-between w-full gap-4 text-gray-600 dark:text-gray-300">
+                        <span>{cd.name}:</span>
+                        <span>₹{cd.amount}</span>
+                      </div>
+                    ))}
+
+                  {parseFloat(currentPayslip.customDeduction) > 0 && (
+                    <div className="flex justify-between w-full gap-4 text-red-500 font-medium">
+                      <span>{currentPayslip.deductionReason || 'Manual Deduction'}:</span>
+                      <span>₹{currentPayslip.customDeduction}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
-          </div>
-        </Card>
-      </div>
+          </Card>
+
+          <Card>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Net Pay</p>
+                <p className="text-3xl font-bold text-blue-600">₹{currentPayslip.netPay}</p>
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
 
       <Card title="Current Month Payslip" className="mb-6">
         <div className="flex gap-4 mb-4">
