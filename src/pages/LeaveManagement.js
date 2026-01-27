@@ -2,8 +2,33 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Card, Button, Table, Modal, Input, Select, Alert, Badge, Pagination } from '../components/UI';
 // import { leaveTypes } from '../data/mockData';
-import { formatDate, getStatusColor } from '../utils/helpers';
-import { User, CheckCircle, XCircle, Search } from 'lucide-react';
+import { User, CheckCircle, XCircle, Search, TrendingUp, BarChart3, Download } from 'lucide-react';
+import { formatDate, getStatusColor, exportToCSV } from '../utils/helpers';
+
+import { Bar, Line } from 'react-chartjs-2';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+} from 'chart.js';
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend
+);
+
 
 // Helper: Calculate business days (excluding Sat/Sun)
 const calculateBusinessDays = (startDate, endDate) => {
@@ -171,7 +196,37 @@ const LeaveManagement = () => {
     });
   }, [leaveBalances, allUsers, balanceSearchTerm]);
 
+  const leaveHistoryTrendData = useMemo(() => {
+    // Generate trend for the last 6 months
+    const months = [];
+    const labels = [];
+    const now = new Date();
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      months.push(`${d.getFullYear()}-${d.getMonth()}`);
+      labels.push(d.toLocaleString('default', { month: 'short', year: '2-digit' }));
+    }
+
+    const datasets = [
+      {
+        label: 'Leaves Taken',
+        data: months.map(m => {
+          return myLeaves.filter(l => {
+            const lDate = new Date(l.startDate);
+            return `${lDate.getFullYear()}-${lDate.getMonth()}` === m && l.status === 'Approved';
+          }).reduce((sum, l) => sum + parseFloat(l.days), 0);
+        }),
+        borderColor: '#ef4444',
+        backgroundColor: '#ef4444',
+        tension: 0.4
+      }
+    ];
+
+    return { labels, datasets };
+  }, [myLeaves]);
+
   const paginatedBalances = useMemo(() => {
+
     const startIndex = (balanceCurrentPage - 1) * itemsPerPage;
     return filteredBalances.slice(startIndex, startIndex + itemsPerPage);
   }, [filteredBalances, balanceCurrentPage]);
@@ -459,22 +514,99 @@ const LeaveManagement = () => {
           )}
         </Card>
       ) : activeTab === 'myLeaves' ? (
-        <Card title="My Leave History">
-          <Table columns={columns} data={paginatedLeaves} />
-          {totalPages > 1 && (
-            <div className="mt-4 flex justify-center">
-              <Pagination
-                currentPage={currentPage}
-                totalPages={totalPages}
-                onPageChange={setCurrentPage}
-              />
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <Card className="lg:col-span-2" title="Leave Usage Trend (6 Months)">
+              <div className="h-[250px]">
+                <Line
+                  data={leaveHistoryTrendData}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+                  }}
+                />
+              </div>
+            </Card>
+            <Card title="Quick Summary">
+              <div className="space-y-4">
+                <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700">
+                  <p className="text-xs font-bold text-gray-400 uppercase mb-1">Total Leaves (Yearly)</p>
+                  <p className="text-2xl font-black text-gray-900 dark:text-white">
+                    {myLeaves.filter(l => l.status === 'Approved' && new Date(l.startDate).getFullYear() === new Date().getFullYear()).reduce((sum, l) => sum + parseFloat(l.days), 0)} Days
+                  </p>
+                </div>
+                <div className="p-4 bg-primary-50 dark:bg-primary-900/20 rounded-2xl border border-primary-100 dark:border-primary-800">
+                  <p className="text-xs font-bold text-primary-600 uppercase mb-1">Most Used Type</p>
+                  <p className="text-xl font-black text-primary-900 dark:text-white">
+                    {myLeaves.length > 0 ? [...new Set(myLeaves.map(l => l.leaveType))].sort((a, b) => myLeaves.filter(l => l.leaveType === b).length - myLeaves.filter(l => l.leaveType === a).length)[0] : 'N/A'}
+                  </p>
+                </div>
+              </div>
+            </Card>
+          </div>
+          <Card title="My Leave History">
+            <div className="flex justify-end mb-4">
+              <Button
+                onClick={() => {
+                  const csvData = myLeaves.map(l => ({
+                    'Leave Type': l.leaveType,
+                    'Start Date': formatDate(l.startDate),
+                    'End Date': formatDate(l.endDate),
+                    'Days': l.days,
+                    'Applied Date': formatDate(l.appliedDate),
+                    'Status': l.status,
+                    'Reason': l.reason
+                  }));
+                  exportToCSV(csvData, 'my_leave_history');
+                }}
+                variant="secondary"
+                className="flex items-center gap-2 text-xs"
+              >
+                <Download size={14} /> Export CSV
+              </Button>
             </div>
-          )}
-        </Card>
+            <Table columns={columns} data={paginatedLeaves} />
+
+            {totalPages > 1 && (
+              <div className="mt-4 flex justify-center">
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={setCurrentPage}
+                />
+              </div>
+            )}
+          </Card>
+        </div>
       ) : (
+
         <Card>
           <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-bold text-gray-800 dark:text-white">All Applications (Admin)</h3>
+            <div className="flex items-center gap-4">
+              <h3 className="text-lg font-bold text-gray-800 dark:text-white">All Applications (Admin)</h3>
+              <Button
+                onClick={() => {
+                  const csvData = allApplications.map(l => ({
+                    'Employee': l.employeeName,
+                    'Leave Type': l.leaveType,
+                    'Start Date': formatDate(l.startDate),
+                    'End Date': formatDate(l.endDate),
+                    'Days': l.days,
+                    'Applied Date': formatDate(l.appliedDate),
+                    'Status': l.status,
+                    'Reason': l.reason
+                  }));
+                  exportToCSV(csvData, 'leave_applications_report');
+                }}
+                variant="secondary"
+                className="flex items-center gap-2 text-xs py-1 h-8"
+              >
+                <Download size={14} /> Export CSV
+              </Button>
+            </div>
+
             <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
               <button
                 onClick={() => { setAdminSubTab('pending'); setAdminCurrentPage(1); }}

@@ -1,10 +1,11 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Card, Button, Table, Modal, Input, Select, Alert } from '../components/UI';
-import { Calendar as CalendarIcon, Clock, UserPlus, Trash2, ChevronLeft, ChevronRight, List, ChevronDown, User, Edit, Filter, X } from 'lucide-react';
-import { formatDate, TIMEZONES, getISTEquivalent } from '../utils/helpers';
+import { Calendar as CalendarIcon, Clock, UserPlus, Trash2, ChevronLeft, ChevronRight, List, ChevronDown, User, Edit, Filter, X, Download } from 'lucide-react';
+import { formatDate, TIMEZONES, getISTEquivalent, exportToCSV } from '../utils/helpers';
 
-const DateRosterGroup = ({ date, rosters, columns }) => {
+
+const DateRosterGroup = React.memo(({ date, rosters, columns }) => {
     const [isExpanded, setIsExpanded] = useState(true);
 
     return (
@@ -43,7 +44,7 @@ const DateRosterGroup = ({ date, rosters, columns }) => {
             )}
         </div>
     );
-};
+});
 
 const Roster = () => {
     const { currentUser, rosters, allUsers, assignRoster, deleteRoster, updateRoster } = useAuth();
@@ -628,7 +629,29 @@ const Roster = () => {
                     <p className="text-gray-600 dark:text-gray-400">Manage and view employee shift assignments</p>
                 </div>
                 <div className="flex items-center gap-3">
+                    {currentUser.role !== 'employee' && (
+                        <Button
+                            onClick={() => {
+                                const csvData = sortedRosters.map(r => ({
+                                    Date: r.date,
+                                    'Employee ID': r.employeeId,
+                                    'Employee Name': r.employeeName,
+                                    Shift: r.shiftName,
+                                    'Start Time': r.startTime,
+                                    'End Time': r.endTime,
+                                    Timezone: r.timezone,
+                                    'Grace Period': r.gracePeriod
+                                }));
+                                exportToCSV(csvData, 'roster_report');
+                            }}
+                            variant="secondary"
+                            className="bg-white hover:shadow-md transition-all"
+                        >
+                            <Download size={16} className="mr-2" /> Export CSV
+                        </Button>
+                    )}
                     {currentUser.role === 'employee' && (
+
                         <div className="flex bg-white dark:bg-gray-800 rounded-lg p-1 shadow-sm border border-gray-200 dark:border-gray-700">
                             <button
                                 onClick={() => setView('list')}

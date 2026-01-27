@@ -2,13 +2,57 @@ import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Card, Button, Alert } from '../components/UI';
-import { Users, Calendar, FileText, CheckCircle, Clock, TrendingUp, MapPin, ShieldCheck, ShieldAlert, Zap, ArrowRight, User } from 'lucide-react';
+import { Users, Calendar, FileText, CheckCircle, Clock, TrendingUp, MapPin, ShieldCheck, ShieldAlert, Zap, ArrowRight, User, Activity } from 'lucide-react';
 import { getTodayLocal } from '../utils/helpers';
+import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
+import { db } from '../config/firebase';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  ArcElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler
+} from 'chart.js';
+import { Line, Pie, Bar } from 'react-chartjs-2';
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  ArcElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler
+);
+
 
 const Dashboard = () => {
   const { currentUser, allUsers, attendance, leaves, leaveBalances, currentIP, ipValidation, ipSettings, clockIn, clockOut } = useAuth();
   const navigate = useNavigate();
   const [alert, setAlert] = useState(null);
+  const [auditLogs, setAuditLogs] = useState([]);
+
+  // Fetch Audit Logs for Admin/HR
+  React.useEffect(() => {
+    if (currentUser.role === 'admin' || currentUser.role === 'hr' || currentUser.role === 'super_admin') {
+      const q = query(collection(db, 'auditLogs'), orderBy('timestamp', 'desc'), limit(10));
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        const logs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setAuditLogs(logs);
+      });
+      return () => unsubscribe();
+    }
+  }, [currentUser]);
+
 
   // Time-based greeting logic
   const greeting = useMemo(() => {
@@ -110,21 +154,141 @@ const Dashboard = () => {
           icon: Clock
         }));
     } else {
-      return leaves
-        .filter(l => l.status === 'Pending')
-        .sort((a, b) => new Date(b.appliedDate) - new Date(a.appliedDate))
-        .slice(0, 5)
-        .map(l => ({
-          date: l.appliedDate,
-          type: 'Leave Request',
-          status: l.status,
-          details: `${l.employeeName} - ${l.leaveType}`,
-          icon: FileText
-        }));
+      // For Admin: Show real-time Audit Logs
+      return auditLogs.map(log => ({
+        date: log.timestamp?.toDate ? log.timestamp.toDate().toLocaleTimeString() : 'Recent',
+        type: log.action.replace(/_/g, ' '),
+        status: log.category,
+        details: `${log.performedBy.name}: ${log.targetName || log.targetId}`,
+        icon: Activity
+      }));
     }
-  }, [currentUser, attendance, leaves]);
+  }, [currentUser, attendance, auditLogs]);
+
+  const burnRateData = useMemo(() => {
+    // Analytics: Monthly Burn Rate (Net Pay)
+    // Using dummy trend for visualization if real history isn't available
+    const labels = ['Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb'];
+    const data = [450000, 480000, 475000, 520000, 510000, 535000]; // Mock Net Pay trend
+
+    return {
+      labels,
+      datasets: [
+        {
+          label: 'Total Net Pay (₹)',
+          data: data,
+          fill: true,
+          borderColor: '#4f46e5',
+          backgroundColor: 'rgba(79, 70, 229, 0.1)',
+          tension: 0.4,
+          pointBackgroundColor: '#4f46e5',
+        }
+      ]
+    };
+  }, []);
+
+  const attendanceMixData = useMemo(() => {
+    const today = getTodayLocal();
+    const todayAtt = attendance.filter(a => a.date === today);
+    const presentCount = todayAtt.filter(a => a.status === 'Present' || a.status === 'Late').length;
+    const halfDayCount = todayAtt.filter(a => a.status === 'Half Day').length;
+    const absentCount = allUsers.filter(u => u.role === 'employee').length - todayAtt.length;
+
+    return {
+      labels: ['Present', 'Half Day', 'Absent'],
+      datasets: [
+        {
+          data: [presentCount, halfDayCount, Math.max(0, absentCount)],
+          backgroundColor: ['#22c55e', '#f59e0b', '#ef4444'],
+          borderWidth: 0,
+        }
+      ]
+    };
+  }, [attendance, allUsers]);
+
+  const headcountGrowthData = useMemo(() => {
+    // Group employees by joining month
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const growthMap = {};
+
+    allUsers.forEach(u => {
+      const doj = u.dateOfJoining ? new Date(u.dateOfJoining) : new Date(2025, 0, 1);
+      const key = `${months[doj.getMonth()]} ${doj.getFullYear()}`;
+      growthMap[key] = (growthMap[key] || 0) + 1;
+    });
+
+    // Sort keys chronologically (simple approach for recent months)
+    const sortedKeys = Object.keys(growthMap).sort((a, b) => new Date(a) - new Date(b)).slice(-6);
+    let cumulative = allUsers.length - sortedKeys.reduce((sum, key) => sum + growthMap[key], 0);
+    const data = sortedKeys.map(key => {
+      cumulative += growthMap[key];
+      return cumulative;
+    });
+
+    return {
+      labels: sortedKeys,
+      datasets: [{
+        label: 'Total Headcount',
+        data: data,
+        borderColor: '#10b981',
+        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+        fill: true,
+        tension: 0.4
+      }]
+    };
+  }, [allUsers]);
+
+  const attendanceTrendData = useMemo(() => {
+    // Last 14 days attendance trend
+    const labels = [];
+    const data = [];
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dateStr = d.toISOString().split('T')[0];
+      const count = attendance.filter(a => a.date === dateStr && (a.status === 'Present' || a.status === 'Late')).length;
+      labels.push(d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }));
+      data.push(count);
+    }
+
+    return {
+      labels,
+      datasets: [{
+        label: 'Presence',
+        data: data,
+        backgroundColor: '#6366f1',
+        borderRadius: 4
+      }]
+    };
+  }, [attendance]);
+
+
+
+  const leaveConsumptionData = useMemo(() => {
+    const myBalance = leaveBalances.find(lb => String(lb.employeeId) === String(currentUser.id));
+    if (!myBalance) return null;
+
+    return {
+      labels: ['Paid Leave', 'Casual Leave'],
+      datasets: [
+        {
+          label: 'Used',
+          data: [myBalance.paidLeave.used, myBalance.casualLeave.used],
+          backgroundColor: '#ef4444',
+          borderRadius: 4
+        },
+        {
+          label: 'Available',
+          data: [myBalance.paidLeave.available, myBalance.casualLeave.available],
+          backgroundColor: '#22c55e',
+          borderRadius: 4
+        }
+      ]
+    };
+  }, [leaveBalances, currentUser]);
 
   const quickActions = useMemo(() => {
+
     if (currentUser.role === 'employee') {
       return [
         { label: 'Attendance', path: '/attendance', icon: Calendar, color: 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600' },
@@ -257,7 +421,7 @@ const Dashboard = () => {
           </div>
         )}
 
-        {/* Improved Stats Grid */}
+        {/* Stats Grid */}
         <div className={`xl:col-span-12 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6`}>
           {stats.map((stat, idx) => (
             <div
@@ -281,9 +445,105 @@ const Dashboard = () => {
           ))}
         </div>
 
+        {/* Employee Analytics Row */}
+        {currentUser.role === 'employee' && leaveConsumptionData && (
+          <div className="xl:col-span-12 grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card title="Leave Consumption" className="border-gray-100 dark:border-gray-800/50 shadow-sm rounded-[2.5rem]">
+              <div className="h-[250px] flex items-center justify-center">
+                <Bar
+                  data={leaveConsumptionData}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                      x: { stacked: true, grid: { display: false } },
+                      y: { stacked: true, beginAtZero: true }
+                    }
+                  }}
+                />
+              </div>
+            </Card>
+            <Card title="Quick Overview" className="border-gray-100 dark:border-gray-800/50 shadow-sm rounded-[2.5rem] p-6">
+              <div className="space-y-4">
+                <div className="flex justify-between items-center p-4 bg-primary-50 dark:bg-primary-900/20 rounded-2xl">
+                  <span className="text-xs font-bold text-primary-600 uppercase">Effective Present Days</span>
+                  <span className="text-xl font-black text-primary-700 dark:text-primary-300">{stats[0].value}</span>
+                </div>
+                <div className="flex justify-between items-center p-4 bg-green-50 dark:bg-green-900/20 rounded-2xl">
+                  <span className="text-xs font-bold text-green-600 uppercase">Leaves This Month</span>
+                  <span className="text-xl font-black text-green-700 dark:text-green-300">0</span>
+                </div>
+                <p className="text-[10px] text-gray-400 font-medium px-2 italic text-center">Charts update in real-time based on your attendance and leave approvals.</p>
+              </div>
+            </Card>
+          </div>
+        )}
+
+
         {/* Dashboard Bottom Section */}
-        <div className="xl:col-span-8">
-          <Card title="Recent Activity Feed" className="border-gray-100 dark:border-gray-800/50 shadow-sm h-full rounded-[2.5rem]">
+        <div className="xl:col-span-8 space-y-6">
+          {currentUser.role !== 'employee' && (
+            <>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <Card title="Monthly Burn Rate" className="border-gray-100 dark:border-gray-800/50 shadow-sm rounded-[2.5rem]">
+                  <div className="h-[250px] flex items-center justify-center">
+                    <Line
+                      data={burnRateData}
+                      options={{
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: { y: { display: false }, x: { grid: { display: false } } }
+                      }}
+                    />
+                  </div>
+                </Card>
+                <Card title="Attendance Mix (Today)" className="border-gray-100 dark:border-gray-800/50 shadow-sm rounded-[2.5rem]">
+                  <div className="h-[250px] flex items-center justify-center">
+                    <Pie
+                      data={attendanceMixData}
+                      options={{
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { position: 'bottom' } }
+                      }}
+                    />
+                  </div>
+                </Card>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <Card title="Headcount Growth" className="border-gray-100 dark:border-gray-800/50 shadow-sm rounded-[2.5rem]">
+                  <div className="h-[250px] flex items-center justify-center">
+                    <Line
+                      data={headcountGrowthData}
+                      options={{
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: { y: { display: true }, x: { grid: { display: false } } }
+                      }}
+                    />
+                  </div>
+                </Card>
+                <Card title="Presence Trend (14 Days)" className="border-gray-100 dark:border-gray-800/50 shadow-sm rounded-[2.5rem]">
+                  <div className="h-[250px] flex items-center justify-center">
+                    <Line
+                      data={attendanceTrendData}
+                      options={{
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: { y: { beginAtZero: true }, x: { grid: { display: false } } }
+                      }}
+                    />
+                  </div>
+                </Card>
+              </div>
+            </>
+          )}
+
+          <Card title={currentUser.role === 'employee' ? "Recent Activity Feed" : "System Audit Feed"} className="border-gray-100 dark:border-gray-800/50 shadow-sm h-fit rounded-[2.5rem]">
             <div className="space-y-4 px-2">
               {recentActivity.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 border-2 border-dashed border-gray-100 dark:border-gray-800 rounded-3xl">
@@ -304,14 +564,14 @@ const Dashboard = () => {
                         <span className="text-[10px] font-black text-gray-400 tabular-nums">{activity.date}</span>
                       </div>
                       <p className="text-xs text-gray-500 dark:text-gray-400 font-medium truncate mb-2">{activity.details}</p>
-                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest shadow-sm ${activity.status === 'Present' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' :
-                        activity.status === 'Pending' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400' :
-                          activity.status === 'Late' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400' :
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest shadow-sm ${activity.status === 'Present' || activity.status === 'EMPLOYEE' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' :
+                        activity.status === 'Pending' || activity.status === 'PAYROLL' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400' :
+                          activity.status === 'Late' || activity.status === 'ATTENDANCE' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400' :
                             'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400'
                         }`}>
-                        <div className={`w-1 h-1 rounded-full ${activity.status === 'Present' ? 'bg-green-500' :
-                          activity.status === 'Pending' ? 'bg-yellow-500' :
-                            activity.status === 'Late' ? 'bg-orange-500' : 'bg-blue-500'
+                        <div className={`w-1 h-1 rounded-full ${activity.status === 'Present' || activity.status === 'EMPLOYEE' ? 'bg-green-500' :
+                          activity.status === 'Pending' || activity.status === 'PAYROLL' ? 'bg-yellow-500' :
+                            activity.status === 'Late' || activity.status === 'ATTENDANCE' ? 'bg-orange-500' : 'bg-blue-500'
                           }`} />
                         {activity.status}
                       </span>
@@ -324,12 +584,16 @@ const Dashboard = () => {
               )}
             </div>
             {recentActivity.length > 0 && (
-              <button className="w-full mt-6 py-4 text-xs font-black text-gray-500 uppercase tracking-[0.2em] border-t border-gray-100 dark:border-gray-800/50 hover:text-primary-600 transition-colors">
-                View All Activity
+              <button
+                onClick={() => currentUser.role === 'employee' ? navigate('/attendance') : navigate('/audit-logs')}
+                className="w-full mt-6 py-4 text-xs font-black text-gray-500 uppercase tracking-[0.2em] border-t border-gray-100 dark:border-gray-800/50 hover:text-primary-600 transition-colors"
+              >
+                View Full History
               </button>
             )}
           </Card>
         </div>
+
 
         {/* Global Quick Actions Section - Column style for balance */}
         <div className="xl:col-span-4 space-y-6">

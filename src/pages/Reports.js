@@ -2,7 +2,29 @@ import React, { useMemo, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Card, Button, Select } from '../components/UI';
 import { exportToCSV, getYearOptions, getTodayLocal } from '../utils/helpers';
-import { BarChart3, Download, TrendingUp, Users } from 'lucide-react';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  ArcElement
+} from 'chart.js';
+import { Bar, Pie } from 'react-chartjs-2';
+import { BarChart3, Download, TrendingUp, Users, DollarSign } from 'lucide-react';
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  ArcElement
+);
+
 
 const Reports = () => {
   const { attendance, leaves, allUsers, rosters } = useAuth();
@@ -108,6 +130,23 @@ const Reports = () => {
 
     return byDepartment;
   }, [allUsers, attendance, rosters, selectedMonth, selectedYear]);
+
+  const payrollAnalytics = useMemo(() => {
+    // 1. Department Wise Cost (Current)
+    const deptCost = {};
+    allUsers.forEach(u => {
+      if (u.ctc && u.department && u.role !== 'admin') {
+        deptCost[u.department] = (deptCost[u.department] || 0) + (u.ctc / 12);
+      }
+    });
+
+    // 2. Cost Trend (Simulated for demo as we lack historical collection here, 
+    // real app would fetch from 'payrollHistory' or 'processedPayrolls' collection)
+    // For now, we compare estimated vs processed if available or just show current distribution
+
+    return { deptCost };
+  }, [allUsers]);
+
 
   const monthOptions = [
     { value: 0, label: 'January' }, { value: 1, label: 'February' }, { value: 2, label: 'March' },
@@ -333,7 +372,83 @@ const Reports = () => {
           ))}
         </div>
       </Card>
+
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+        <Card title="Attendance Trends (This Month)">
+          <div className="h-[300px] flex justify-center">
+            <Bar
+              data={{
+                labels: ['Present', 'Absent', 'Late'],
+                datasets: [{
+                  label: 'Days',
+                  data: [attendanceReport.present, attendanceReport.absent, attendanceReport.late],
+                  backgroundColor: ['#10b981', '#ef4444', '#f59e0b'],
+                  borderRadius: 8
+                }]
+              }}
+              options={{
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } }
+              }}
+            />
+          </div>
+        </Card>
+
+        <Card title="Leave Distribution">
+          <div className="h-[300px] flex justify-center">
+            <Pie
+              data={{
+                labels: Object.keys(leaveReport.byType),
+                datasets: [{
+                  data: Object.values(leaveReport.byType),
+                  backgroundColor: ['#3b82f6', '#8b5cf6', '#ec4899', '#10b981', '#f59e0b'],
+                  borderWidth: 0
+                }]
+              }}
+              options={{
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'right' } }
+              }}
+            />
+          </div>
+        </Card>
+      </div>
+
+      <div className="mt-6">
+        <Card title="Estimated Monthly Payroll Cost by Department">
+          <div className="h-[350px]">
+            <Bar
+              data={{
+                labels: Object.keys(payrollAnalytics.deptCost),
+                datasets: [{
+                  label: 'Monthly Cost (₹)',
+                  data: Object.values(payrollAnalytics.deptCost),
+                  backgroundColor: '#3b82f6',
+                  borderRadius: 6,
+                  barThickness: 40
+                }]
+              }}
+              options={{
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                  tooltip: {
+                    callbacks: {
+                      label: (ctx) => ` ₹${ctx.raw.toLocaleString()}`
+                    }
+                  }
+                }
+              }}
+            />
+          </div>
+        </Card>
+      </div>
     </div>
+
+
   );
 };
 

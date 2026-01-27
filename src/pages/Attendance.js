@@ -774,12 +774,13 @@ const Attendance = () => {
                 const csvData = filteredAttendance.map(a => {
                   const user = allUsers.find(u => String(u.id) === String(a.employeeId));
                   return {
-                    Date: formatDate(a.date),
+                    Date: a.date,
                     'Emp ID': user?.employeeId || 'N/A',
                     'Employee Name': user?.name || 'Unknown',
-                    'Clock In': a.clockIn || 'N/A',
-                    'Clock Out': a.clockOut || 'N/A',
-                    Status: a.status
+                    'Clock In': a.clockIn || 'P',
+                    'Clock Out': a.clockOut || 'P',
+                    Status: a.status,
+                    'Work Hours': a.workHours || 0
                   };
                 });
                 exportToCSV(csvData, 'attendance_report');
@@ -789,6 +790,7 @@ const Attendance = () => {
             >
               <Download size={16} /> Export CSV
             </Button>
+
 
             {currentUser.role !== 'employee' && (
               <div className="flex flex-wrap gap-2 w-full sm:w-auto justify-end">

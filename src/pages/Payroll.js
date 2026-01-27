@@ -7,9 +7,11 @@ import {
   ChevronLeft, ChevronRight, Gift, History,
   Download, Eye, CheckCircle, BarChart, Wallet,
   Receipt, Plus, FileSpreadsheet, TrendingDown,
-  Briefcase, Landmark, ShieldCheck
+  Briefcase, Landmark, ShieldCheck, Upload
 } from 'lucide-react';
 import Papa from 'papaparse';
+import { logAuditAction } from '../utils/auditLogger';
+
 import {
   BarElement, CategoryScale, Chart as ChartJS,
   Legend, LinearScale, Title, Tooltip, ArcElement
@@ -38,6 +40,8 @@ const Payroll = () => {
   const [ctc, setCtc] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [alert, setAlert] = useState(null);
+  const [isBulkProcessing, setIsBulkProcessing] = useState(false);
+
   const [currentPage, setCurrentPage] = useState(1);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showDeductionModal, setShowDeductionModal] = useState(false);
@@ -191,6 +195,14 @@ const Payroll = () => {
   const handleSaveTemplate = async () => {
     const result = await updatePayrollSettings({ template });
     if (result.success) {
+      logAuditAction({
+        action: 'UPDATE_PAYROLL_TEMPLATE',
+        category: 'PAYROLL',
+        performedBy: currentUser,
+        targetId: 'GLOBAL_SETTINGS',
+        targetName: 'Earnings Structure',
+        details: { newTemplate: template }
+      });
       setShowTemplateModal(false);
       setAlert({ type: 'success', message: 'Earnings Structure synced to cloud' });
     } else {
@@ -201,6 +213,14 @@ const Payroll = () => {
   const handleSaveTaxConfig = async () => {
     const result = await updatePayrollSettings({ tax: taxConfig });
     if (result.success) {
+      logAuditAction({
+        action: 'UPDATE_TAX_CONFIG',
+        category: 'PAYROLL',
+        performedBy: currentUser,
+        targetId: 'GLOBAL_SETTINGS',
+        targetName: 'Statutory Rules',
+        details: { newConfig: taxConfig }
+      });
       setShowTaxModal(false);
       setAlert({ type: 'success', message: 'Statutory Rules synced to cloud' });
     } else {
@@ -230,6 +250,16 @@ const Payroll = () => {
         employeeId: selectedEmployee.id, employeeName: selectedEmployee.name, ...adjustmentData,
         amount: parseFloat(adjustmentData.amount), appliedBy: currentUser.id, createdAt: serverTimestamp()
       });
+
+      logAuditAction({
+        action: 'APPLY_PAYROLL_ADJUSTMENT',
+        category: 'PAYROLL',
+        performedBy: currentUser,
+        targetId: selectedEmployee.employeeId || selectedEmployee.id,
+        targetName: selectedEmployee.name,
+        details: { type: adjustmentData.type, amount: adjustmentData.amount, reason: adjustmentData.reason }
+      });
+
       if (adjustmentData.type === 'Increment') {
         const newCtc = (selectedEmployee.ctc || 0) + parseFloat(adjustmentData.amount);
         await updateUser(selectedEmployee.id, {
@@ -242,6 +272,88 @@ const Payroll = () => {
     } catch (e) { setAlert({ type: 'error', message: e.message }); }
     finally { setIsProcessing(false); }
   };
+
+  const handleBulkAdjustments = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setIsBulkProcessing(true);
+    setAlert({ type: 'info', message: 'Processing bulk adjustments...' });
+
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: async (results) => {
+        const rows = results.data;
+        let successCount = 0;
+        let errorCount = 0;
+
+        for (const row of rows) {
+          try {
+            const empId = row.employee_id || row.employeeId || row.ID;
+            const type = row.type || 'Bonus';
+            const amount = parseFloat(row.amount);
+            const reason = row.reason || 'Bulk Upload';
+            const date = row.date || new Date().toISOString().split('T')[0];
+
+            if (!empId || isNaN(amount)) {
+              errorCount++;
+              continue;
+            }
+
+            // Find internal UID for employeeId string
+            const emp = allUsers.find(u => String(u.employeeId) === String(empId));
+            if (!emp) {
+              errorCount++;
+              continue;
+            }
+
+            await addDoc(collection(db, 'payrollHistory'), {
+              employeeId: emp.id,
+              employeeName: emp.name,
+              type,
+              amount,
+              reason,
+              date,
+              appliedBy: currentUser.id,
+              createdAt: serverTimestamp()
+            });
+
+            logAuditAction({
+              action: 'APPLY_PAYROLL_ADJUSTMENT',
+              category: 'PAYROLL',
+              performedBy: currentUser,
+              targetId: emp.employeeId || emp.id,
+              targetName: emp.name,
+              details: { type, amount, reason, method: 'BULK_UPLOAD' }
+            });
+
+            if (type === 'Increment') {
+              const newCtc = (emp.ctc || 0) + amount;
+              await updateUser(emp.id, {
+                ctc: newCtc,
+                salaryBreakdown: calculateBreakdown(newCtc, emp.deductionToggles || { pf: true, esi: true, tds: true, pt: true })
+              });
+            }
+
+            successCount++;
+          } catch (err) {
+            console.error(err);
+            errorCount++;
+          }
+        }
+
+        setAlert({
+          type: errorCount === 0 ? 'success' : 'warning',
+          message: `Bulk adjustments complete: ${successCount} success, ${errorCount} failed.`
+        });
+        setIsBulkProcessing(false);
+        setTimeout(() => setAlert(null), 5000);
+      }
+    });
+    e.target.value = ''; // Reset input
+  };
+
 
   const fetchHistory = async (empId) => {
     const q = query(collection(db, 'payrollHistory'), where('employeeId', '==', empId));
@@ -270,6 +382,16 @@ const Payroll = () => {
         employeeId: selectedEmployee.id, employeeName: selectedEmployee.name,
         ...newLoan, amount: parseFloat(newLoan.amount), status: 'Active', createdAt: serverTimestamp()
       });
+
+      logAuditAction({
+        action: 'CREATE_LOAN',
+        category: 'PAYROLL',
+        performedBy: currentUser,
+        targetId: selectedEmployee.employeeId || selectedEmployee.id,
+        targetName: selectedEmployee.name,
+        details: { amount: newLoan.amount, duration: newLoan.duration, reason: newLoan.reason }
+      });
+
       setAlert({ type: 'success', message: 'Loan entry created' });
       setShowLoanModal(false);
       fetchLoans();
@@ -285,6 +407,16 @@ const Payroll = () => {
         ...newClaim, amount: parseFloat(newClaim.amount), status: 'Pending',
         date: new Date().toISOString().split('T')[0], createdAt: serverTimestamp()
       });
+
+      logAuditAction({
+        action: 'SUBMIT_CLAIM',
+        category: 'PAYROLL',
+        performedBy: currentUser,
+        targetId: selectedEmployee.employeeId || selectedEmployee.id,
+        targetName: selectedEmployee.name,
+        details: { type: newClaim.type, amount: newClaim.amount, reason: newClaim.reason }
+      });
+
       setAlert({ type: 'success', message: 'Claim submitted' });
       setShowReimbursementModal(false);
       fetchReimbursements();
@@ -411,6 +543,16 @@ const Payroll = () => {
       deductionToggles: deductionToggles,
       salaryBreakdown: breakdown
     });
+
+    logAuditAction({
+      action: 'ASSIGN_CTC',
+      category: 'PAYROLL',
+      performedBy: currentUser,
+      targetId: selectedEmployee.employeeId || selectedEmployee.id,
+      targetName: selectedEmployee.name,
+      details: { newCtc: ctc, toggles: deductionToggles }
+    });
+
     setShowModal(false); setAlert({ type: 'success', message: 'Structure Updated' });
   };
 
@@ -458,6 +600,25 @@ const Payroll = () => {
         </div>
 
         <div className="flex gap-3">
+          <input
+            type="file"
+            id="bulk-adj-upload"
+            className="hidden"
+            accept=".csv"
+            onChange={handleBulkAdjustments}
+          />
+          <Button
+            onClick={() => {
+              if (window.confirm("Upload a CSV with columns: employee_id, type (Bonus/Deduction/Increment), amount, reason, date. Proceed?")) {
+                document.getElementById('bulk-adj-upload').click();
+              }
+            }}
+            variant="secondary"
+            className="bg-white hover:shadow-md transition-all text-blue-600"
+            disabled={isBulkProcessing}
+          >
+            <Upload size={16} className="mr-2" /> Bulk Adjustments
+          </Button>
           <Button onClick={() => setShowTemplateModal(true)} variant="secondary" className="bg-white hover:shadow-md transition-all">
             <Settings size={16} className="mr-2" /> Configuration
           </Button>
@@ -465,6 +626,7 @@ const Payroll = () => {
             <FileSpreadsheet size={16} className="mr-2" /> Export Ledger
           </Button>
         </div>
+
       </div>
 
       {alert && <div className="mb-6"><Alert type={alert.type} message={alert.message} onClose={() => setAlert(null)} /></div>}

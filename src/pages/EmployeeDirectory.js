@@ -2,8 +2,9 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Card, Table, Input, Select, Modal, Button } from '../components/UI';
 import { departments } from '../data/mockData';
-import { filterData } from '../utils/helpers';
-import { Mail, Phone, MapPin, Briefcase, Edit2, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
+import { Mail, Phone, MapPin, Briefcase, Edit2, ChevronLeft, ChevronRight, Trash2, Download } from 'lucide-react';
+import { formatDate, exportToCSV, filterData } from '../utils/helpers';
+
 
 const EmployeeDirectory = () => {
   const { allUsers, currentUser, updateUser, deleteUser } = useAuth();
@@ -192,7 +193,29 @@ const EmployeeDirectory = () => {
             onChange={(e) => setSelectedDepartment(e.target.value)}
             options={departmentOptions}
           />
+
+          <Button
+            onClick={() => {
+              const csvData = filteredEmployees.map(e => ({
+                'Employee ID': e.employeeId,
+                'Name': e.name,
+                'Email': e.email,
+                'Phone': e.phone,
+                'Department': e.department,
+                'Designation': e.designation,
+                'Joining Date': formatDate(e.dateOfJoining),
+                'Reporting To': e.reportingTo,
+                'Blood Group': e.bloodGroup
+              }));
+              exportToCSV(csvData, 'employee_directory');
+            }}
+            variant="secondary"
+            className="flex items-center gap-2"
+          >
+            <Download size={16} /> Export CSV
+          </Button>
         </div>
+
 
         <Table columns={columns} data={paginatedEmployees.data} />
 

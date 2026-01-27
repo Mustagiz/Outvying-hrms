@@ -4,8 +4,10 @@ import { useAuth } from '../context/AuthContext';
 import {
   Home, Users, Calendar, FileText, UserPlus, UserMinus,
   Briefcase, DollarSign, CheckSquare, BarChart2, Settings,
-  LogOut, Menu, X, Sun, Moon, BookOpen, Fingerprint, Megaphone, UserCog, Wallet, CreditCard, Building, Shield
+  LogOut, Menu, X, Sun, Moon, BookOpen, Fingerprint, Megaphone, UserCog, Wallet, CreditCard, Building, Shield, Globe, TrendingUp
 } from 'lucide-react';
+
+
 import NotificationBell from './NotificationBell';
 
 const Layout = ({ children }) => {
@@ -78,8 +80,13 @@ const Layout = ({ children }) => {
       { path: '/roster', icon: Calendar, label: 'Roster' },
       { path: '/salary-slip-template', icon: FileText, label: 'Salary Slip Template' },
       { path: '/settings', icon: Settings, label: 'Settings' },
-      { path: '/user-management', icon: UserCog, label: 'User Management' }
+      { path: '/user-management', icon: UserCog, label: 'User Management' },
+      { path: '/audit-logs', icon: Shield, label: 'Audit Logs' },
+      { path: '/performance', icon: TrendingUp, label: 'Performance' },
+      { path: '/webhooks', icon: Globe, label: 'Webhooks & Integrations' }
+
     ],
+
     manager: [
       { path: '/dashboard', icon: Home, label: 'Dashboard' },
       { path: '/attendance', icon: Calendar, label: 'My Team Attendance' },

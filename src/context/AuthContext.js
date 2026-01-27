@@ -353,11 +353,16 @@ export const AuthProvider = ({ children }) => {
       });
 
       Object.values(attendanceByMonth).forEach(daysPresent => {
-        if (daysPresent >= 15) {
-          accruedPL += 1.0;
-          accruedCL += 0.5;
+        if (daysPresent >= (leavePolicy.workingDaysRequired || 15)) {
+          accruedPL += parseFloat(leavePolicy.monthlyAccrual || 1.5);
+          accruedCL += 0.5; // Fixed CL accrual for now, could be made configurable too
         }
       });
+
+      // 1b. Add Opening Balances from user profile
+      accruedPL += parseFloat(user.openingBalancePL || 0);
+      accruedCL += parseFloat(user.openingBalanceCL || 0);
+
 
       // 2. Add Manual Allocations
       const userManuals = manualLeaveAllocations.filter(m => String(m.employeeId) === String(user.uid) || String(m.employeeId) === String(user.id));
@@ -1070,6 +1075,16 @@ export const AuthProvider = ({ children }) => {
         read: false,
         createdAt: serverTimestamp()
       });
+
+      // Phase 6: External Integrations
+      const { triggerWebhooks, sendBrowserNotification } = await import('../utils/notifier');
+
+      // 1. Browser Push (Real-time fallback)
+      sendBrowserNotification(title, { body: message });
+
+      // 2. Webhooks (External reporting/automation)
+      triggerWebhooks(type, { title, message, relatedId });
+
       return { success: true };
     } catch (error) {
       console.error('Failed to create notification:', error);

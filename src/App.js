@@ -1,40 +1,45 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import Layout from './components/Layout';
-import Login from './pages/Login';
-import Dashboard from './pages/Dashboard';
-import Attendance from './pages/Attendance';
-import LeaveManagement from './pages/LeaveManagement';
-import LeavePolicy from './pages/LeavePolicy';
-import EmployeeDirectory from './pages/EmployeeDirectory';
-import Documents from './pages/Documents';
-import Onboarding from './pages/Onboarding';
-import Deboarding from './pages/Deboarding';
-import BankAccount from './pages/BankAccount';
-import Approvals from './pages/Approvals';
-import Reports from './pages/Reports';
-import Settings from './pages/Settings';
-import BiometricConfig from './pages/BiometricConfig';
-import ReportingHierarchy from './pages/ReportingHierarchy';
-import BulletinBoard from './pages/BulletinBoard';
-import Payslips from './pages/Payslips';
-import Payroll from './pages/Payroll';
-import SalarySlipTemplate from './pages/SalarySlipTemplate';
-import Departments from './pages/Departments';
-import DashboardSettings from './pages/DashboardSettings';
-import AttendanceRegularization from './pages/AttendanceRegularization';
-import AttendanceRules from './pages/AttendanceRules';
-import AdminManagement from './pages/AdminManagement';
-import DataSync from './pages/DataSync';
-import UserManagement from './pages/UserManagement';
-import IPRestrictions from './pages/IPRestrictions';
-import IPAccessLogs from './pages/IPAccessLogs';
-import Profile from './pages/Profile';
-import Roster from './pages/Roster';
-import AttendanceDebug from './pages/AttendanceDebug';
-import RosterFix from './pages/RosterFix';
 import { Spinner } from './components/UI';
+
+// Lazy load pages
+const Layout = lazy(() => import('./components/Layout'));
+const Login = lazy(() => import('./pages/Login'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Attendance = lazy(() => import('./pages/Attendance'));
+const LeaveManagement = lazy(() => import('./pages/LeaveManagement'));
+const LeavePolicy = lazy(() => import('./pages/LeavePolicy'));
+const EmployeeDirectory = lazy(() => import('./pages/EmployeeDirectory'));
+const Documents = lazy(() => import('./pages/Documents'));
+const Onboarding = lazy(() => import('./pages/Onboarding'));
+const Deboarding = lazy(() => import('./pages/Deboarding'));
+const BankAccount = lazy(() => import('./pages/BankAccount'));
+const Approvals = lazy(() => import('./pages/Approvals'));
+const Reports = lazy(() => import('./pages/Reports'));
+const Settings = lazy(() => import('./pages/Settings'));
+const BiometricConfig = lazy(() => import('./pages/BiometricConfig'));
+const ReportingHierarchy = lazy(() => import('./pages/ReportingHierarchy'));
+const BulletinBoard = lazy(() => import('./pages/BulletinBoard'));
+const Payslips = lazy(() => import('./pages/Payslips'));
+const Payroll = lazy(() => import('./pages/Payroll'));
+const SalarySlipTemplate = lazy(() => import('./pages/SalarySlipTemplate'));
+const Departments = lazy(() => import('./pages/Departments'));
+const DashboardSettings = lazy(() => import('./pages/DashboardSettings'));
+const AttendanceRegularization = lazy(() => import('./pages/AttendanceRegularization'));
+const AttendanceRules = lazy(() => import('./pages/AttendanceRules'));
+const AdminManagement = lazy(() => import('./pages/AdminManagement'));
+const DataSync = lazy(() => import('./pages/DataSync'));
+const UserManagement = lazy(() => import('./pages/UserManagement'));
+const IPRestrictions = lazy(() => import('./pages/IPRestrictions'));
+const IPAccessLogs = lazy(() => import('./pages/IPAccessLogs'));
+const Profile = lazy(() => import('./pages/Profile'));
+const Roster = lazy(() => import('./pages/Roster'));
+const AttendanceDebug = lazy(() => import('./pages/AttendanceDebug'));
+const RosterFix = lazy(() => import('./pages/RosterFix'));
+const AuditLogs = lazy(() => import('./pages/AuditLogs'));
+const WebhookSettings = lazy(() => import('./pages/WebhookSettings'));
+const PerformanceManagement = lazy(() => import('./pages/PerformanceManagement'));
 
 const PrivateRoute = ({ children }) => {
   const { currentUser, loading } = useAuth();
@@ -373,17 +378,63 @@ const AppRoutes = () => {
           </PrivateRoute>
         }
       />
+      <Route
+        path="/audit-logs"
+        element={
+          <PrivateRoute>
+            <Layout>
+              <AuditLogs />
+            </Layout>
+          </PrivateRoute>
+        }
+      />
+
+      <Route
+        path="/performance"
+        element={
+          <PrivateRoute>
+            <Layout>
+              <PerformanceManagement />
+            </Layout>
+          </PrivateRoute>
+        }
+      />
+
+      <Route
+        path="/webhooks"
+
+        element={
+          <PrivateRoute>
+            <Layout>
+              <WebhookSettings />
+            </Layout>
+          </PrivateRoute>
+        }
+      />
     </Routes>
+
   );
 };
+
+const LoadingScreen = () => (
+  <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+    <div className="flex flex-col items-center gap-4">
+      <Spinner size="lg" />
+      <p className="text-sm font-bold text-primary-600 animate-pulse tracking-widest uppercase">Optimizing Experience...</p>
+    </div>
+  </div>
+);
 
 function App() {
   return (
     <Router>
       <AuthProvider>
-        <AppRoutes />
+        <Suspense fallback={<LoadingScreen />}>
+          <AppRoutes />
+        </Suspense>
       </AuthProvider>
     </Router>
+
   );
 }
 

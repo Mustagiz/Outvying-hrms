@@ -1,10 +1,16 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Card, Button, Modal, Table, Alert, Pagination } from '../components/UI';
-import { UserPlus, Trash2, Key, RefreshCw, Search, Shield } from 'lucide-react';
+import { UserPlus, Trash2, Key, RefreshCw, Search, Shield, FileSpreadsheet, Upload, Download } from 'lucide-react';
+import { logAuditAction } from '../utils/auditLogger';
+import { exportToCSV } from '../utils/helpers';
+
+import Papa from 'papaparse';
+
+
 
 const UserManagement = () => {
-  const { allUsers, addUser, deleteUser, updateUser, resetPassword, forceUpdatePassword, updateUserId, repairAdminProfile } = useAuth();
+  const { currentUser, allUsers, addUser, deleteUser, updateUser, resetPassword, forceUpdatePassword, updateUserId, repairAdminProfile } = useAuth();
   const [alert, setAlert] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showResetModal, setShowResetModal] = useState(false);
@@ -62,6 +68,16 @@ const UserManagement = () => {
       const result = await addUser(finalData);
       setAlert({ type: result.success ? 'success' : 'error', message: result.message });
       if (result.success) {
+        // Log the action
+        await logAuditAction({
+          action: 'CREATE_EMPLOYEE',
+          category: 'EMPLOYEE',
+          performedBy: currentUser,
+          targetId: finalData.employeeId,
+          targetName: finalData.name,
+          details: { email: finalData.email, role: finalData.role, designation: finalData.designation }
+        });
+
         setShowAddModal(false);
         setFormData({ name: '', email: '', employeeId: '', designation: '', department: '', role: 'employee', userId: '', password: '', reportingTo: '' });
       }
@@ -74,8 +90,20 @@ const UserManagement = () => {
 
   const handleDeleteUser = async (userId) => {
     if (window.confirm('Are you sure you want to delete this user?')) {
+      const targetUser = allUsers.find(u => u.id === userId);
       const result = await deleteUser(userId);
       setAlert({ type: result.success ? 'success' : 'error', message: result.message });
+
+      if (result.success && targetUser) {
+        await logAuditAction({
+          action: 'DELETE_EMPLOYEE',
+          category: 'EMPLOYEE',
+          performedBy: currentUser,
+          targetId: targetUser.employeeId || userId,
+          targetName: targetUser.name,
+          details: { email: targetUser.email }
+        });
+      }
       setTimeout(() => setAlert(null), 3000);
     }
   };
@@ -96,6 +124,14 @@ const UserManagement = () => {
     setAlert({ type: result.success ? 'success' : 'error', message: result.message });
 
     if (result.success) {
+      await logAuditAction({
+        action: 'UPDATE_USER_ID',
+        category: 'EMPLOYEE',
+        performedBy: currentUser,
+        targetId: selectedUser.employeeId || selectedUser.id,
+        targetName: selectedUser.name,
+        details: { oldEmail: selectedUser.email, newEmail: formData.userId }
+      });
       setShowResetModal(false);
       setSelectedUser(null);
     }
@@ -115,6 +151,14 @@ const UserManagement = () => {
     setAlert({ type: result.success ? 'success' : 'error', message: result.message });
 
     if (result.success) {
+      await logAuditAction({
+        action: 'RESET_PASSWORD_EMAIL',
+        category: 'EMPLOYEE',
+        performedBy: currentUser,
+        targetId: selectedUser.employeeId || selectedUser.id,
+        targetName: selectedUser.name,
+        details: { email: selectedUser.email }
+      });
       setShowResetModal(false);
       setSelectedUser(null);
     }
@@ -131,6 +175,14 @@ const UserManagement = () => {
     setAlert({ type: result.success ? 'success' : 'error', message: result.message });
 
     if (result.success) {
+      await logAuditAction({
+        action: 'RESET_PASSWORD_MANUAL',
+        category: 'EMPLOYEE',
+        performedBy: currentUser,
+        targetId: selectedUser.employeeId || selectedUser.id,
+        targetName: selectedUser.name,
+        details: { email: selectedUser.email }
+      });
       setShowResetModal(false);
       setSelectedUser(null);
       setFormData({ ...formData, password: '', newPassword: '' });
@@ -148,10 +200,79 @@ const UserManagement = () => {
     setAlert({ type: result.success ? 'success' : 'error', message: result.message });
 
     if (result.success) {
+      await logAuditAction({
+        action: 'UPDATE_ROLE',
+        category: 'EMPLOYEE',
+        performedBy: currentUser,
+        targetId: selectedUser.employeeId || selectedUser.id,
+        targetName: selectedUser.name,
+        details: { oldRole: selectedUser.role, newRole: formData.role }
+      });
       setShowRoleModal(false);
       setSelectedUser(null);
     }
     setTimeout(() => setAlert(null), 3000);
+  };
+
+  const handleBulkImport = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: async (results) => {
+        const employees = results.data;
+        let successCount = 0;
+        let errorCount = 0;
+
+        setAlert({ type: 'info', message: `Processing ${employees.length} employees...` });
+
+        for (const emp of employees) {
+          try {
+            // Basic map from CSV headers to our schema (case-insensitive)
+            const mappedData = {
+              name: emp.Name || emp.name,
+              email: emp.Email || emp.email,
+              employeeId: emp.EmployeeID || emp.employeeId || emp.ID || emp.id,
+              designation: emp.Designation || emp.designation,
+              department: emp.Department || emp.department,
+              role: (emp.Role || emp.role || 'employee').toLowerCase(),
+              password: emp.Password || emp.password || 'Welcome@123',
+              userId: emp.Email || emp.email
+            };
+
+            if (!mappedData.email || !mappedData.name) {
+              errorCount++;
+              continue;
+            }
+
+            const result = await addUser(mappedData);
+            if (result.success) {
+              successCount++;
+              logAuditAction({
+                action: 'BULK_IMPORT',
+                category: 'EMPLOYEE',
+                performedBy: currentUser,
+                targetId: mappedData.employeeId,
+                targetName: mappedData.name,
+                details: { method: 'CSV_IMPORT' }
+              });
+            } else {
+              errorCount++;
+            }
+          } catch (err) {
+            errorCount++;
+          }
+        }
+
+        setAlert({
+          type: errorCount === 0 ? 'success' : 'warning',
+          message: `Import Complete: ${successCount} successful, ${errorCount} failed.`
+        });
+        setTimeout(() => setAlert(null), 5000);
+      }
+    });
   };
 
   const openResetModal = (user, type) => {
@@ -208,6 +329,38 @@ const UserManagement = () => {
         </div>
 
         <div className="flex gap-3">
+          <input
+            type="file"
+            id="csv-import"
+            className="hidden"
+            accept=".csv"
+            onChange={handleBulkImport}
+          />
+          <Button
+            onClick={() => {
+              const csvData = allUsers.map(u => ({
+                'Employee ID': u.employeeId,
+                'Name': u.name,
+                'Email': u.email,
+                'Role': u.role,
+                'Designation': u.designation,
+                'Department': u.department
+              }));
+              exportToCSV(csvData, 'system_users_report');
+            }}
+            variant="secondary"
+            className="bg-white hover:shadow-md transition-all"
+          >
+            <Download size={16} className="mr-2" /> Export CSV
+          </Button>
+          <Button
+            onClick={() => document.getElementById('csv-import').click()}
+            variant="secondary"
+            className="bg-white hover:shadow-md transition-all"
+          >
+            <FileSpreadsheet size={16} className="mr-2" /> Bulk Import
+          </Button>
+
           <Button onClick={handleRepairPermissions} variant="secondary" className="bg-white hover:shadow-md transition-all">
             <Shield size={16} className="mr-2" /> Repair My Access
           </Button>
@@ -215,6 +368,7 @@ const UserManagement = () => {
             <UserPlus size={16} className="mr-2" /> New Operator
           </Button>
         </div>
+
       </div>
 
       {alert && <div className="mb-6"><Alert type={alert.type} message={alert.message} onClose={() => setAlert(null)} /></div>}

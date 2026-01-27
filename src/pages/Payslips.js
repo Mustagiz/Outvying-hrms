@@ -4,6 +4,8 @@ import { Card, Button, Select, Table, Modal, Pagination } from '../components/UI
 import { Download, FileText, Calendar, DollarSign, Eye, EyeOff, Settings } from 'lucide-react';
 import jsPDF from 'jspdf';
 import { getYearOptions } from '../utils/helpers';
+import { logAuditAction } from '../utils/auditLogger';
+
 
 const Payslips = () => {
   const { currentUser, attendance, allUsers, payrollSettings } = useAuth();
@@ -50,6 +52,18 @@ const Payslips = () => {
     const updated = [...releasedPayslips, newRelease];
     setReleasedPayslips(updated);
     localStorage.setItem('releasedPayslips', JSON.stringify(updated));
+
+    // Log the action
+    const targetEmployee = allUsers.find(u => u.id === empId);
+    logAuditAction({
+      action: 'RELEASE_PAYSLIP',
+      category: 'PAYROLL',
+      performedBy: currentUser,
+      targetId: targetEmployee?.employeeId || empId,
+      targetName: targetEmployee?.name || 'Unknown',
+      details: { month: selectedMonth, year: selectedYear, netPay: currentPayslip.netPay }
+    });
+
     alert('Payslip released successfully');
   };
 
@@ -63,6 +77,17 @@ const Payslips = () => {
     const updated = [...releasedPayslips, newRelease];
     setReleasedPayslips(updated);
     localStorage.setItem('releasedPayslips', JSON.stringify(updated));
+
+    // Log the action
+    logAuditAction({
+      action: 'RELEASE_ALL_PAYSLIPS',
+      category: 'PAYROLL',
+      performedBy: currentUser,
+      targetId: 'ALL',
+      targetName: `All Employees - ${selectedMonth}/${selectedYear}`,
+      details: { month: selectedMonth, year: selectedYear }
+    });
+
     alert('All payslips released successfully');
   };
 
@@ -347,9 +372,16 @@ const Payslips = () => {
   };
 
   const handlePreview = () => {
-    setPreviewData(currentPayslip);
+    // Current Payslip state already has computedEarnings/Deductions
+    // We need to map it to the structure expected by the modal
+    const data = {
+      ...currentPayslip,
+      earnedBasic: (currentPayslip.computedEarnings.find(e => e.id === 'basic')?.actual || '0.00'),
+    };
+    setPreviewData(data);
     setShowPreview(true);
   };
+
 
   const payslipHistory = useMemo(() => {
     const history = [];

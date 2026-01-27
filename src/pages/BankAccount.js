@@ -2,6 +2,8 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Card, Button, Input, Alert } from '../components/UI';
 import { CreditCard, Building, Search, Download, User, Hash, MapPin } from 'lucide-react';
+import { exportToCSV } from '../utils/helpers';
+
 
 const BankAccount = () => {
   const { currentUser, bankAccounts, updateBankAccount, allUsers } = useAuth();
@@ -86,35 +88,27 @@ const BankAccount = () => {
       return true;
     });
 
-    const headers = ['Employee ID', 'Employee Name', 'Department', 'Bank Name', 'Account Number', 'IFSC Code', 'Account Type', 'Branch'];
-    const rows = filteredEmployees.map(emp => {
-      // Try matching by UID first, then by numeric employeeId
+    const csvData = filteredEmployees.map(emp => {
       const bankAcc = bankAccounts.find(b =>
         String(b.id) === String(emp.id) ||
         (emp.employeeId && b.employeeId && String(b.employeeId) === String(emp.employeeId)) ||
         String(b.id) === String(emp.employeeId)
       ) || {};
-      return [
-        emp.employeeId || '',
-        emp.name || '',
-        emp.department || '',
-        bankAcc.bankName || '',
-        bankAcc.accountNumber || '',
-        bankAcc.ifscCode || '',
-        bankAcc.accountType || '',
-        bankAcc.branch || ''
-      ];
+      return {
+        'Employee ID': emp.employeeId || '',
+        'Employee Name': emp.name || '',
+        'Department': emp.department || '',
+        'Bank Name': bankAcc.bankName || '',
+        'Account Number': bankAcc.accountNumber || '',
+        'IFSC Code': bankAcc.ifscCode || '',
+        'Account Type': bankAcc.accountType || '',
+        'Branch': bankAcc.branch || ''
+      };
     });
 
-    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `bank_accounts_${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-    window.URL.revokeObjectURL(url);
+    exportToCSV(csvData, 'bank_accounts_report');
   };
+
 
   const handleApplyFilters = () => {
     setAppliedFilters(localFilters);
