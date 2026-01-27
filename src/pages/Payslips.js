@@ -592,12 +592,7 @@ const Payslips = () => {
               <p className="text-sm text-gray-600 dark:text-gray-400">Working Days (excl. weekends)</p>
               <p className="text-xl font-bold text-gray-800 dark:text-white">{currentPayslip.workingDaysInMonth}</p>
             </div>
-            {showCards && (
-              <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                <p className="text-sm text-gray-600 dark:text-gray-400">Daily Rate</p>
-                <p className="text-xl font-bold text-gray-800 dark:text-white">₹{currentPayslip.dailyRate}</p>
-              </div>
-            )}
+
           </div>
         )}
 
