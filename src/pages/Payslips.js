@@ -8,7 +8,7 @@ import { logAuditAction } from '../utils/auditLogger';
 
 
 const Payslips = () => {
-  const { currentUser, attendance, allUsers, payrollSettings } = useAuth();
+  const { currentUser, attendance, allUsers, payrollSettings, allBankAccounts } = useAuth();
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedEmployee, setSelectedEmployee] = useState(currentUser.id);
@@ -112,6 +112,9 @@ const Payslips = () => {
       p.month === month && p.year === year && (p.employeeId === employeeId || p.allReleased)
     );
 
+    // Fetch Bank Details
+    const bankDetails = allBankAccounts?.find(b => String(b.employeeId) === String(employeeId) || String(b.id) === String(employeeId)) || {};
+
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     // ... rest of working days logic ...
     let workingDaysInMonth = 0;
@@ -198,14 +201,19 @@ const Payslips = () => {
       netPay: netPay.toFixed(2),
       released: !!releaseInfo,
       computedEarnings,
-      computedDeductions
+      computedDeductions,
+      // Merge Bank Details explicitly
+      bankName: bankDetails.bankName || employee.bankName || '-',
+      bankAccount: bankDetails.accountNumber || employee.bankAccount || '-',
+      ifscCode: bankDetails.ifscCode || employee.ifscCode || '-',
+      panNumber: bankDetails.panNumber || employee.panNumber || '-' // Although PAN usually in user profile
     };
   };
 
   const currentPayslip = useMemo(() => {
     const empId = currentUser.role === 'employee' ? currentUser.id : selectedEmployee;
     return calculatePayslip(empId, selectedMonth, selectedYear);
-  }, [selectedEmployee, selectedMonth, selectedYear, attendance, currentUser, releasedPayslips, payrollSettings]);
+  }, [selectedEmployee, selectedMonth, selectedYear, attendance, currentUser, releasedPayslips, payrollSettings, allBankAccounts]);
 
   const downloadPDF = (payslipData) => {
     if (!canViewPayslip(payslipData.month, payslipData.year)) {
@@ -248,9 +256,9 @@ const Payslips = () => {
       { label: 'Business Unit', value: payslipData.employee?.department || '-' },
       { label: 'Date Of Joining', value: payslipData.employee?.dateOfJoining || '-' },
       { label: 'Location', value: 'Pune' },
-      { label: 'Bank Name', value: payslipData.employee?.bankName || '-' },
-      { label: 'Bank Account No.', value: payslipData.employee?.bankAccount || '-' },
-      { label: 'IFSC Code', value: payslipData.employee?.ifscCode || '-' },
+      { label: 'Bank Name', value: payslipData.bankName },
+      { label: 'Bank Account No.', value: payslipData.bankAccount },
+      { label: 'IFSC Code', value: payslipData.ifscCode },
       { label: 'ESI No.', value: payslipData.employee?.esiNumber || '-' },
       { label: 'PF Number', value: payslipData.employee?.pfNumber || '-' },
       { label: 'UAN Number', value: payslipData.employee?.uanNumber || '-' },
@@ -408,7 +416,7 @@ const Payslips = () => {
       }
     }
     return history;
-  }, [selectedEmployee, selectedMonth, selectedYear, currentUser, releasedPayslips, statusFilter]);
+  }, [selectedEmployee, selectedMonth, selectedYear, currentUser, releasedPayslips, statusFilter, allBankAccounts]);
 
   const columns = [
     {
@@ -584,10 +592,12 @@ const Payslips = () => {
               <p className="text-sm text-gray-600 dark:text-gray-400">Working Days (excl. weekends)</p>
               <p className="text-xl font-bold text-gray-800 dark:text-white">{currentPayslip.workingDaysInMonth}</p>
             </div>
-            <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-              <p className="text-sm text-gray-600 dark:text-gray-400">Daily Rate</p>
-              <p className="text-xl font-bold text-gray-800 dark:text-white">₹{currentPayslip.dailyRate}</p>
-            </div>
+            {showCards && (
+              <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                <p className="text-sm text-gray-600 dark:text-gray-400">Daily Rate</p>
+                <p className="text-xl font-bold text-gray-800 dark:text-white">₹{currentPayslip.dailyRate}</p>
+              </div>
+            )}
           </div>
         )}
 
