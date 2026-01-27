@@ -1175,6 +1175,7 @@ export const AuthProvider = ({ children }) => {
     announcements,
     rosters,
     theme,
+    toggleTheme,
     loading,
     currentIP,
     ipValidation,
