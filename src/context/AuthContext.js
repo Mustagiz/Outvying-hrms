@@ -57,6 +57,7 @@ export const AuthProvider = ({ children }) => {
   const [allDocuments, setAllDocuments] = useState([]);
   const [allBankAccounts, setAllBankAccounts] = useState([]);
   const [allLeaveTypes, setAllLeaveTypes] = useState([]);
+  const [holidays, setHolidays] = useState([]);
   const [leavePolicy, setLeavePolicy] = useState({
     annualLeaves: 18,
     monthlyAccrual: 1.5,
@@ -256,6 +257,12 @@ export const AuthProvider = ({ children }) => {
       setAllLeaveTypes(types);
     });
 
+    // Subscribe to Holidays
+    const unsubHolidays = onSnapshot(collection(db, 'holidays'), (snapshot) => {
+      const holidayData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setHolidays(holidayData);
+    });
+
     // Subscribe to Leave Policy (Single doc)
     const unsubPolicy = onSnapshot(doc(db, 'settings', 'leavePolicy'), (docSnap) => {
       if (docSnap.exists()) {
@@ -321,6 +328,7 @@ export const AuthProvider = ({ children }) => {
       unsubDocuments();
       unsubBank();
       unsubLeaveTypes();
+      unsubHolidays();
       unsubPolicy();
       unsubManualLeaves();
       unsubIPSettings();
@@ -1023,6 +1031,21 @@ export const AuthProvider = ({ children }) => {
     } catch (e) { return { success: false, message: 'Error' }; }
   };
 
+  // HOLIDAYS
+  const addHoliday = async (holidayData) => {
+    try {
+      await addDoc(collection(db, 'holidays'), { ...holidayData, createdAt: serverTimestamp() });
+      return { success: true, message: 'Holiday added' };
+    } catch (e) { return { success: false, message: 'Error adding holiday' }; }
+  };
+
+  const deleteHoliday = async (id) => {
+    try {
+      await deleteDoc(doc(db, 'holidays', id));
+      return { success: true, message: 'Holiday deleted' };
+    } catch (e) { return { success: false, message: 'Error deleting holiday' }; }
+  };
+
   // ANNOUNCEMENTS
   const addAnnouncement = async (data) => {
     try {
@@ -1186,6 +1209,9 @@ export const AuthProvider = ({ children }) => {
     addLeaveType,
     deleteLeaveType,
     allLeaveTypes,
+    holidays,
+    addHoliday,
+    deleteHoliday,
     leavePolicy,
     regularizationRequests,
     attendanceRules,

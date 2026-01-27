@@ -4,6 +4,7 @@ import { Card, Button, Table, Modal, Input, Select, Alert, Badge, Pagination } f
 // import { leaveTypes } from '../data/mockData';
 import { User, CheckCircle, XCircle, Search, TrendingUp, BarChart3, Download } from 'lucide-react';
 import { formatDate, getStatusColor, exportToCSV } from '../utils/helpers';
+import LeavePolicy from './LeavePolicy';
 
 import { Bar, Line } from 'react-chartjs-2';
 import {
@@ -122,7 +123,7 @@ const LeaveManagement = () => {
   }, [filteredLeaveTypes]);
 
   // Tab State
-  const [activeTab, setActiveTab] = useState('myLeaves'); // 'myLeaves' | 'allApplications'
+  const [activeTab, setActiveTab] = useState('myLeaves'); // 'myLeaves' | 'allApplications' | 'manageBalances' | 'policy'
   const [adminSubTab, setAdminSubTab] = useState('pending'); // 'pending' | 'history'
 
 
@@ -513,6 +514,8 @@ const LeaveManagement = () => {
             </div>
           )}
         </Card>
+      ) : activeTab === 'policy' ? (
+        <LeavePolicy />
       ) : activeTab === 'myLeaves' ? (
         <div className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
