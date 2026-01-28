@@ -771,10 +771,130 @@ export const AuthProvider = ({ children }) => {
   const updateLeaveStatus = async (leaveId, status, approvedBy) => {
     try {
       const docRef = doc(db, 'leaves', leaveId);
-      await updateDoc(docRef, { status, approvedBy });
+      await updateDoc(docRef, {
+        status,
+        approvedBy,
+        updatedAt: serverTimestamp()
+      });
+
+      // Fetch the leave data to notify the employee
+      const leaveSnap = await getDoc(docRef);
+      if (leaveSnap.exists()) {
+        const leaveData = leaveSnap.data();
+        await createNotification({
+          userId: leaveData.employeeId,
+          type: status === 'Approved' ? 'leave_approved' : 'leave_rejected',
+          title: `Leave ${status}`,
+          message: `Your ${leaveData.leaveType} request from ${leaveData.startDate} to ${leaveData.endDate} has been ${status.toLowerCase()}`,
+          relatedId: leaveId,
+          actionUrl: '/leave'
+        });
+      }
+
       return { success: true, message: `Leave ${status.toLowerCase()} successfully` };
     } catch (error) {
-      return { success: false, message: 'Update failed' };
+      console.error("Update Leave Status Error:", error);
+      return { success: false, message: 'Update failed: ' + error.message };
+    }
+  };
+
+  // UPDATE ATTENDANCE REGULARIZATION STATUS
+  const updateRegularizationStatus = async (requestId, status, comments, approvedBy, approverId) => {
+    try {
+      const requestRef = doc(db, 'regularizationRequests', requestId);
+      const requestSnap = await getDoc(requestRef);
+
+      if (!requestSnap.exists()) throw new Error("Request not found");
+      const request = requestSnap.data();
+
+      const auditEntry = {
+        action: status,
+        by: approvedBy,
+        date: new Date().toISOString(),
+        comments
+      };
+
+      await updateDoc(requestRef, {
+        status,
+        approverComments: comments,
+        auditLog: [...(request.auditLog || []), auditEntry],
+        updatedAt: serverTimestamp()
+      });
+
+      // If Approved, update the actual Attendance Record
+      if (status === 'Approved') {
+        const { employeeId, date, inTime, outTime, regularizationType } = request;
+
+        // Find existing attendance record
+        const q = query(
+          collection(db, 'attendance'),
+          where('employeeId', '==', employeeId),
+          where('date', '==', date)
+        );
+        const querySnapshot = await getDocs(q);
+        let existingData = !querySnapshot.empty ? querySnapshot.docs[0].data() : {};
+
+        let attendanceUpdate = {};
+        // Determine which fields to update based on regularizationType
+        if (regularizationType === 'Login Only') {
+          const finalClockOut = existingData.clockOut || null;
+          if (inTime && finalClockOut) {
+            const result = calculateAttendanceStatus(inTime, finalClockOut, date, rosters.find(r => r.employeeId === employeeId && r.date === date), attendanceRules);
+            attendanceUpdate = { clockIn: inTime, status: result.status, workHours: result.workHours, workingDays: result.workingDays, overtime: result.overtime };
+          } else {
+            attendanceUpdate = { clockIn: inTime };
+          }
+        } else if (regularizationType === 'Logout Only') {
+          const finalClockIn = existingData.clockIn || null;
+          if (finalClockIn && outTime) {
+            const result = calculateAttendanceStatus(finalClockIn, outTime, date, rosters.find(r => r.employeeId === employeeId && r.date === date), attendanceRules);
+            attendanceUpdate = { clockOut: outTime, status: result.status, workHours: result.workHours, workingDays: result.workingDays, overtime: result.overtime };
+          } else {
+            attendanceUpdate = { clockOut: outTime };
+          }
+        } else {
+          // Both
+          if (inTime && outTime) {
+            const result = calculateAttendanceStatus(inTime, outTime, date, rosters.find(r => r.employeeId === employeeId && r.date === date), attendanceRules);
+            attendanceUpdate = { clockIn: inTime, clockOut: outTime, status: result.status, workHours: result.workHours, workingDays: result.workingDays, overtime: result.overtime };
+          } else {
+            attendanceUpdate = { clockIn: inTime || null, clockOut: outTime || null, status: 'Present', workingDays: 1.0 };
+          }
+        }
+
+        attendanceUpdate = {
+          ...attendanceUpdate,
+          regularizedBy: approverId,
+          regularizedAt: serverTimestamp(),
+          isRegularized: true
+        };
+
+        if (!querySnapshot.empty) {
+          await updateDoc(querySnapshot.docs[0].ref, attendanceUpdate);
+          // Auto-heal duplicates
+          if (querySnapshot.docs.length > 1) {
+            for (let i = 1; i < querySnapshot.docs.length; i++) await deleteDoc(querySnapshot.docs[i].ref);
+          }
+        } else {
+          const docId = `${employeeId}-${date}`;
+          await setDoc(doc(db, 'attendance', docId), { employeeId, date, ...attendanceUpdate });
+        }
+      }
+
+      // Notify employee
+      await createNotification({
+        userId: request.employeeId,
+        type: status === 'Approved' ? 'regularization_approved' : 'regularization_rejected',
+        title: `Regularization ${status}`,
+        message: `Your regularization request for ${request.date} has been ${status.toLowerCase()}`,
+        relatedId: requestId,
+        actionUrl: '/attendance-regularization'
+      });
+
+      return { success: true, message: `Request ${status.toLowerCase()} successfully` };
+    } catch (error) {
+      console.error("Update Regularization Status Error:", error);
+      return { success: false, message: 'Operation failed: ' + error.message };
     }
   };
 
@@ -1312,6 +1432,7 @@ export const AuthProvider = ({ children }) => {
     deleteHoliday,
     leavePolicy,
     regularizationRequests,
+    updateRegularizationStatus,
     attendanceRules,
     // Add Employee wrapper
     addEmployee: addUser,

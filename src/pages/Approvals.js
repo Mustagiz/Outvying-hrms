@@ -73,17 +73,20 @@ const Approvals = () => {
     setShowImpactModal(true);
   };
 
-  const handleApproval = (leaveId, status) => {
-    updateLeaveStatus(leaveId, status, currentUser.name);
+  const handleApproval = async (leaveId, status) => {
+    const result = await updateLeaveStatus(leaveId, status, currentUser.name);
+    if (!result.success) {
+      alert(result.message);
+    }
     setShowImpactModal(false);
   };
 
-  const handleBulkApproval = (status) => {
+  const handleBulkApproval = async (status) => {
     if (window.confirm(`Are you sure you want to ${status} ${selectedItems.length} requests?`)) {
-      selectedItems.forEach(id => {
-        updateLeaveStatus(id, status, currentUser.name);
-      });
+      const promises = selectedItems.map(id => updateLeaveStatus(id, status, currentUser.name));
+      await Promise.all(promises);
       setSelectedItems([]);
+      alert(`Successfully ${status.toLowerCase()}ed ${selectedItems.length} requests`);
     }
   };
 
@@ -154,12 +157,12 @@ const Approvals = () => {
     {
       header: 'Status', render: (row) => (
         <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider shadow-sm ${row.status === 'Approved' ? 'bg-green-50 text-green-700 border border-green-200' :
-            row.status === 'Rejected' ? 'bg-red-50 text-red-700 border border-red-200' :
-              'bg-yellow-50 text-yellow-700 border border-yellow-200'
+          row.status === 'Rejected' ? 'bg-red-50 text-red-700 border border-red-200' :
+            'bg-yellow-50 text-yellow-700 border border-yellow-200'
           }`}>
           <span className={`w-1.5 h-1.5 rounded-full ${row.status === 'Approved' ? 'bg-green-500' :
-              row.status === 'Rejected' ? 'bg-red-500' :
-                'bg-yellow-500'
+            row.status === 'Rejected' ? 'bg-red-500' :
+              'bg-yellow-500'
             }`} />
           {row.status}
         </span>
@@ -205,15 +208,31 @@ const Approvals = () => {
   ];
 
   const approvalStats = useMemo(() => {
-    const filtered = currentUser.role === 'Employee'
+    const filteredLeaves = currentUser.role === 'Employee' || currentUser.role === 'employee'
       ? leaves.filter(l => l.employeeId === currentUser.id)
       : leaves;
-    const total = filtered.length;
-    const pending = filtered.filter(l => l.status === 'Pending').length;
-    const approved = filtered.filter(l => l.status === 'Approved').length;
-    const rejected = filtered.filter(l => l.status === 'Rejected').length;
-    return { total, pending, approved, rejected };
-  }, [leaves, currentUser]);
+
+    const filteredRegs = currentUser.role === 'Employee' || currentUser.role === 'employee'
+      ? regularizationRequests.filter(r => r.employeeId === currentUser.id)
+      : regularizationRequests;
+
+    const total = filteredLeaves.length + filteredRegs.length;
+    const pending = filteredLeaves.filter(l => l.status === 'Pending').length +
+      filteredRegs.filter(r => r.status === 'Pending').length;
+    const approved = filteredLeaves.filter(l => l.status === 'Approved').length +
+      filteredRegs.filter(r => r.status === 'Approved').length;
+    const rejected = filteredLeaves.filter(l => l.status === 'Rejected').length +
+      filteredRegs.filter(r => r.status === 'Rejected').length;
+
+    return {
+      total,
+      pending,
+      approved,
+      rejected,
+      pendingLeaves: filteredLeaves.filter(l => l.status === 'Pending').length,
+      pendingRegs: filteredRegs.filter(r => r.status === 'Pending').length
+    };
+  }, [leaves, regularizationRequests, currentUser]);
 
   const StatCard = ({ title, value, color, icon: Icon, gradient }) => (
     <div className="relative overflow-hidden bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-700/50 group hover:shadow-lg transition-all duration-300">
@@ -232,6 +251,28 @@ const Approvals = () => {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
+
+      {/* Pending Items Alert */}
+      {approvalStats.pendingRegs > 0 && (activeTab === 'pending') && (
+        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/30 p-4 rounded-2xl flex items-center justify-between animate-pulse-slow">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-amber-100 dark:bg-amber-800 rounded-xl text-amber-600 dark:text-amber-400">
+              <AlertTriangle size={20} />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-amber-900 dark:text-amber-300">Outstanding Attendance Regularizations</p>
+              <p className="text-xs text-amber-700 dark:text-amber-400 font-medium">There are {approvalStats.pendingRegs} attendance requests waiting for your review.</p>
+            </div>
+          </div>
+          <Button
+            variant="secondary"
+            className="text-xs bg-white dark:bg-gray-800"
+            onClick={() => navigate('/attendance-regularization')}
+          >
+            Review Regularizations <ArrowUpRight size={14} className="ml-1" />
+          </Button>
+        </div>
+      )}
 
       {/* Header */}
       <div>
@@ -290,8 +331,8 @@ const Approvals = () => {
             key={tab}
             onClick={() => { setActiveTab(tab); setCurrentPage(1); }}
             className={`px-6 py-2.5 rounded-xl text-sm font-bold uppercase tracking-wider transition-all duration-300 ${activeTab === tab
-                ? 'bg-white dark:bg-gray-700 text-indigo-600 shadow-sm scale-100'
-                : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+              ? 'bg-white dark:bg-gray-700 text-indigo-600 shadow-sm scale-100'
+              : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
               }`}
           >
             {tab === 'pending' ? 'Pending Queue' : 'History Log'}
@@ -385,8 +426,8 @@ const Approvals = () => {
                     <p className="text-3xl font-black text-yellow-700 dark:text-yellow-300">{impact.avgImpact}%</p>
                   </div>
                   <div className={`p-4 rounded-2xl border ${impact.maxImpact >= 20
-                      ? 'bg-red-50 dark:bg-red-900/20 border-red-100 dark:border-red-800/30'
-                      : 'bg-green-50 dark:bg-green-900/20 border-green-100 dark:border-green-800/30'
+                    ? 'bg-red-50 dark:bg-red-900/20 border-red-100 dark:border-red-800/30'
+                    : 'bg-green-50 dark:bg-green-900/20 border-green-100 dark:border-green-800/30'
                     }`}>
                     <p className={`text-[10px] font-bold uppercase mb-1 ${impact.maxImpact >= 20 ? 'text-red-600' : 'text-green-600'}`}>Peak Impact</p>
                     <p className={`text-3xl font-black ${impact.maxImpact >= 20 ? 'text-red-700 dark:text-red-300' : 'text-green-700 dark:text-green-300'}`}>{impact.maxImpact}%</p>
@@ -400,13 +441,13 @@ const Approvals = () => {
                 <div className="space-y-2 max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
                   {impact.dateRange.map(day => (
                     <div key={day.date} className={`flex items-center justify-between p-3 rounded-xl border ${day.status === 'critical' ? 'bg-red-50/50 border-red-100 text-red-900' :
-                        day.status === 'warning' ? 'bg-yellow-50/50 border-yellow-100 text-yellow-900' :
-                          'bg-green-50/50 border-green-100 text-green-900'
+                      day.status === 'warning' ? 'bg-yellow-50/50 border-yellow-100 text-yellow-900' :
+                        'bg-green-50/50 border-green-100 text-green-900'
                       }`}>
                       <div className="flex items-center gap-3">
                         <div className={`w-2 h-10 rounded-full ${day.status === 'critical' ? 'bg-red-500' :
-                            day.status === 'warning' ? 'bg-yellow-500' :
-                              'bg-green-500'
+                          day.status === 'warning' ? 'bg-yellow-500' :
+                            'bg-green-500'
                           }`} />
                         <div>
                           <p className="text-sm font-bold">{new Date(day.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</p>

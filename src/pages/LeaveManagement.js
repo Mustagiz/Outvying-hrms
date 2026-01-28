@@ -283,25 +283,8 @@ const LeaveManagement = () => {
   };
 
   const handleApproval = async (leaveId, status) => {
-    const result = updateLeaveStatus(leaveId, status, currentUser.name);
+    const result = await updateLeaveStatus(leaveId, status, currentUser.name);
     setAlert({ type: result.success ? 'success' : 'error', message: result.message });
-
-    if (result.success) {
-      // Find the leave request to get employee details
-      const leaveRequest = leaves.find(l => l.id === leaveId);
-      if (leaveRequest) {
-        // Create notification for employee
-        await createNotification({
-          userId: leaveRequest.employeeId,
-          type: status === 'Approved' ? 'leave_approved' : 'leave_rejected',
-          title: `Leave ${status}`,
-          message: `Your ${leaveRequest.leaveType} request from ${leaveRequest.startDate} to ${leaveRequest.endDate} has been ${status.toLowerCase()}`,
-          relatedId: leaveId,
-          actionUrl: '/leave'
-        });
-      }
-    }
-
     setTimeout(() => setAlert(null), 3000);
   };
 
