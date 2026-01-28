@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Card, Table, Button, Badge, Pagination, Modal } from '../components/UI';
 import { formatDate, getStatusColor } from '../utils/helpers';
@@ -6,7 +7,8 @@ import { CheckCircle, XCircle, Users, AlertTriangle, Clock, Calendar, Search, Fi
 import LeaveCalendar from '../components/LeaveCalendar';
 
 const Approvals = () => {
-  const { leaves, updateLeaveStatus, currentUser, allUsers } = useAuth();
+  const { leaves, updateLeaveStatus, currentUser, allUsers, regularizationRequests } = useAuth();
+  const navigate = useNavigate();
   const [selectedItems, setSelectedItems] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [showImpactModal, setShowImpactModal] = useState(false);

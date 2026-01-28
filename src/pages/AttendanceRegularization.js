@@ -20,7 +20,7 @@ import { getEffectiveWorkDate, calculateAbsDuration } from '../utils/helpers';
 import { calculateAttendanceStatus } from '../utils/biometricSync';
 
 const AttendanceRegularization = () => {
-  const { currentUser, attendance, allUsers, regularizationRequests, rosters, createNotification, attendanceRules } = useAuth();
+  const { currentUser, attendance, allUsers, regularizationRequests, rosters, createNotification, attendanceRules, updateRegularizationStatus } = useAuth();
   const [showModal, setShowModal] = useState(false);
   const [alert, setAlert] = useState(null);
   const [editingRequest, setEditingRequest] = useState(null);
