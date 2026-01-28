@@ -29,6 +29,7 @@ import {
 import { getCurrentIP, validateIP, logIPAccess, checkModuleAccess } from '../utils/ipValidation';
 import { calculateAttendanceStatus } from '../utils/biometricSync';
 import { getTodayLocal } from '../utils/helpers';
+import { geolocation, defaultOfficeLocations } from '../utils/geolocation';
 
 // --- Default Data for Seeding (Optional) ---
 // You can remove this import if you don't plan to auto-seed
@@ -519,10 +520,23 @@ export const AuthProvider = ({ children }) => {
   const clockIn = async (employeeId) => {
     console.log("Starting Clock In Process for:", employeeId);
 
-    // IP Check
+    // 1. IP Check
     if (checkAccess('attendance') && !ipValidation.allowed) {
       console.warn("Clock In Blocked by IP:", ipValidation);
       return { success: false, message: ipValidation.message };
+    }
+
+    // 2. Geolocation Check
+    try {
+      const geoResult = await geolocation.validateLocation(defaultOfficeLocations);
+      if (!geoResult.valid) {
+        console.warn("Clock In Blocked by Geolocation:", geoResult);
+        // Note: Uncomment the line below to ENFORCE geolocation. Currently logging warning to avoid lockout during testing.
+        // return { success: false, message: geoResult.message || 'Location validation failed' };
+      }
+    } catch (geoError) {
+      console.error("Geolocation Error:", geoError);
+      // Decide if you want to block on error. For now, allow but log.
     }
 
     const today = getTodayLocal();
@@ -554,47 +568,67 @@ export const AuthProvider = ({ children }) => {
 
     console.log("Clock In - Roster Match:", targetRoster ? "Found" : "None", "Effective Date:", effectiveDate);
 
-    // 1. Critical Session Check: Prevent multiple open sessions for the SAME business day
-    const openSession = attendance.find(a => String(a.employeeId) === String(employeeId) && !a.clockOut && a.date === effectiveDate);
-    if (openSession) {
-      console.warn("Clock In Failed: Active session exists", openSession);
-      return { success: false, message: `Found an active session for the same date: ${openSession.date}. Please clock out first.` };
-    }
-
-    // 2. Already clocked in for this specific day? (Safety check)
-    // Note: This logic prevents re-clocking in if they already have a completed session for the day.
-    // Ensure this is desired behavior. If multiple shifts per day are allowed, this needs relaxation.
-    const existingInState = attendance.find(a => String(a.employeeId) === String(employeeId) && a.date === effectiveDate);
-    if (existingInState && existingInState.clockIn) {
-      console.warn("Clock In Failed: Record exists for date", existingInState);
-      return { success: false, message: `Already clocked in for Work Date: ${effectiveDate}` };
-    }
-
+    // Fetch existing record
     const docId = `${employeeId}_${effectiveDate}`;
     const docRef = doc(db, 'attendance', docId);
+    const docSnap = await getDoc(docRef);
+
+    let newSessions = [];
+    let previousWorkHours = 0;
+
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      // Check if currently clocked in (active session)
+      if (!data.clockOut && data.sessions && data.sessions.length > 0) {
+        const lastSession = data.sessions[data.sessions.length - 1];
+        if (!lastSession.out) {
+          return { success: false, message: `Already clocked in for today at ${lastSession.in}. Please clock out first.` };
+        }
+      }
+
+      // Check legacy single-session format
+      if (!data.sessions && data.clockIn && !data.clockOut) {
+        return { success: false, message: `Already clocked in for today at ${data.clockIn}.` };
+      }
+
+      // Prepare for multiple sessions
+      newSessions = data.sessions || [];
+      if (!data.sessions && data.clockIn) {
+        // Convert legacy to session format
+        newSessions.push({ in: data.clockIn, out: data.clockOut || null });
+      }
+      previousWorkHours = parseFloat(data.workHours || 0);
+    }
+
+    // Add new session
+    newSessions.push({ in: clockInTime, out: null });
 
     try {
-      const result = calculateAttendanceStatus(clockInTime, null, today, targetRoster, attendanceRules);
-      console.log("Clock In - Status Calculation:", result);
+      const result = calculateAttendanceStatus(newSessions[0].in, null, effectiveDate, targetRoster, attendanceRules);
 
-      const newRecord = {
+      const updateData = {
         employeeId,
-        date: effectiveDate, // Store under the Business Day
-        istDate: today,     // Original IST date for audit
-        clockIn: clockInTime,
+        date: effectiveDate,
+        istDate: today,
+        // Keep legacy fields for backward compatibility with UI
+        clockIn: newSessions[0].in,
         clockOut: null,
+        sessions: newSessions,
         status: result.status,
-        workHours: 0,
-        workingDays: 0,
+        workHours: previousWorkHours, // Don't reset hours on new punch-in
         ruleApplied: result.ruleApplied,
-        createdAt: serverTimestamp()
+        updatedAt: serverTimestamp()
       };
 
-      console.log("Clock In - Writing to Firestore:", docId, newRecord);
-      await setDoc(docRef, newRecord);
+      if (!docSnap.exists()) {
+        updateData.createdAt = serverTimestamp();
+      }
+
+      console.log("Clock In - Writing to Firestore:", docId, updateData);
+      await setDoc(docRef, updateData, { merge: true });
       console.log("Clock In - Write Success");
 
-      return { success: true, message: `Clocked in for Work Date: ${effectiveDate}`, time: clockInTime };
+      return { success: true, message: `Clocked in at ${clockInTime}`, time: clockInTime };
     } catch (error) {
       console.error("ClockIn Error:", error);
       return { success: false, message: `Failed to clock in: ${error.message}` };
@@ -605,10 +639,17 @@ export const AuthProvider = ({ children }) => {
   const clockOut = async (employeeId) => {
     console.log("Starting Clock Out Process for:", employeeId);
 
-    // IP Check
     if (checkAccess('attendance') && !ipValidation.allowed) {
       return { success: false, message: ipValidation.message };
     }
+
+    // Geolocation Check (Optional)
+    try {
+      const geoResult = await geolocation.validateLocation(defaultOfficeLocations);
+      if (!geoResult.valid) {
+        console.warn("Clock Out: Geolocation warning:", geoResult);
+      }
+    } catch (e) { console.error(e); }
 
     const today = getTodayLocal();
     const now = new Date();
@@ -616,42 +657,75 @@ export const AuthProvider = ({ children }) => {
 
     console.log("Clock Out - Local Time:", clockOutTime, "Today:", today);
 
-    // Find the active record for this employee
-    // Enhanced: Look for ANY open session, regardless of date boundaries
-    const findActiveRecord = () => {
-      const allOpen = attendance.filter(a => String(a.employeeId) === String(employeeId) && !a.clockOut);
-      console.log("Clock Out - Open Sessions Found:", allOpen);
-      return allOpen.sort((a, b) => new Date(b.date) - new Date(a.date))[0];
-    };
+    // Find record with open session
+    const record = attendance.find(a => String(a.employeeId) === String(employeeId) && !a.clockOut);
 
-    const record = findActiveRecord();
+    if (!record) {
+      // Check if we have a record with detailed sessions that is open
+      const complexRecord = attendance.find(a =>
+        String(a.employeeId) === String(employeeId) &&
+        a.sessions &&
+        a.sessions.length > 0 &&
+        !a.sessions[a.sessions.length - 1].out
+      );
 
-    if (!record || !record.clockIn) {
+      if (complexRecord) {
+        // Proceed with complex record
+        return await finalizeClockOut(complexRecord, clockOutTime, employeeId);
+      }
+
       console.warn("Clock Out Failed: No active logic found.");
       return { success: false, message: 'No active clock-in found to clock out from' };
     }
 
-    try {
-      // Ensure we match with the correct roster for rules
-      const roster = rosters.find(r => String(r.employeeId) === String(employeeId) && r.date === record.date);
-      console.log("Clock Out - Matching Roster:", roster ? "Found" : "None");
+    return await finalizeClockOut(record, clockOutTime, employeeId);
+  };
 
-      const result = calculateAttendanceStatus(record.clockIn, clockOutTime, record.istDate, roster, attendanceRules);
-      console.log("Clock Out - Status Calculation:", result);
+  const finalizeClockOut = async (record, clockOutTime, employeeId) => {
+    try {
+      const roster = rosters.find(r => String(r.employeeId) === String(employeeId) && r.date === record.date);
+
+      // Update Sessions
+      let sessions = record.sessions || [];
+      if (sessions.length === 0 && record.clockIn) {
+        sessions.push({ in: record.clockIn, out: null });
+      }
+
+      // Close last session
+      if (sessions.length > 0) {
+        sessions[sessions.length - 1].out = clockOutTime;
+      }
+
+      // Recalculate Total Work Hours
+      // We can use the helper or sum up sessions manually
+      let totalHours = 0;
+      const { calculateAbsDuration } = require('../utils/helpers'); // Lazy import to avoid circular dep if any
+
+      sessions.forEach(s => {
+        if (s.in && s.out) {
+          totalHours += calculateAbsDuration(s.in, record.date, s.out, record.date);
+        }
+      });
+
+      // Recalculate Status
+      const firstIn = sessions[0].in;
+      const result = calculateAttendanceStatus(firstIn, clockOutTime, record.istDate, roster, attendanceRules);
 
       const updates = {
-        clockOut: clockOutTime,
-        workHours: parseFloat(result.workHours || 0),
-        status: result.status,
-        workingDays: result.workingDays,
+        clockOut: clockOutTime, // Legacy: Last clock out
+        sessions: sessions,
+        workHours: parseFloat(totalHours.toFixed(2)),
+        status: result.status, // Warning: Status logic (Late/Half Day) usually depends on FIRST IN and TOTAL HOURS
+        workingDays: totalHours >= 9 ? 1 : (totalHours >= 4.5 ? 0.5 : 0), // Simple override based on total hours
         ruleApplied: result.ruleApplied || null,
-        overtime: result.overtime
+        overtime: Math.max(0, totalHours - 9),
+        updatedAt: serverTimestamp()
       };
 
-      console.log("Clock Out - Writing to Firestore:", record.id, updates);
+      console.log("Clock Out - Writing updates:", record.id, updates);
       const docRef = doc(db, 'attendance', record.id);
-      await updateDoc(docRef, updates);
-      console.log("Clock Out Success");
+      await updateDoc(docRef, updates); // Merge is default for updateDoc
+
       return { success: true, message: 'Clocked out successfully', time: clockOutTime };
 
     } catch (error) {

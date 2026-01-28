@@ -45,6 +45,8 @@ const PerformanceManagement = lazy(() => import('./pages/PerformanceManagement')
 const Workflows = lazy(() => import('./pages/Workflows'));
 const AIChatbot = lazy(() => import('./components/AIChatbot'));
 const Permissions = lazy(() => import('./pages/Permissions'));
+const CultureHub = lazy(() => import('./pages/CultureHub'));
+const VirtualOnboarding = lazy(() => import('./pages/VirtualOnboarding'));
 
 const PrivateRoute = ({ children }) => {
   const { currentUser, loading } = useAuth();
@@ -422,6 +424,28 @@ const AppRoutes = () => {
           <PrivateRoute>
             <Layout>
               <Permissions />
+            </Layout>
+          </PrivateRoute>
+        }
+      />
+
+      <Route
+        path="/culture"
+        element={
+          <PrivateRoute>
+            <Layout>
+              <CultureHub />
+            </Layout>
+          </PrivateRoute>
+        }
+      />
+
+      <Route
+        path="/orientation"
+        element={
+          <PrivateRoute>
+            <Layout>
+              <VirtualOnboarding />
             </Layout>
           </PrivateRoute>
         }
