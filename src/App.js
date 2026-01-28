@@ -47,6 +47,9 @@ const AIChatbot = lazy(() => import('./components/AIChatbot'));
 const Permissions = lazy(() => import('./pages/Permissions'));
 const CultureHub = lazy(() => import('./pages/CultureHub'));
 const VirtualOnboarding = lazy(() => import('./pages/VirtualOnboarding'));
+const LMS = lazy(() => import('./pages/LMS'));
+const CourseDetail = lazy(() => import('./pages/CourseDetail'));
+const Assets = lazy(() => import('./pages/Assets'));
 
 const PrivateRoute = ({ children }) => {
   const { currentUser, loading } = useAuth();
@@ -101,6 +104,16 @@ const AppRoutes = () => {
           <PrivateRoute>
             <Layout>
               <AttendanceRegularization />
+            </Layout>
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/assets"
+        element={
+          <PrivateRoute>
+            <Layout>
+              <Assets />
             </Layout>
           </PrivateRoute>
         }
@@ -450,7 +463,18 @@ const AppRoutes = () => {
           </PrivateRoute>
         }
       />
-    </Routes>
+
+      <Route
+        path="/lms"
+        element={
+          <PrivateRoute>
+            <Layout>
+              <LMS />
+            </Layout>
+          </PrivateRoute>
+        }
+      />
+    </Routes >
 
   );
 };
