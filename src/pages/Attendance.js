@@ -478,18 +478,43 @@ const Attendance = () => {
   }, [filteredAttendance, currentPage]);
 
   const attendanceStats = useMemo(() => {
-    // Filter attendance for the selected stats date
-    const dailyAttendance = attendance.filter(a => a.date === statsDate);
+    // 1. Get all employees (excluding admins)
+    const employees = allUsers.filter(u => u.role === 'employee' || u.role === 'hr' || u.role === 'manager');
 
-    const present = dailyAttendance.filter(a => (a.status === 'Present' || a.status === 'Late' || !a.clockOut) && a.status !== 'Absent' && a.status !== 'LWP').length;
-    const late = dailyAttendance.filter(a => a.status === 'Late').length;
-    const halfDay = dailyAttendance.filter(a => a.status === 'Half Day').length;
-    const lwp = dailyAttendance.filter(a => a.status === 'LWP').length;
-    const totalHours = dailyAttendance.reduce((sum, a) => sum + parseFloat(a.workHours || 0), 0);
-    const totalOvertime = dailyAttendance.reduce((sum, a) => sum + parseFloat(a.overtime || 0), 0);
-    const workingDays = dailyAttendance.reduce((sum, a) => sum + parseFloat(a.workingDays || 0), 0);
-    return { present, late, halfDay, lwp, totalHours: totalHours.toFixed(1), totalOvertime: totalOvertime.toFixed(1), workingDays: workingDays.toFixed(1) };
-  }, [attendance, statsDate]);
+    // 2. Filter attendance records for the selected stats date
+    const dailyRecords = attendance.filter(a => a.date === statsDate);
+
+    // 3. Find who HAS rosters for today (to identify expected attendance)
+    const dailyRosters = rosters.filter(r => r.date === statsDate && r.shiftName !== 'Weekly Off' && r.shiftName !== 'Holiday');
+    const expectedEmpIds = new Set(dailyRosters.map(r => String(r.employeeId)));
+
+    // 4. Calculate stats
+    const presentOnly = dailyRecords.filter(a => a.status === 'Present').length;
+    const late = dailyRecords.filter(a => a.status === 'Late').length;
+    const halfDay = dailyRecords.filter(a => a.status === 'Half Day').length;
+    const lwp = dailyRecords.filter(a => a.status === 'LWP').length;
+
+    // Identify Absent: People who are expected (have roster) but have no record OR record status is 'Absent'
+    const recordEmpIds = new Set(dailyRecords.map(a => String(a.employeeId)));
+    const absentCount = dailyRosters.filter(r => {
+      const record = dailyRecords.find(a => String(a.employeeId) === String(r.employeeId));
+      return !record || record.status === 'Absent';
+    }).length;
+
+    const totalHours = dailyRecords.reduce((sum, a) => sum + parseFloat(a.workHours || 0), 0);
+    const totalOvertime = dailyRecords.reduce((sum, a) => sum + parseFloat(a.overtime || 0), 0);
+    const workingDays = dailyRecords.reduce((sum, a) => sum + parseFloat(a.workingDays || 0), 0);
+
+    return {
+      present: presentOnly + late, // Total present includes late arrivals
+      late,
+      halfDay,
+      lwp: lwp + absentCount, // Group LWP and Absent as per the card label
+      totalHours: totalHours.toFixed(1),
+      totalOvertime: totalOvertime.toFixed(1),
+      workingDays: workingDays.toFixed(1)
+    };
+  }, [attendance, statsDate, allUsers, rosters]);
 
   const columns = [
     { header: 'Date', accessor: 'date', render: (row) => formatDate(row.date) },

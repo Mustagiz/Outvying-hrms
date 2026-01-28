@@ -31,7 +31,7 @@ const Deboarding = () => {
   const progress = (completedTasks / tasks.length) * 100;
 
   const handleSubmit = () => {
-    const employee = allUsers.find(u => u.id === parseInt(formData.employeeId));
+    const employee = allUsers.find(u => String(u.id) === String(formData.employeeId));
     if (!employee) return;
 
     const exitRecord = {
@@ -47,16 +47,16 @@ const Deboarding = () => {
     const updated = [...exitedEmployees, exitRecord];
     setExitedEmployees(updated);
     localStorage.setItem('exitedEmployees', JSON.stringify(updated));
-    
+
     // Mark employee as exited with status
     const exitedIds = JSON.parse(localStorage.getItem('exitedEmployeeIds') || '[]');
-    exitedIds.push(parseInt(formData.employeeId));
+    exitedIds.push(String(formData.employeeId));
     localStorage.setItem('exitedEmployeeIds', JSON.stringify(exitedIds));
-    
+
     const exitedStatuses = JSON.parse(localStorage.getItem('exitedEmployeeStatuses') || '{}');
     exitedStatuses[formData.employeeId] = formData.exitStatus;
     localStorage.setItem('exitedEmployeeStatuses', JSON.stringify(exitedStatuses));
-    
+
     setShowModal(false);
     setFormData({ employeeId: '', lastWorkingDay: '', exitReason: '', exitInterview: '', finalSettlement: '', exitStatus: 'Resigned' });
     alert('Employee exit record saved successfully');
@@ -75,14 +75,13 @@ const Deboarding = () => {
     { header: 'Designation', accessor: 'designation' },
     { header: 'Last Working Day', accessor: 'lastWorkingDay' },
     { header: 'Exit Date', accessor: 'exitDate' },
-    { 
-      header: 'Status', 
+    {
+      header: 'Status',
       render: (row) => (
-        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-          row.exitStatus === 'Resigned' ? 'bg-blue-100 text-blue-800' :
-          row.exitStatus === 'Terminated' ? 'bg-red-100 text-red-800' :
-          'bg-gray-100 text-gray-800'
-        }`}>
+        <span className={`px-2 py-1 rounded-full text-xs font-medium ${row.exitStatus === 'Resigned' ? 'bg-blue-100 text-blue-800' :
+            row.exitStatus === 'Terminated' ? 'bg-red-100 text-red-800' :
+              'bg-gray-100 text-gray-800'
+          }`}>
           {row.exitStatus}
         </span>
       )
@@ -206,7 +205,7 @@ const Deboarding = () => {
               <option value="">Select an employee</option>
               {allUsers.filter(u => {
                 const exitedIds = JSON.parse(localStorage.getItem('exitedEmployeeIds') || '[]');
-                return (u.role === 'employee' || u.role === 'hr') && !exitedIds.includes(u.id);
+                return (u.role === 'employee' || u.role === 'hr') && !exitedIds.includes(String(u.id));
               }).map(emp => (
                 <option key={emp.id} value={emp.id}>{emp.name} ({emp.employeeId})</option>
               ))}
