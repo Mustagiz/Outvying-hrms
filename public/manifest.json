@@ -1,6 +1,7 @@
 {
-    "short_name": "Outvying HRMS",
-    "name": "Outvying Media HRMS Portal",
+    "short_name": "HRMS",
+    "name": "Human Resource Management System",
+    "description": "Comprehensive HRMS application for managing employees, attendance, leave, payroll, and more",
     "icons": [
         {
             "src": "favicon.ico",
@@ -20,6 +21,44 @@
     ],
     "start_url": ".",
     "display": "standalone",
-    "theme_color": "#4f46e5",
-    "background_color": "#ffffff"
+    "theme_color": "#2563eb",
+    "background_color": "#ffffff",
+    "orientation": "portrait-primary",
+    "categories": [
+        "business",
+        "productivity"
+    ],
+    "screenshots": [
+        {
+            "src": "screenshot1.png",
+            "type": "image/png",
+            "sizes": "540x720"
+        }
+    ],
+    "shortcuts": [
+        {
+            "name": "Dashboard",
+            "short_name": "Dashboard",
+            "description": "Open dashboard",
+            "url": "/dashboard",
+            "icons": [
+                {
+                    "src": "logo192.png",
+                    "sizes": "192x192"
+                }
+            ]
+        },
+        {
+            "name": "Clock In/Out",
+            "short_name": "Attendance",
+            "description": "Mark attendance",
+            "url": "/attendance",
+            "icons": [
+                {
+                    "src": "logo192.png",
+                    "sizes": "192x192"
+                }
+            ]
+        }
+    ]
 }

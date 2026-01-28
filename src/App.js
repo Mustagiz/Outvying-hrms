@@ -1,7 +1,9 @@
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense, lazy, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Spinner } from './components/UI';
+import { ToastProvider } from './utils/toast';
+import GlobalSearch from './components/GlobalSearch';
 
 // Lazy load pages
 const Layout = lazy(() => import('./components/Layout'));
@@ -426,15 +428,34 @@ const LoadingScreen = () => (
 );
 
 function App() {
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+
+  // Global keyboard shortcut for search
+  React.useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setIsSearchOpen(true);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   return (
     <Router>
       <AuthProvider>
-        <Suspense fallback={<LoadingScreen />}>
-          <AppRoutes />
-        </Suspense>
+        <ToastProvider>
+          <Suspense fallback={<LoadingScreen />}>
+            <AppRoutes />
+            <GlobalSearch
+              isOpen={isSearchOpen}
+              onClose={() => setIsSearchOpen(false)}
+            />
+          </Suspense>
+        </ToastProvider>
       </AuthProvider>
     </Router>
-
   );
 }
 
