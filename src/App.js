@@ -42,6 +42,8 @@ const RosterFix = lazy(() => import('./pages/RosterFix'));
 const AuditLogs = lazy(() => import('./pages/AuditLogs'));
 const WebhookSettings = lazy(() => import('./pages/WebhookSettings'));
 const PerformanceManagement = lazy(() => import('./pages/PerformanceManagement'));
+const Workflows = lazy(() => import('./pages/Workflows'));
+const AIChatbot = lazy(() => import('./components/AIChatbot'));
 
 const PrivateRoute = ({ children }) => {
   const { currentUser, loading } = useAuth();
@@ -404,11 +406,21 @@ const AppRoutes = () => {
 
       <Route
         path="/webhooks"
-
         element={
           <PrivateRoute>
             <Layout>
               <WebhookSettings />
+            </Layout>
+          </PrivateRoute>
+        }
+      />
+
+      <Route
+        path="/workflows"
+        element={
+          <PrivateRoute>
+            <Layout>
+              <Workflows />
             </Layout>
           </PrivateRoute>
         }
@@ -452,6 +464,7 @@ function App() {
               isOpen={isSearchOpen}
               onClose={() => setIsSearchOpen(false)}
             />
+            <AIChatbot />
           </Suspense>
         </ToastProvider>
       </AuthProvider>
