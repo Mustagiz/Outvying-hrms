@@ -215,7 +215,18 @@ export const AuthProvider = ({ children }) => {
     // For now, load all to match previous Context API behavior.
     const unsubAttendance = onSnapshot(collection(db, 'attendance'), (snapshot) => {
       const attData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setAttendance(attData);
+      // Sort by date descending and time (if available) to ensure latest records are first
+      const sorted = attData.sort((a, b) => {
+        const dateA = a.date || '';
+        const dateB = b.date || '';
+        if (dateA !== dateB) return dateB.localeCompare(dateA);
+
+        // If same date, prefer the one with most recent clockIn
+        const timeA = a.clockIn || '';
+        const timeB = b.clockIn || '';
+        return timeB.localeCompare(timeA);
+      });
+      setAttendance(sorted);
     });
 
     // Subscribe to Leaves
@@ -657,27 +668,19 @@ export const AuthProvider = ({ children }) => {
 
     console.log("Clock Out - Local Time:", clockOutTime, "Today:", today);
 
-    // Find record with open session
-    const record = attendance.find(a => String(a.employeeId) === String(employeeId) && !a.clockOut);
+    // Find record with open session - Prioritize MOST RECENT open session
+    // Filtering on both clockOut and sessions array to be safe
+    const record = attendance.find(a =>
+      String(a.employeeId) === String(employeeId) &&
+      (!a.clockOut || (a.sessions && a.sessions.length > 0 && !a.sessions[a.sessions.length - 1].out))
+    );
 
     if (!record) {
-      // Check if we have a record with detailed sessions that is open
-      const complexRecord = attendance.find(a =>
-        String(a.employeeId) === String(employeeId) &&
-        a.sessions &&
-        a.sessions.length > 0 &&
-        !a.sessions[a.sessions.length - 1].out
-      );
-
-      if (complexRecord) {
-        // Proceed with complex record
-        return await finalizeClockOut(complexRecord, clockOutTime, employeeId);
-      }
-
-      console.warn("Clock Out Failed: No active logic found.");
+      console.warn("Clock Out Failed: No active session found for employee", employeeId);
       return { success: false, message: 'No active clock-in found to clock out from' };
     }
 
+    console.log("Clock Out - Found Active Record:", record.id, "Date:", record.date);
     return await finalizeClockOut(record, clockOutTime, employeeId);
   };
 
@@ -703,22 +706,24 @@ export const AuthProvider = ({ children }) => {
 
       sessions.forEach(s => {
         if (s.in && s.out) {
-          totalHours += calculateAbsDuration(s.in, record.date, s.out, record.date);
+          const duration = calculateAbsDuration(s.in, record.date, s.out, record.date);
+          totalHours += duration;
+          console.log(`Session: ${s.in} - ${s.out}, Duration: ${duration}h`);
         }
       });
 
       // Recalculate Status
       const firstIn = sessions[0].in;
       const result = calculateAttendanceStatus(firstIn, clockOutTime, record.istDate, roster, attendanceRules);
+      console.log("Clock Out - Calculated Status:", result.status, "Total Hours:", totalHours);
 
       const updates = {
         clockOut: clockOutTime, // Legacy: Last clock out
         sessions: sessions,
         workHours: parseFloat(totalHours.toFixed(2)),
-        status: result.status, // Warning: Status logic (Late/Half Day) usually depends on FIRST IN and TOTAL HOURS
-        workingDays: totalHours >= 9 ? 1 : (totalHours >= 4.5 ? 0.5 : 0), // Simple override based on total hours
+        status: result.status,
+        workingDays: result.workingDays,
         ruleApplied: result.ruleApplied || null,
-        overtime: Math.max(0, totalHours - 9),
         updatedAt: serverTimestamp()
       };
 

@@ -1,10 +1,12 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Card, Button, Select, Table, Modal, Pagination } from '../components/UI';
 import { Download, FileText, Calendar, DollarSign, Eye, EyeOff, Settings } from 'lucide-react';
 import jsPDF from 'jspdf';
 import { getYearOptions } from '../utils/helpers';
 import { logAuditAction } from '../utils/auditLogger';
+import { db } from '../config/firebase';
+import { collection, addDoc, onSnapshot, query, where, serverTimestamp } from 'firebase/firestore';
 
 
 const Payslips = () => {
@@ -15,9 +17,15 @@ const Payslips = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
-  const [releasedPayslips, setReleasedPayslips] = useState(
-    JSON.parse(localStorage.getItem('releasedPayslips') || '[]')
-  );
+  const [releasedPayslips, setReleasedPayslips] = useState([]);
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'releasedPayslips'), (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setReleasedPayslips(data);
+    });
+    return () => unsub();
+  }, []);
   const [showPreview, setShowPreview] = useState(false);
   const [previewData, setPreviewData] = useState(null);
 
@@ -40,7 +48,7 @@ const Payslips = () => {
     return releasedPayslips.some(p => p.month === month && p.year === year && (p.employeeId === employeeId || p.allReleased));
   };
 
-  const releasePayslip = () => {
+  const releasePayslip = async () => {
     const empId = currentUser.role === 'employee' ? currentUser.id : selectedEmployee;
     const newRelease = {
       month: selectedMonth,
@@ -48,61 +56,66 @@ const Payslips = () => {
       employeeId: empId,
       customDeduction,
       deductionReason,
-      releasedOn: new Date().toISOString()
+      releasedOn: new Date().toISOString(),
+      createdAt: serverTimestamp()
     };
-    const updated = [...releasedPayslips, newRelease];
-    setReleasedPayslips(updated);
-    localStorage.setItem('releasedPayslips', JSON.stringify(updated));
 
-    // Log the action
-    const targetEmployee = allUsers.find(u => u.id === empId);
-    logAuditAction({
-      action: 'RELEASE_PAYSLIP',
-      category: 'PAYROLL',
-      performedBy: currentUser,
-      targetId: targetEmployee?.employeeId || empId,
-      targetName: targetEmployee?.name || 'Unknown',
-      details: { month: selectedMonth, year: selectedYear, netPay: currentPayslip.netPay }
-    });
+    try {
+      await addDoc(collection(db, 'releasedPayslips'), newRelease);
+      // Local state will update via listener
 
-    alert('Payslip released successfully');
+      // Log the action
+      const targetEmployee = allUsers.find(u => u.id === empId);
+      logAuditAction({
+        action: 'RELEASE_PAYSLIP',
+        category: 'PAYROLL',
+        performedBy: currentUser,
+        targetId: targetEmployee?.employeeId || empId,
+        targetName: targetEmployee?.name || 'Unknown',
+        details: { month: selectedMonth, year: selectedYear, netPay: currentPayslip.netPay }
+      });
+
+      alert('Payslip released successfully');
+    } catch (error) {
+      console.error("Error releasing payslip:", error);
+      alert('Failed to release payslip');
+    }
   };
 
-  const releaseAllPayslips = () => {
+  const releaseAllPayslips = async () => {
     const newRelease = {
       month: selectedMonth,
       year: selectedYear,
       allReleased: true,
-      releasedOn: new Date().toISOString()
+      releasedOn: new Date().toISOString(),
+      createdAt: serverTimestamp()
     };
-    const updated = [...releasedPayslips, newRelease];
-    setReleasedPayslips(updated);
-    localStorage.setItem('releasedPayslips', JSON.stringify(updated));
 
-    // Log the action
-    logAuditAction({
-      action: 'RELEASE_ALL_PAYSLIPS',
-      category: 'PAYROLL',
-      performedBy: currentUser,
-      targetId: 'ALL',
-      targetName: `All Employees - ${selectedMonth}/${selectedYear}`,
-      details: { month: selectedMonth, year: selectedYear }
-    });
+    try {
+      await addDoc(collection(db, 'releasedPayslips'), newRelease);
+      // Local state will update via listener
 
-    alert('All payslips released successfully');
+      // Log the action
+      logAuditAction({
+        action: 'RELEASE_ALL_PAYSLIPS',
+        category: 'PAYROLL',
+        performedBy: currentUser,
+        targetId: 'ALL',
+        targetName: `All Employees - ${selectedMonth}/${selectedYear}`,
+        details: { month: selectedMonth, year: selectedYear }
+      });
+
+      alert('All payslips released successfully');
+    } catch (error) {
+      console.error("Error releasing all payslips:", error);
+      alert('Failed to release all payslips');
+    }
   };
 
   const canViewPayslip = (month, year) => {
     if (currentUser.role === 'admin' || currentUser.role === 'hr' || currentUser.role === 'super_admin') return true;
 
-    // Allow employees to view last 3 months regardless of release status
-    const currentDate = new Date();
-    const payslipDate = new Date(year, month, 1);
-    const monthsDiff = (currentDate.getFullYear() - payslipDate.getFullYear()) * 12 + (currentDate.getMonth() - payslipDate.getMonth());
-
-    if (monthsDiff >= 0 && monthsDiff < 3) return true;
-
-    // For older months, check if released
+    // For employees, check if released
     return isPayslipReleased(month, year, currentUser.id);
   };
 
