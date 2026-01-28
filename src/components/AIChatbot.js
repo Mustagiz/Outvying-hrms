@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { MessageSquare, X, Send, Bot, User, CornerDownRight } from 'lucide-react';
-import { processQuery } from '../utils/aiAssistant';
+import aiService from '../services/aiService';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const AIChatbot = () => {
@@ -37,9 +37,9 @@ const AIChatbot = () => {
         setInput('');
         setIsTyping(true);
 
-        // Simulate AI "thinking"
-        setTimeout(() => {
-            const aiResponse = processQuery(input);
+        // Simulate AI "thinking" using the Advanced AI Service
+        try {
+            const aiResponse = await aiService.chat(input, { userRole: 'Admin' });
             const botMsg = {
                 id: Date.now() + 1,
                 type: 'bot',
@@ -48,8 +48,17 @@ const AIChatbot = () => {
                 timestamp: new Date()
             };
             setMessages(prev => [...prev, botMsg]);
+        } catch (error) {
+            const errorMsg = {
+                id: Date.now() + 1,
+                type: 'bot',
+                text: "I'm having trouble connecting to my brain right now. Please try again later.",
+                timestamp: new Date()
+            };
+            setMessages(prev => [...prev, errorMsg]);
+        } finally {
             setIsTyping(false);
-        }, 1000);
+        }
     };
 
     return (
@@ -102,8 +111,8 @@ const AIChatbot = () => {
                                             {msg.type === 'user' ? <User size={16} /> : <Bot size={16} />}
                                         </div>
                                         <div className={`p-3 rounded-2xl text-sm ${msg.type === 'user'
-                                                ? 'bg-blue-600 text-white rounded-tr-none'
-                                                : 'bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 shadow-sm border border-gray-100 dark:border-gray-700 rounded-tl-none'
+                                            ? 'bg-blue-600 text-white rounded-tr-none'
+                                            : 'bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 shadow-sm border border-gray-100 dark:border-gray-700 rounded-tl-none'
                                             }`}>
                                             {msg.text}
                                             {msg.action && (

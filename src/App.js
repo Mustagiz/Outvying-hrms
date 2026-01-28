@@ -44,6 +44,7 @@ const WebhookSettings = lazy(() => import('./pages/WebhookSettings'));
 const PerformanceManagement = lazy(() => import('./pages/PerformanceManagement'));
 const Workflows = lazy(() => import('./pages/Workflows'));
 const AIChatbot = lazy(() => import('./components/AIChatbot'));
+const Permissions = lazy(() => import('./pages/Permissions'));
 
 const PrivateRoute = ({ children }) => {
   const { currentUser, loading } = useAuth();
@@ -416,11 +417,11 @@ const AppRoutes = () => {
       />
 
       <Route
-        path="/workflows"
+        path="/permissions"
         element={
           <PrivateRoute>
             <Layout>
-              <Workflows />
+              <Permissions />
             </Layout>
           </PrivateRoute>
         }
