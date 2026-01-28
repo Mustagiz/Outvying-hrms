@@ -14,7 +14,8 @@ import {
     TrendingUp,
     Zap,
     Gift,
-    Smile
+    Smile,
+    X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -124,8 +125,8 @@ const CultureHub = () => {
                                 <div
                                     key={badge.id}
                                     className={`p-6 rounded-2xl border-2 transition-all ${badge.earned
-                                            ? 'border-blue-100 bg-white dark:bg-gray-800 dark:border-gray-700'
-                                            : 'border-dashed border-gray-200 dark:border-gray-800 opacity-60 grayscale'
+                                        ? 'border-blue-100 bg-white dark:bg-gray-800 dark:border-gray-700'
+                                        : 'border-dashed border-gray-200 dark:border-gray-800 opacity-60 grayscale'
                                         }`}
                                 >
                                     <div className={`w-14 h-14 rounded-2xl ${badge.bg} ${badge.color} flex items-center justify-center mb-4 shadow-sm`}>
