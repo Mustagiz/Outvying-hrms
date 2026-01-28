@@ -37,7 +37,7 @@ const Layout = ({ children }) => {
     hr: [
       { path: '/dashboard', icon: Home, label: 'Dashboard' },
       { path: '/approvals', icon: CheckSquare, label: 'Approvals' },
-      { path: '/attendance', icon: Calendar, label: 'Attendance' },
+      { path: '/attendance', icon: Calendar, label: 'Attendance Management' },
       { path: '/bulletin-board', icon: Megaphone, label: 'Bulletin Board' },
       { path: '/deboarding', icon: UserMinus, label: 'Deboarding' },
       { path: '/documents', icon: Briefcase, label: 'Documents' },
@@ -55,7 +55,7 @@ const Layout = ({ children }) => {
     admin: [
       { path: '/dashboard', icon: Home, label: 'Dashboard' },
       { path: '/approvals', icon: CheckSquare, label: 'Approvals' },
-      { path: '/attendance', icon: Calendar, label: 'Attendance' },
+      { path: '/attendance', icon: Calendar, label: 'Attendance Management' },
       { path: '/attendance-rules', icon: Settings, label: 'Attendance Rules' },
       { path: '/admin-management', icon: Shield, label: 'Admin Management' },
       { path: '/bank-account', icon: DollarSign, label: 'Bank Account Management' },

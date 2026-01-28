@@ -795,7 +795,7 @@ const Attendance = () => {
             {currentUser.role !== 'employee' && (
               <div className="flex flex-wrap gap-2 w-full sm:w-auto justify-end">
                 <Button onClick={() => setShowBulkModal(true)} variant="secondary" className="bg-emerald-50 border-emerald-100 text-emerald-700 flex items-center gap-2 py-2 text-xs font-bold uppercase tracking-wider">
-                  <Upload size={16} /> Bulk Import
+                  <Upload size={16} /> Bulk Upload
                 </Button>
                 <Button onClick={() => setShowManualModal(true)} variant="secondary" className="bg-indigo-50 border-indigo-100 text-indigo-700 flex items-center gap-2 py-2 text-xs font-bold uppercase tracking-wider">
                   <FilePlus size={16} /> Mark Attendance
@@ -914,7 +914,7 @@ const Attendance = () => {
         </div>
       </Modal>
 
-      <Modal isOpen={showBulkModal} onClose={() => setShowBulkModal(false)} title="Bulk Attendance Import">
+      <Modal isOpen={showBulkModal} onClose={() => setShowBulkModal(false)} title="Bulk Attendance Upload">
         <div className="space-y-6">
           <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-xl">
             <h3 className="text-sm font-bold text-blue-800 dark:text-blue-300 mb-2 uppercase tracking-wide">Instructions</h3>
