@@ -533,7 +533,7 @@ const Attendance = () => {
     { header: 'Clock In', accessor: 'clockIn', render: (row) => row.clockIn || 'N/A' },
     { header: 'Clock Out', accessor: 'clockOut', render: (row) => row.clockOut || 'N/A' },
     { header: 'Work Hours', accessor: 'workHours', render: (row) => `${row.workHours || 0}h` },
-    { header: 'Overtime', accessor: 'overtime', render: (row) => `${row.overtime || 0}h` },
+    { header: 'Overtime', accessor: 'overtime', render: (row) => `${parseFloat(row.overtime || 0).toFixed(2)}h` },
     {
       header: 'Status',
       accessor: 'status',

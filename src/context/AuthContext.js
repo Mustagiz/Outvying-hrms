@@ -723,6 +723,7 @@ export const AuthProvider = ({ children }) => {
         workHours: parseFloat(totalHours.toFixed(2)),
         status: result.status,
         workingDays: result.workingDays,
+        overtime: result.overtime || 0,
         ruleApplied: result.ruleApplied || null,
         updatedAt: serverTimestamp()
       };
