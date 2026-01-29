@@ -16,6 +16,7 @@ const OfferLetters = () => {
     const { currentUser } = useAuth();
     const [offers, setOffers] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [actionLoading, setActionLoading] = useState(false);
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [currentStep, setCurrentStep] = useState(1);
     const [searchTerm, setSearchTerm] = useState('');
@@ -63,6 +64,18 @@ const OfferLetters = () => {
     }, []);
 
     const handleCreateOffer = async () => {
+        // Basic Validation
+        if (!newOffer.candidateName || !newOffer.candidateEmail || !newOffer.jobTitle || !newOffer.department || !newOffer.joiningDate) {
+            showToast.error('Please fill in all required fields');
+            return;
+        }
+
+        if (isNaN(newOffer.annualCTC) || newOffer.annualCTC <= 0) {
+            showToast.error('Please enter a valid Annual CTC');
+            return;
+        }
+
+        setActionLoading(true);
         try {
             const docRef = await addDoc(collection(db, 'offers'), {
                 ...newOffer,
@@ -87,7 +100,9 @@ const OfferLetters = () => {
             resetForm();
         } catch (error) {
             console.error('Error creating offer:', error);
-            showToast.error('Failed to generate offer');
+            showToast.error('Failed to generate offer: ' + error.message);
+        } finally {
+            setActionLoading(false);
         }
     };
 
@@ -190,8 +205,11 @@ const OfferLetters = () => {
                             <label className="text-xs font-bold text-gray-500 uppercase">Total Annual CTC (INR)</label>
                             <Input
                                 type="number"
-                                value={newOffer.annualCTC}
-                                onChange={(e) => setNewOffer({ ...newOffer, annualCTC: parseInt(e.target.value) })}
+                                value={newOffer.annualCTC || ''}
+                                onChange={(e) => {
+                                    const val = e.target.value === '' ? 0 : parseInt(e.target.value);
+                                    setNewOffer({ ...newOffer, annualCTC: val });
+                                }}
                                 className="text-lg font-bold"
                             />
                         </div>
@@ -366,6 +384,7 @@ const OfferLetters = () => {
                         ) : (
                             <Button
                                 onClick={handleCreateOffer}
+                                loading={actionLoading}
                                 className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white"
                             >
                                 <Send size={18} /> Generate & Send Offer
