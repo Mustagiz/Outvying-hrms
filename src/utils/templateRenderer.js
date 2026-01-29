@@ -29,14 +29,20 @@ export const renderTemplate = async (templateId, templates, offerData) => {
             candidateName: offerData.candidateName || '[Name]',
             candidateEmail: offerData.candidateEmail || '[Email]',
             jobTitle: offerData.jobTitle || '[Job Title]',
+            designation: offerData.jobTitle || '[Designation]',
             department: offerData.department || '[Department]',
             annualCTC: offerData.annualCTC?.toLocaleString('en-IN') || '0',
             monthlyCTC: Math.round((offerData.annualCTC || 0) / 12).toLocaleString('en-IN'),
-            joiningDate: offerData.joiningDate || '[Date]',
+            joiningDate: offerData.joiningDate ? new Date(offerData.joiningDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : '[Date]',
             basicSalary: offerData.breakdown?.basic?.toLocaleString('en-IN') || '0',
             hra: offerData.breakdown?.hra?.toLocaleString('en-IN') || '0',
             companyName: 'Outvying',
-            currentDate: new Date().toLocaleDateString('en-IN')
+            currentDate: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }),
+            place: 'Mumbai',
+            workLocation: 'Mumbai, Maharashtra',
+            reportingManager: offerData.reportingManager || 'HR Department',
+            probationPeriod: '6 months',
+            noticePeriod: '30 days'
         };
 
         // Replace all variables

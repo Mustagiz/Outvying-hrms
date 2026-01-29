@@ -31,14 +31,20 @@ const TemplateManager = ({ isOpen, onClose }) => {
         candidateName: 'John Doe',
         candidateEmail: 'john.doe@example.com',
         jobTitle: 'Senior Software Engineer',
+        designation: 'Senior Software Engineer',
         department: 'Engineering',
         annualCTC: '1200000',
         monthlyCTC: '100000',
-        joiningDate: '2026-02-15',
+        joiningDate: '15th February 2026',
         basicSalary: '600000',
         hra: '240000',
         companyName: 'Outvying',
-        currentDate: new Date().toLocaleDateString('en-IN')
+        currentDate: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }),
+        place: 'Mumbai',
+        workLocation: 'Mumbai, Maharashtra',
+        reportingManager: 'Jane Smith',
+        probationPeriod: '6 months',
+        noticePeriod: '30 days'
     };
 
     useEffect(() => {
@@ -387,11 +393,61 @@ const TemplateManager = ({ isOpen, onClose }) => {
 
                         <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
                             <p className="text-sm font-medium text-blue-900 dark:text-blue-200 mb-2">Required Variables:</p>
-                            <ul className="text-xs text-blue-800 dark:text-blue-300 space-y-1">
+                            <ul className="text-xs text-blue-800 dark:text-blue-300 space-y-1 mb-3">
                                 <li><code>{'{{candidateName}}'}</code> - Candidate's name</li>
                                 <li><code>{'{{jobTitle}}'}</code> - Job position</li>
                                 <li><code>{'{{annualCTC}}'}</code> - Annual compensation</li>
                             </ul>
+
+                            <details className="mt-3">
+                                <summary className="text-sm font-medium text-blue-900 dark:text-blue-200 cursor-pointer hover:text-blue-700 dark:hover:text-blue-100">
+                                    View All Available Variables (20+)
+                                </summary>
+                                <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-blue-800 dark:text-blue-300">
+                                    <div>
+                                        <p className="font-semibold mb-1">Candidate Info:</p>
+                                        <ul className="space-y-0.5 ml-2">
+                                            <li><code>{'{{candidateName}}'}</code> - Full name</li>
+                                            <li><code>{'{{candidateEmail}}'}</code> - Email address</li>
+                                        </ul>
+                                    </div>
+                                    <div>
+                                        <p className="font-semibold mb-1">Position Details:</p>
+                                        <ul className="space-y-0.5 ml-2">
+                                            <li><code>{'{{jobTitle}}'}</code> - Job title</li>
+                                            <li><code>{'{{designation}}'}</code> - Designation</li>
+                                            <li><code>{'{{department}}'}</code> - Department</li>
+                                            <li><code>{'{{reportingManager}}'}</code> - Manager name</li>
+                                        </ul>
+                                    </div>
+                                    <div>
+                                        <p className="font-semibold mb-1">Compensation:</p>
+                                        <ul className="space-y-0.5 ml-2">
+                                            <li><code>{'{{annualCTC}}'}</code> - Annual CTC</li>
+                                            <li><code>{'{{monthlyCTC}}'}</code> - Monthly CTC</li>
+                                            <li><code>{'{{basicSalary}}'}</code> - Basic salary</li>
+                                            <li><code>{'{{hra}}'}</code> - HRA amount</li>
+                                        </ul>
+                                    </div>
+                                    <div>
+                                        <p className="font-semibold mb-1">Dates & Location:</p>
+                                        <ul className="space-y-0.5 ml-2">
+                                            <li><code>{'{{joiningDate}}'}</code> - Joining date</li>
+                                            <li><code>{'{{currentDate}}'}</code> - Today's date</li>
+                                            <li><code>{'{{place}}'}</code> - City</li>
+                                            <li><code>{'{{workLocation}}'}</code> - Full location</li>
+                                        </ul>
+                                    </div>
+                                    <div>
+                                        <p className="font-semibold mb-1">Employment Terms:</p>
+                                        <ul className="space-y-0.5 ml-2">
+                                            <li><code>{'{{probationPeriod}}'}</code> - Probation</li>
+                                            <li><code>{'{{noticePeriod}}'}</code> - Notice period</li>
+                                            <li><code>{'{{companyName}}'}</code> - Company</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </details>
                         </div>
 
                         <div className="flex gap-2 justify-end">
