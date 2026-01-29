@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, Button } from '../components/UI';
 import { Plus, GraduationCap, Users, Clock, Award } from 'lucide-react';
 import { showToast } from '../utils/toast';
 
 const Courses = () => {
-    const [courses, setcourses] = useState([
+    const navigate = useNavigate();
+    const [courses, setCourses] = useState([
         {
             id: '1',
             title: 'Leadership Development Program',
@@ -199,10 +201,10 @@ const Courses = () => {
                                 <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                                     <div
                                         className={`h-2 rounded-full transition-all ${enrollmentPercentage >= 90
-                                                ? 'bg-red-600'
-                                                : enrollmentPercentage >= 70
-                                                    ? 'bg-yellow-600'
-                                                    : 'bg-green-600'
+                                            ? 'bg-red-600'
+                                            : enrollmentPercentage >= 70
+                                                ? 'bg-yellow-600'
+                                                : 'bg-green-600'
                                             }`}
                                         style={{ width: `${enrollmentPercentage}%` }}
                                     />
@@ -215,7 +217,12 @@ const Courses = () => {
                             </div>
 
                             <div className="flex gap-2">
-                                <Button variant="primary" size="sm" className="flex-1">
+                                <Button
+                                    variant="primary"
+                                    size="sm"
+                                    className="flex-1"
+                                    onClick={() => navigate(`/courses/${course.id}`)}
+                                >
                                     View Details
                                 </Button>
                                 <Button variant="secondary" size="sm" className="flex-1">

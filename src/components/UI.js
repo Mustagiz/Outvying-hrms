@@ -218,10 +218,16 @@ export const Alert = ({ type = 'info', message, onClose }) => {
   );
 };
 
-export const Spinner = () => {
+export const Spinner = ({ size = 'md', className = '' }) => {
+  const sizes = {
+    sm: 'h-4 w-4 border-2',
+    md: 'h-8 w-8 border-2',
+    lg: 'h-12 w-12 border-b-2'
+  };
+
   return (
-    <div className="flex justify-center items-center">
-      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+    <div className={`flex justify-center items-center ${className}`}>
+      <div className={`animate-spin rounded-full ${sizes[size]} border-primary-600`}></div>
     </div>
   );
 };

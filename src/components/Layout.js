@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import {
   Home, Users, Calendar, FileText, UserPlus, UserMinus,
   Briefcase, DollarSign, CheckSquare, BarChart2, Settings,
-  LogOut, Menu, X, Sun, Moon, BookOpen, Fingerprint, Megaphone, UserCog, Wallet, CreditCard, Building, Shield, Globe, TrendingUp
+  LogOut, Menu, X, Sun, Moon, BookOpen, Fingerprint, Megaphone, UserCog, Wallet, CreditCard, Building, Shield, Globe, TrendingUp, GraduationCap, Compass
 } from 'lucide-react';
 
 
@@ -32,7 +32,10 @@ const Layout = ({ children }) => {
       { path: '/profile', icon: Users, label: 'My Profile' },
       { path: '/roster', icon: Calendar, label: 'Roster' },
       { path: '/payslips', icon: DollarSign, label: 'Payslips' },
-      { path: '/attendance-regularization', icon: CheckSquare, label: 'Regularization' }
+      { path: '/attendance-regularization', icon: CheckSquare, label: 'Regularization' },
+      { path: '/lms', icon: BookOpen, label: 'Learning Center' },
+      { path: '/culture', icon: Globe, label: 'Culture Hub' },
+      { path: '/orientation', icon: Compass, label: 'Orientation' }
     ],
     hr: [
       { path: '/dashboard', icon: Home, label: 'Dashboard' },
@@ -52,7 +55,10 @@ const Layout = ({ children }) => {
       { path: '/roster', icon: Calendar, label: 'Roster' },
       { path: '/bank-account', icon: DollarSign, label: 'Bank Account Management' },
       { path: '/attendance-regularization', icon: CheckSquare, label: 'Regularization' },
-      { path: '/reports', icon: BarChart2, label: 'Reports' }
+      { path: '/reports', icon: BarChart2, label: 'Reports' },
+      { path: '/courses', icon: GraduationCap, label: 'Training & Development' },
+      { path: '/lms', icon: BookOpen, label: 'Learning Center' },
+      { path: '/culture', icon: Globe, label: 'Culture Hub' }
     ],
     admin: [
       { path: '/dashboard', icon: Home, label: 'Dashboard' },
@@ -87,8 +93,10 @@ const Layout = ({ children }) => {
       { path: '/user-management', icon: UserCog, label: 'User Management' },
       { path: '/audit-logs', icon: Shield, label: 'Audit Logs' },
       { path: '/performance', icon: TrendingUp, label: 'Performance' },
-      { path: '/webhooks', icon: Globe, label: 'Webhooks & Integrations' }
-
+      { path: '/webhooks', icon: Globe, label: 'Webhooks & Integrations' },
+      { path: '/courses', icon: GraduationCap, label: 'Training Management' },
+      { path: '/lms', icon: BookOpen, label: 'LMS Center' },
+      { path: '/culture', icon: Globe, label: 'Culture Hub' }
     ],
 
     manager: [
@@ -99,7 +107,9 @@ const Layout = ({ children }) => {
       { path: '/employees', icon: Users, label: 'My Team' },
       { path: '/profile', icon: Users, label: 'My Profile' },
       { path: '/payslips', icon: DollarSign, label: 'My Payslips' },
-      { path: '/attendance-regularization', icon: CheckSquare, label: 'Regularization' }
+      { path: '/attendance-regularization', icon: CheckSquare, label: 'Regularization' },
+      { path: '/lms', icon: BookOpen, label: 'Learning Center' },
+      { path: '/culture', icon: Globe, label: 'Culture Hub' }
     ]
   };
 

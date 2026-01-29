@@ -384,10 +384,15 @@ const OfferLetters = () => {
                         ) : (
                             <Button
                                 onClick={handleCreateOffer}
-                                loading={actionLoading}
-                                className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white"
+                                disabled={actionLoading}
+                                className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white disabled:bg-green-400"
                             >
-                                <Send size={18} /> Generate & Send Offer
+                                {actionLoading ? (
+                                    <Spinner size="sm" className="mr-2 border-white" />
+                                ) : (
+                                    <Send size={18} />
+                                )}
+                                {actionLoading ? 'Generating...' : 'Generate & Send Offer'}
                             </Button>
                         )}
                     </div>

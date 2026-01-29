@@ -49,6 +49,7 @@ const CultureHub = lazy(() => import('./pages/CultureHub'));
 const VirtualOnboarding = lazy(() => import('./pages/VirtualOnboarding'));
 const LMS = lazy(() => import('./pages/LMS'));
 const CourseDetail = lazy(() => import('./pages/CourseDetail'));
+const Courses = lazy(() => import('./pages/Courses'));
 const Assets = lazy(() => import('./pages/Assets'));
 const OfferLetters = lazy(() => import('./pages/OfferLetters'));
 const Applicants = lazy(() => import('./pages/Applicants'));
@@ -477,6 +478,36 @@ const AppRoutes = () => {
           <PrivateRoute>
             <Layout>
               <LMS />
+            </Layout>
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/lms/:courseId"
+        element={
+          <PrivateRoute>
+            <Layout>
+              <CourseDetail />
+            </Layout>
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/courses"
+        element={
+          <PrivateRoute>
+            <Layout>
+              <Courses />
+            </Layout>
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/courses/:courseId"
+        element={
+          <PrivateRoute>
+            <Layout>
+              <CourseDetail />
             </Layout>
           </PrivateRoute>
         }
