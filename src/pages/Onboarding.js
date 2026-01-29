@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Card, Button, Input, Select, Alert } from '../components/UI';
 import { onboardingTasks, departments, designations } from '../data/mockData';
-import { CheckCircle, Circle, UserPlus, Upload } from 'lucide-react';
+import { CheckCircle, Circle, UserPlus, Upload, LayoutGrid, List } from 'lucide-react';
+import OnboardingQueue from '../components/Hiring/OnboardingQueue';
 
 const Onboarding = () => {
   const { addEmployee } = useAuth();
@@ -96,6 +97,23 @@ const Onboarding = () => {
       });
     }
     setTimeout(() => setAlert(null), 3000);
+  };
+
+  const handlePromote = (joiner) => {
+    const [firstName, ...lastNameParts] = joiner.candidateName.split(' ');
+    setFormData({
+      ...formData,
+      firstName: firstName,
+      lastName: lastNameParts.join(' '),
+      email: joiner.candidateEmail,
+      userId: joiner.candidateEmail,
+      department: joiner.department,
+      designation: joiner.jobTitle,
+      // Default some values
+      password: 'Welcome@123',
+    });
+    setShowForm(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const toggleTask = (taskId) => {
@@ -221,6 +239,10 @@ const Onboarding = () => {
       </div>
 
       {alert && <Alert type={alert.type} message={alert.message} onClose={() => setAlert(null)} />}
+
+      <div className="mb-8">
+        <OnboardingQueue onPromote={handlePromote} />
+      </div>
 
       {showBulkUpload && (
         <Card title="Bulk Employee Upload" className="mb-6">

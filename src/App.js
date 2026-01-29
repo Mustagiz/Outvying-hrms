@@ -50,6 +50,9 @@ const VirtualOnboarding = lazy(() => import('./pages/VirtualOnboarding'));
 const LMS = lazy(() => import('./pages/LMS'));
 const CourseDetail = lazy(() => import('./pages/CourseDetail'));
 const Assets = lazy(() => import('./pages/Assets'));
+const OfferLetters = lazy(() => import('./pages/OfferLetters'));
+const Applicants = lazy(() => import('./pages/Applicants'));
+const CandidateOffer = lazy(() => import('./pages/CandidateOffer'));
 
 const PrivateRoute = ({ children }) => {
   const { currentUser, loading } = useAuth();
@@ -73,6 +76,10 @@ const AppRoutes = () => {
       <Route
         path="/login"
         element={currentUser ? <Navigate to="/dashboard" /> : <Login />}
+      />
+      <Route
+        path="/offer/:offerId"
+        element={<CandidateOffer />}
       />
       <Route
         path="/"
@@ -470,6 +477,26 @@ const AppRoutes = () => {
           <PrivateRoute>
             <Layout>
               <LMS />
+            </Layout>
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/offer-letters"
+        element={
+          <PrivateRoute>
+            <Layout>
+              <OfferLetters />
+            </Layout>
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/applicants"
+        element={
+          <PrivateRoute>
+            <Layout>
+              <Applicants />
             </Layout>
           </PrivateRoute>
         }

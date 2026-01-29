@@ -1093,6 +1093,15 @@ export const AuthProvider = ({ children }) => {
       // 3. Create user profile in Firestore (using the new UID)
       const { password: _, ...userDataToStore } = userData; // Exclude password from Firestore
 
+      // Auto-generate Employee ID if missing
+      if (!userDataToStore.employeeId) {
+        const empUsers = allUsers.filter(u => u.employeeId && u.employeeId.startsWith('EMP'));
+        const lastId = empUsers.length > 0
+          ? Math.max(...empUsers.map(u => parseInt(u.employeeId.replace('EMP', '')) || 0))
+          : 0;
+        userDataToStore.employeeId = `EMP${String(lastId + 1).padStart(3, '0')}`;
+      }
+
       await setDoc(doc(db, 'users', uid), {
         ...userDataToStore,
         uid: uid,

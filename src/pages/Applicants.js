@@ -191,16 +191,25 @@ const Applicants = () => {
                                 </div>
                             </div>
 
-                            <div className="ml-4">
+                            <div className="ml-4 flex flex-col gap-2">
                                 <select
                                     value={applicant.stage}
                                     onChange={(e) => moveToStage(applicant.id, e.target.value)}
-                                    className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-sm"
+                                    className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-sm w-full"
                                 >
                                     {stages.map((stage) => (
                                         <option key={stage} value={stage}>{stage}</option>
                                     ))}
                                 </select>
+                                {(applicant.stage === 'Interview Completed' || applicant.stage === 'Offer Extended') && (
+                                    <Button
+                                        size="sm"
+                                        onClick={() => window.location.href = `/offer-letters?candidate=${encodeURIComponent(applicant.name)}&email=${encodeURIComponent(applicant.email)}&role=${encodeURIComponent(applicant.jobTitle)}`}
+                                        className="w-full flex items-center justify-center gap-1"
+                                    >
+                                        <FileText size={14} /> Generate Offer
+                                    </Button>
+                                )}
                             </div>
                         </div>
                     </Card>
