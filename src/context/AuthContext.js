@@ -28,7 +28,7 @@ import {
 } from 'firebase/firestore';
 import { getCurrentIP, validateIP, logIPAccess, checkModuleAccess } from '../utils/ipValidation';
 import { calculateAttendanceStatus } from '../utils/biometricSync';
-import { getTodayLocal } from '../utils/helpers';
+import { getTodayLocal, calculateAbsDuration } from '../utils/helpers';
 import { geolocation, defaultOfficeLocations } from '../utils/geolocation';
 
 // --- Default Data for Seeding (Optional) ---
