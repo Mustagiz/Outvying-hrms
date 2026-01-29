@@ -531,23 +531,20 @@ export const AuthProvider = ({ children }) => {
   const clockIn = async (employeeId) => {
     console.log("Starting Clock In Process for:", employeeId);
 
-    // 1. IP Check
+    // 1. IP Check (Warning Only)
     if (checkAccess('attendance') && !ipValidation.allowed) {
-      console.warn("Clock In Blocked by IP:", ipValidation);
-      return { success: false, message: ipValidation.message };
+      console.warn("Clock In Warning - Unverified IP:", ipValidation);
+      // Removed hard block. Proceed with warning.
     }
 
-    // 2. Geolocation Check
+    // 2. Geolocation Check (Warning Only)
     try {
       const geoResult = await geolocation.validateLocation(defaultOfficeLocations);
       if (!geoResult.valid) {
-        console.warn("Clock In Blocked by Geolocation:", geoResult);
-        // Note: Uncomment the line below to ENFORCE geolocation. Currently logging warning to avoid lockout during testing.
-        // return { success: false, message: geoResult.message || 'Location validation failed' };
+        console.warn("Clock In Warning - Geolocation:", geoResult);
       }
     } catch (geoError) {
       console.error("Geolocation Error:", geoError);
-      // Decide if you want to block on error. For now, allow but log.
     }
 
     const today = getTodayLocal();
@@ -590,24 +587,17 @@ export const AuthProvider = ({ children }) => {
     if (docSnap.exists()) {
       const data = docSnap.data();
       // Check if currently clocked in (active session)
-      if (!data.clockOut && data.sessions && data.sessions.length > 0) {
-        const lastSession = data.sessions[data.sessions.length - 1];
+      const sessions = data.sessions || [];
+      if (sessions.length > 0) {
+        const lastSession = sessions[sessions.length - 1];
         if (!lastSession.out) {
-          return { success: false, message: `Already clocked in for today at ${lastSession.in}. Please clock out first.` };
+          // If the last session is still open, we can't clock in again
+          return { success: false, message: `Already clocked in at ${lastSession.in}. Please clock out first.` };
         }
       }
 
-      // Check legacy single-session format
-      if (!data.sessions && data.clockIn && !data.clockOut) {
-        return { success: false, message: `Already clocked in for today at ${data.clockIn}.` };
-      }
-
       // Prepare for multiple sessions
-      newSessions = data.sessions || [];
-      if (!data.sessions && data.clockIn) {
-        // Convert legacy to session format
-        newSessions.push({ in: data.clockIn, out: data.clockOut || null });
-      }
+      newSessions = sessions;
       previousWorkHours = parseFloat(data.workHours || 0);
     }
 
@@ -650,15 +640,16 @@ export const AuthProvider = ({ children }) => {
   const clockOut = async (employeeId) => {
     console.log("Starting Clock Out Process for:", employeeId);
 
+    // IP Check (Warning Only)
     if (checkAccess('attendance') && !ipValidation.allowed) {
-      return { success: false, message: ipValidation.message };
+      console.warn("Clock Out Warning - Unverified IP:", ipValidation);
     }
 
-    // Geolocation Check (Optional)
+    // Geolocation Check (Warning Only)
     try {
       const geoResult = await geolocation.validateLocation(defaultOfficeLocations);
       if (!geoResult.valid) {
-        console.warn("Clock Out: Geolocation warning:", geoResult);
+        console.warn("Clock Out Warning - Geolocation:", geoResult);
       }
     } catch (e) { console.error(e); }
 
@@ -699,26 +690,20 @@ export const AuthProvider = ({ children }) => {
         sessions[sessions.length - 1].out = clockOutTime;
       }
 
-      // Recalculate Total Work Hours
-      // We can use the helper or sum up sessions manually
-      let totalHours = 0;
-      const { calculateAbsDuration } = require('../utils/helpers'); // Lazy import to avoid circular dep if any
-
-      sessions.forEach(s => {
-        if (s.in && s.out) {
-          const duration = calculateAbsDuration(s.in, record.date, s.out, record.date);
-          totalHours += duration;
-          console.log(`Session: ${s.in} - ${s.out}, Duration: ${duration}h`);
-        }
-      });
-
-      // Recalculate Status
+      // First-In Last-Out Logic
+      // Calculate duration between the FIRST punch-in of the day and the CURRENT punch-out
       const firstIn = sessions[0].in;
-      const result = calculateAttendanceStatus(firstIn, clockOutTime, record.istDate, roster, attendanceRules);
-      console.log("Clock Out - Calculated Status:", result.status, "Total Hours:", totalHours);
+      const lastOut = clockOutTime;
+
+      const totalHours = calculateAbsDuration(firstIn, record.date, lastOut, record.date);
+      console.log(`FILO Calculation: First In (${firstIn}) to Last Out (${lastOut}) = ${totalHours}h`);
+
+      // Recalculate Status based on First-In and Total Hours (FILO)
+      const result = calculateAttendanceStatus(firstIn, lastOut, record.istDate, roster, attendanceRules);
+      console.log("Clock Out - Calculated Status:", result.status, "Total Hours (FILO):", totalHours);
 
       const updates = {
-        clockOut: clockOutTime, // Legacy: Last clock out
+        clockOut: clockOutTime, // Current punch out
         sessions: sessions,
         workHours: parseFloat(totalHours.toFixed(2)),
         status: result.status,

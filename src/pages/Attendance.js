@@ -73,16 +73,27 @@ const Attendance = () => {
 
   const activeAttendance = useMemo(() => {
     const todayDate = getTodayLocal();
-    // 1. Prefer today's open session
-    const todayOpen = attendance.find(a => String(a.employeeId) === String(currentUser.id) && !a.clockOut && a.date === todayDate);
-    if (todayOpen) return todayOpen;
+    const todayRecord = attendance.find(a => String(a.employeeId) === String(currentUser.id) && a.date === todayDate);
 
-    // 2. Otherwise look for ANY open session (Logical priority)
-    const anyOpen = attendance.find(a => String(a.employeeId) === String(currentUser.id) && !a.clockOut);
+    // 1. Prefer today's record if it has an open session
+    if (todayRecord) {
+      const sessions = todayRecord.sessions || [];
+      if (sessions.length > 0 && !sessions[sessions.length - 1].out) {
+        return todayRecord;
+      }
+    }
+
+    // 2. Otherwise look for ANY open session (Logical priority for cross-midnight)
+    const anyOpen = attendance.find(a =>
+      String(a.employeeId) === String(currentUser.id) &&
+      a.sessions &&
+      a.sessions.length > 0 &&
+      !a.sessions[a.sessions.length - 1].out
+    );
     if (anyOpen) return anyOpen;
 
     // 3. Fallback to today's completed record
-    return attendance.find(a => String(a.employeeId) === String(currentUser.id) && a.date === todayDate);
+    return todayRecord;
   }, [attendance, currentUser]);
 
   const handleClockIn = async () => {
@@ -596,7 +607,11 @@ const Attendance = () => {
                     </p>
                   </div>
                 </div>
-                <Button onClick={handleClockIn} disabled={activeAttendance?.clockIn} className="shadow-sm">
+                <Button
+                  onClick={handleClockIn}
+                  disabled={activeAttendance?.sessions?.length > 0 && !activeAttendance.sessions[activeAttendance.sessions.length - 1].out}
+                  className="shadow-sm"
+                >
                   Clock In
                 </Button>
               </div>
@@ -613,7 +628,12 @@ const Attendance = () => {
                     </p>
                   </div>
                 </div>
-                <Button onClick={handleClockOut} disabled={!activeAttendance?.clockIn || activeAttendance?.clockOut} variant="secondary" className="shadow-sm">
+                <Button
+                  onClick={handleClockOut}
+                  disabled={!(activeAttendance?.sessions?.length > 0 && !activeAttendance.sessions[activeAttendance.sessions.length - 1].out)}
+                  variant="secondary"
+                  className="shadow-sm"
+                >
                   Clock Out
                 </Button>
               </div>

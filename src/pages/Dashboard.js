@@ -64,16 +64,28 @@ const Dashboard = () => {
 
   const activeAttendance = useMemo(() => {
     const today = getTodayLocal();
-    // 1. Prefer today's open session
-    const todayOpen = attendance.find(a => String(a.employeeId) === String(currentUser.id) && !a.clockOut && a.date === today);
-    if (todayOpen) return todayOpen;
+    // Prioritize today's record
+    const todayRecord = attendance.find(a => String(a.employeeId) === String(currentUser.id) && a.date === today);
 
-    // 2. Otherwise look for ANY open session (e.g. from yesterday)
-    const anyOpen = attendance.find(a => String(a.employeeId) === String(currentUser.id) && !a.clockOut);
+    // Check if the record has an open session
+    if (todayRecord) {
+      const sessions = todayRecord.sessions || [];
+      if (sessions.length > 0 && !sessions[sessions.length - 1].out) {
+        return todayRecord;
+      }
+    }
+
+    // Otherwise look for ANY open session (e.g. from yesterday)
+    const anyOpen = attendance.find(a =>
+      String(a.employeeId) === String(currentUser.id) &&
+      a.sessions &&
+      a.sessions.length > 0 &&
+      !a.sessions[a.sessions.length - 1].out
+    );
     if (anyOpen) return anyOpen;
 
-    // 3. Fallback to today's completed record
-    return attendance.find(a => String(a.employeeId) === String(currentUser.id) && a.date === today);
+    // Fallback to today's completed record for status display
+    return todayRecord;
   }, [attendance, currentUser]);
 
   const handleClockIn = async () => {
@@ -370,14 +382,14 @@ const Dashboard = () => {
                   <div className="flex gap-3 w-full sm:w-auto">
                     <Button
                       onClick={handleClockIn}
-                      disabled={activeAttendance?.clockIn}
+                      disabled={activeAttendance?.sessions?.length > 0 && !activeAttendance.sessions[activeAttendance.sessions.length - 1].out}
                       className="flex-1 sm:flex-none py-3 px-8 text-sm font-bold shadow-lg shadow-primary-500/30"
                     >
                       Clock In
                     </Button>
                     <Button
                       onClick={handleClockOut}
-                      disabled={!activeAttendance?.clockIn || activeAttendance?.clockOut}
+                      disabled={!(activeAttendance?.sessions?.length > 0 && !activeAttendance.sessions[activeAttendance.sessions.length - 1].out)}
                       variant="secondary"
                       className="flex-1 sm:flex-none py-3 px-8 text-sm font-bold border-gray-200 dark:border-gray-700 hover:bg-red-50 hover:text-red-700 transition-colors"
                     >
