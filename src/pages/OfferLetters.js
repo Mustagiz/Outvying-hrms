@@ -8,9 +8,11 @@ import { showToast } from '../utils/toast';
 import AccessibleModal from '../components/AccessibleModal';
 import StepIndicator from '../components/StepIndicator';
 import CTCBuilder from '../components/Hiring/CTCBuilder';
+import TemplateManager from '../components/Hiring/TemplateManager';
 import { departments, designations } from '../data/mockData';
 import { logAuditAction } from '../utils/auditLogger';
 import { useAuth } from '../context/AuthContext';
+import { renderTemplate } from '../utils/templateRenderer';
 
 const OfferLetters = () => {
     const { currentUser } = useAuth();
@@ -18,8 +20,12 @@ const OfferLetters = () => {
     const [loading, setLoading] = useState(true);
     const [actionLoading, setActionLoading] = useState(false);
     const [showCreateModal, setShowCreateModal] = useState(false);
+    const [showTemplateManager, setShowTemplateManager] = useState(false);
     const [currentStep, setCurrentStep] = useState(1);
     const [searchTerm, setSearchTerm] = useState('');
+    const [templates, setTemplates] = useState([]);
+    const [selectedTemplateId, setSelectedTemplateId] = useState(null);
+    const [renderedTemplate, setRenderedTemplate] = useState(null);
 
     // Offer State
     const [newOffer, setNewOffer] = useState({
@@ -31,7 +37,8 @@ const OfferLetters = () => {
         joiningDate: '',
         templateType: 'Full-time',
         status: 'Sent',
-        breakdown: {}
+        breakdown: {},
+        selectedTemplate: null
     });
 
     const location = useLocation();
@@ -53,6 +60,22 @@ const OfferLetters = () => {
         }
     }, [location]);
 
+    // Fetch templates
+    useEffect(() => {
+        const q = query(collection(db, 'offerTemplates'));
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const templatesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            setTemplates(templatesData);
+
+            // Set default template if available
+            const defaultTemplate = templatesData.find(t => t.isDefault);
+            if (defaultTemplate && !selectedTemplateId) {
+                setSelectedTemplateId(defaultTemplate.id);
+            }
+        });
+        return () => unsubscribe();
+    }, [selectedTemplateId]);
+
     useEffect(() => {
         const q = query(collection(db, 'offers'));
         const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -60,8 +83,17 @@ const OfferLetters = () => {
             setOffers(offerData);
             setLoading(false);
         });
-        return unsubscribe;
+        return () => unsubscribe();
     }, []);
+
+    // Render template when Step 3 is reached
+    useEffect(() => {
+        if (currentStep === 3) {
+            renderTemplate(selectedTemplateId, templates, newOffer).then(html => {
+                setRenderedTemplate(html);
+            });
+        }
+    }, [currentStep, selectedTemplateId, templates, newOffer]);
 
     const handleCreateOffer = async () => {
         // Basic Validation
@@ -199,6 +231,37 @@ const OfferLetters = () => {
                                 </select>
                             </div>
                         </div>
+
+                        {/* Template Selection */}
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-gray-500 uppercase flex items-center justify-between">
+                                <span>Offer Letter Template</span>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowTemplateManager(true)}
+                                    className="text-xs text-primary-600 hover:text-primary-700 font-normal normal-case"
+                                >
+                                    Manage Templates
+                                </button>
+                            </label>
+                            <select
+                                value={selectedTemplateId || ''}
+                                onChange={(e) => setSelectedTemplateId(e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:text-white"
+                            >
+                                <option value="">Use Default Template</option>
+                                {templates.map(template => (
+                                    <option key={template.id} value={template.id}>
+                                        {template.name} {template.isDefault ? '(Default)' : ''}
+                                    </option>
+                                ))}
+                            </select>
+                            {templates.length === 0 && (
+                                <p className="text-xs text-gray-500 mt-1">
+                                    No custom templates available. Click "Manage Templates" to upload one.
+                                </p>
+                            )}
+                        </div>
                     </div>
                 );
             case 2:
@@ -227,17 +290,16 @@ const OfferLetters = () => {
                     <div className="space-y-4 animate-in fade-in slide-in-from-right-4">
                         <div className="bg-gray-50 dark:bg-gray-800/80 p-6 rounded-xl border border-dashed border-gray-300 dark:border-gray-600">
                             <h4 className="font-serif text-xl text-center mb-6 text-gray-900 dark:text-white border-b pb-4">OFFER OF EMPLOYMENT</h4>
-                            <div className="space-y-4 text-sm text-gray-700 dark:text-gray-300 leading-relaxed font-sans">
-                                <p>Dear <strong>{newOffer.candidateName || '[Name]'}</strong>,</p>
-                                <p>We are delighted to offer you the position of <strong>{newOffer.jobTitle || '[Role]'}</strong> in our <strong>{newOffer.department || '[Dept]'}</strong> department at Outvying. Your joining date is confirmed as <strong>{newOffer.joiningDate || '[Date]'}</strong>.</p>
-                                <p>Your total annual compensation package will be <strong>₹{newOffer.annualCTC.toLocaleString()}</strong>, with a monthly gross of <strong>₹{Math.round(newOffer.annualCTC / 12).toLocaleString()}</strong>.</p>
-                                <ul className="list-disc pl-5 mt-2 space-y-1">
-                                    <li>Basic Salary: ₹{newOffer.breakdown?.basic?.toLocaleString() || '0'}</li>
-                                    <li>Provident Fund: Comprehensive protection plan</li>
-                                    <li>Probation Period: 6 Months</li>
-                                </ul>
-                                <p className="mt-4 italic">Welcome to the team!</p>
-                            </div>
+                            {renderedTemplate ? (
+                                <div
+                                    className="space-y-4 text-sm text-gray-700 dark:text-gray-300 leading-relaxed font-sans"
+                                    dangerouslySetInnerHTML={{ __html: renderedTemplate }}
+                                />
+                            ) : (
+                                <div className="flex justify-center py-8">
+                                    <Spinner />
+                                </div>
+                            )}
                         </div>
                     </div>
                 );
@@ -401,6 +463,12 @@ const OfferLetters = () => {
                     </div>
                 </div>
             </AccessibleModal>
+
+            {/* Template Manager Modal */}
+            <TemplateManager
+                isOpen={showTemplateManager}
+                onClose={() => setShowTemplateManager(false)}
+            />
         </div>
     );
 };
