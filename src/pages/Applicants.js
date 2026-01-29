@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Card, Button } from '../components/UI';
-import { Users, Filter, Download } from 'lucide-react';
+import { Users, Filter, Download, FileText } from 'lucide-react';
 import { showToast } from '../utils/toast';
 
 const Applicants = () => {
