@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { db } from '../config/firebase';
 import { collection, onSnapshot, query, addDoc, serverTimestamp } from 'firebase/firestore';
-import { Card, Button, Input, Select, Spinner } from '../components/UI';
+import { Card, Button, Input, Spinner } from '../components/UI';
 import { FileText, Send, CheckCircle, XCircle, Clock, Plus, Search, Filter, ArrowRight, ArrowLeft, Download, Copy } from 'lucide-react';
 import { showToast } from '../utils/toast';
 import AccessibleModal from '../components/AccessibleModal';
@@ -156,23 +156,25 @@ const OfferLetters = () => {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-1">
                                 <label className="text-xs font-bold text-gray-500 uppercase">Job Title</label>
-                                <Select
+                                <select
                                     value={newOffer.jobTitle}
                                     onChange={(e) => setNewOffer({ ...newOffer, jobTitle: e.target.value })}
+                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:text-white"
                                 >
                                     <option value="">Select Designation</option>
                                     {designations.map(d => <option key={d} value={d}>{d}</option>)}
-                                </Select>
+                                </select>
                             </div>
                             <div className="space-y-1">
                                 <label className="text-xs font-bold text-gray-500 uppercase">Department</label>
-                                <Select
+                                <select
                                     value={newOffer.department}
                                     onChange={(e) => setNewOffer({ ...newOffer, department: e.target.value })}
+                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:text-white"
                                 >
                                     <option value="">Select Department</option>
                                     {departments.map(d => <option key={d} value={d}>{d}</option>)}
-                                </Select>
+                                </select>
                             </div>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
