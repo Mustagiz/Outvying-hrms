@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { Card, Button } from '../components/UI';
-import { Users, Filter, Download, FileText } from 'lucide-react';
+import { Card, Button, Modal } from '../components/UI';
+import { Users, Filter, Download, FileText, Plus } from 'lucide-react';
 import { showToast } from '../utils/toast';
 
 const Applicants = () => {
@@ -76,6 +76,35 @@ const Applicants = () => {
         ? applicants
         : applicants.filter((a) => a.stage === selectedStage);
 
+    const [showAddModal, setShowAddModal] = useState(false);
+    const [newCandidate, setNewCandidate] = useState({
+        name: '',
+        email: '',
+        phone: '',
+        jobTitle: '',
+        stage: 'Applied'
+    });
+
+    const handleAddCandidate = () => {
+        if (!newCandidate.name || !newCandidate.email || !newCandidate.jobTitle) {
+            showToast.error("Please fill in all required fields");
+            return;
+        }
+
+        const candidate = {
+            id: Date.now().toString(),
+            ...newCandidate,
+            score: 0, // Default score
+            appliedDate: new Date().toISOString().split('T')[0],
+            resumeUrl: '#'
+        };
+
+        setApplicants([candidate, ...applicants]);
+        setShowAddModal(false);
+        setNewCandidate({ name: '', email: '', phone: '', jobTitle: '', stage: 'Applied' });
+        showToast.success("Candidate added successfully");
+    };
+
     const moveToStage = (applicantId, newStage) => {
         setApplicants(applicants.map((a) =>
             a.id === applicantId ? { ...a, stage: newStage } : a
@@ -95,10 +124,15 @@ const Applicants = () => {
                         Manage candidates through the recruitment pipeline
                     </p>
                 </div>
-                <Button variant="secondary">
-                    <Download className="w-4 h-4 mr-2" />
-                    Export
-                </Button>
+                <div className="flex gap-3">
+                    <Button onClick={() => setShowAddModal(true)} className="flex items-center gap-2">
+                        <Plus size={18} /> Add Candidate
+                    </Button>
+                    <Button variant="secondary">
+                        <Download className="w-4 h-4 mr-2" />
+                        Export
+                    </Button>
+                </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -271,6 +305,66 @@ const Applicants = () => {
                     </Card>
                 ))}
             </div>
+
+            {/* Add Candidate Modal */}
+            <Modal isOpen={showAddModal} onClose={() => setShowAddModal(false)} title="Add New Candidate">
+                <div className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Full Name *</label>
+                        <input
+                            type="text"
+                            value={newCandidate.name}
+                            onChange={e => setNewCandidate({ ...newCandidate, name: e.target.value })}
+                            className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                            placeholder="John Doe"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email *</label>
+                        <input
+                            type="email"
+                            value={newCandidate.email}
+                            onChange={e => setNewCandidate({ ...newCandidate, email: e.target.value })}
+                            className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                            placeholder="john@example.com"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Phone</label>
+                        <input
+                            type="text"
+                            value={newCandidate.phone}
+                            onChange={e => setNewCandidate({ ...newCandidate, phone: e.target.value })}
+                            className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                            placeholder="+1 234 567 890"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Job Title *</label>
+                        <input
+                            type="text"
+                            value={newCandidate.jobTitle}
+                            onChange={e => setNewCandidate({ ...newCandidate, jobTitle: e.target.value })}
+                            className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                            placeholder="Software Engineer"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Initial Stage</label>
+                        <select
+                            value={newCandidate.stage}
+                            onChange={e => setNewCandidate({ ...newCandidate, stage: e.target.value })}
+                            className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                        >
+                            {stages.map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                    </div>
+                    <div className="flex justify-end gap-2 pt-4">
+                        <Button variant="secondary" onClick={() => setShowAddModal(false)}>Cancel</Button>
+                        <Button variant="primary" onClick={handleAddCandidate}>Add Candidate</Button>
+                    </div>
+                </div>
+            </Modal>
         </div>
     );
 };
