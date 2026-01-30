@@ -25,11 +25,19 @@ export const renderTemplate = async (templateId, templates, offerData) => {
 
         // If not in Firestore, fetch from Storage (legacy fallback)
         if (!htmlContent && template.storageUrl) {
-            const response = await fetch(template.storageUrl);
+            console.log('[RENDER] Fetching legacy content from Storage...');
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout
+
+            const response = await fetch(template.storageUrl, { signal: controller.signal });
+            clearTimeout(timeoutId);
             htmlContent = await response.text();
         }
 
-        if (!htmlContent) return null;
+        if (!htmlContent) {
+            console.warn('[RENDER] No content found for template:', templateId);
+            return null;
+        }
 
         // Variable replacement map
         const variables = {

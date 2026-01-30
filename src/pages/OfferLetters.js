@@ -187,14 +187,17 @@ const OfferLetters = () => {
 
     const handleDownloadPDF = async (offer) => {
         setActionLoading(true);
+        console.log('[PDF_GEN] Starting for:', offer.candidateName);
+
         try {
-            // Render the HTML using the associated template
+            // 1. Render HTML
             const html = await renderTemplate(offer.selectedTemplateId || null, templates, offer);
+            if (!html) throw new Error('Could not render template content');
+            console.log('[PDF_GEN] Template rendered successfully');
 
-            if (!html) throw new Error('Failed to render offer template');
-
-            // Create a temporary container to render the HTML for capturing
+            // 2. Setup Container for Capture
             const container = document.createElement('div');
+            container.id = 'temp-pdf-container';
             container.style.width = '800px';
             container.style.padding = '40px';
             container.style.position = 'absolute';
@@ -202,32 +205,56 @@ const OfferLetters = () => {
             container.style.top = '0';
             container.style.background = 'white';
             container.style.color = '#000';
+            container.style.fontFamily = 'serif';
             container.innerHTML = html;
             document.body.appendChild(container);
 
-            // Wait a moment for any styles or images to settle
-            await new Promise(r => setTimeout(r, 100));
+            // Wait for styles/images
+            await new Promise(r => setTimeout(r, 300));
 
+            // 3. Capture with html2canvas
+            console.log('[PDF_GEN] Starting html2canvas capture...');
             const canvas = await html2canvas(container, {
                 scale: 2,
                 useCORS: true,
-                logging: false,
+                allowTaint: true,
+                logging: true,
                 backgroundColor: '#ffffff'
             });
+            console.log('[PDF_GEN] Capture complete');
 
+            // 4. Generate PDF
             const imgData = canvas.toDataURL('image/png');
             const pdf = new jsPDF('p', 'mm', 'a4');
             const pdfWidth = pdf.internal.pageSize.getWidth();
             const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
 
             pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-            pdf.save(`Offer_${offer.candidateName.replace(/\s+/g, '_')}.pdf`);
+            const fileName = `Offer_${offer.candidateName.replace(/\s+/g, '_')}.pdf`;
+            pdf.save(fileName);
 
             document.body.removeChild(container);
-            showToast.success('PDF generated and downloaded!');
+            showToast.success('PDF downloaded successfully!');
+            console.log('[PDF_GEN] SUCCESS:', fileName);
         } catch (error) {
-            console.error('PDF Export Error:', error);
-            showToast.error('Failed to generate PDF: ' + error.message);
+            console.error('[PDF_GEN_ERROR]:', error);
+
+            // Fallback: Download as HTML if PDF fails
+            try {
+                console.log('[PDF_FALLBACK] Attempting HTML download...');
+                const html = await renderTemplate(offer.selectedTemplateId || null, templates, offer);
+                const blob = new Blob([html], { type: 'text/html' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `Offer_${offer.candidateName.replace(/\s+/g, '_')}.html`;
+                a.click();
+                URL.revokeObjectURL(url);
+                showToast.warning('PDF generation had an issue. Downloaded as HTML instead.');
+            } catch (fallbackError) {
+                console.error('[PDF_FALLBACK_ERROR]:', fallbackError);
+                showToast.error('Failed to download: ' + error.message);
+            }
         } finally {
             setActionLoading(false);
         }
