@@ -3,7 +3,9 @@ import { useLocation } from 'react-router-dom';
 import { db } from '../config/firebase';
 import { collection, onSnapshot, query, addDoc, serverTimestamp } from 'firebase/firestore';
 import { Card, Button, Input, Spinner } from '../components/UI';
-import { FileText, Send, CheckCircle, XCircle, Clock, Plus, Search, Filter, ArrowRight, ArrowLeft, Download, Copy } from 'lucide-react';
+import { FileText, Send, CheckCircle, XCircle, Clock, Plus, Search, Filter, ArrowRight, ArrowLeft, Download, Copy, Mail } from 'lucide-react';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 import { showToast } from '../utils/toast';
 import AccessibleModal from '../components/AccessibleModal';
 import StepIndicator from '../components/StepIndicator';
@@ -130,6 +132,7 @@ const OfferLetters = () => {
         try {
             const docRef = await addDoc(collection(db, 'offers'), {
                 ...newOffer,
+                selectedTemplateId: selectedTemplateId, // Ensure template association is saved
                 createdAt: serverTimestamp()
             });
 
@@ -142,7 +145,8 @@ const OfferLetters = () => {
                 details: {
                     role: newOffer.jobTitle,
                     ctc: newOffer.annualCTC,
-                    email: newOffer.candidateEmail
+                    email: newOffer.candidateEmail,
+                    template: selectedTemplateId || 'Default'
                 }
             });
 
@@ -152,6 +156,78 @@ const OfferLetters = () => {
         } catch (error) {
             console.error('Error creating offer:', error);
             showToast.error('Failed to generate offer: ' + error.message);
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const handleResendOffer = async (offer) => {
+        setActionLoading(true);
+        try {
+            await logAuditAction({
+                action: 'RESEND_OFFER',
+                category: 'HIRING',
+                performedBy: currentUser,
+                targetId: offer.id,
+                targetName: offer.candidateName,
+                details: {
+                    role: offer.jobTitle,
+                    email: offer.candidateEmail
+                }
+            });
+
+            showToast.success(`Offer verification link resent to ${offer.candidateEmail}`);
+        } catch (error) {
+            console.error('Error resending offer:', error);
+            showToast.error('Failed to resend offer notification');
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const handleDownloadPDF = async (offer) => {
+        setActionLoading(true);
+        try {
+            // Render the HTML using the associated template
+            const html = await renderTemplate(offer.selectedTemplateId || null, templates, offer);
+
+            if (!html) throw new Error('Failed to render offer template');
+
+            // Create a temporary container to render the HTML for capturing
+            const container = document.createElement('div');
+            container.style.width = '800px';
+            container.style.padding = '40px';
+            container.style.position = 'absolute';
+            container.style.left = '-9999px';
+            container.style.top = '0';
+            container.style.background = 'white';
+            container.style.color = '#000';
+            container.innerHTML = html;
+            document.body.appendChild(container);
+
+            // Wait a moment for any styles or images to settle
+            await new Promise(r => setTimeout(r, 100));
+
+            const canvas = await html2canvas(container, {
+                scale: 2,
+                useCORS: true,
+                logging: false,
+                backgroundColor: '#ffffff'
+            });
+
+            const imgData = canvas.toDataURL('image/png');
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            const pdfWidth = pdf.internal.pageSize.getWidth();
+            const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+            pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+            pdf.save(`Offer_${offer.candidateName.replace(/\s+/g, '_')}.pdf`);
+
+            document.body.removeChild(container);
+            showToast.success('PDF generated and downloaded!');
+        } catch (error) {
+            console.error('PDF Export Error:', error);
+            showToast.error('Failed to generate PDF: ' + error.message);
         } finally {
             setActionLoading(false);
         }
@@ -468,8 +544,26 @@ const OfferLetters = () => {
                                             >
                                                 <Copy size={16} />
                                             </Button>
-                                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Download PDF"><Download size={16} /></Button>
-                                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Resend"><Send size={16} /></Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-8 w-8 p-0"
+                                                title="Download PDF"
+                                                disabled={actionLoading}
+                                                onClick={() => handleDownloadPDF(offer)}
+                                            >
+                                                <Download size={16} />
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-8 w-8 p-0"
+                                                title="Resend Notification"
+                                                disabled={actionLoading}
+                                                onClick={() => handleResendOffer(offer)}
+                                            >
+                                                <Mail size={16} />
+                                            </Button>
                                         </div>
                                     </td>
                                 </tr>

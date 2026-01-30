@@ -8,6 +8,8 @@ import SignaturePad from '../components/SignaturePad';
 import { showToast } from '../utils/toast';
 import { getCurrentIP } from '../utils/ipValidation';
 import { logAuditAction } from '../utils/auditLogger';
+import { renderTemplate } from '../utils/templateRenderer';
+import { collection, onSnapshot, query } from 'firebase/firestore';
 
 const CandidateOffer = () => {
     const { offerId } = useParams();
@@ -17,6 +19,27 @@ const CandidateOffer = () => {
     const [signature, setSignature] = useState(null);
     const [showDeclineReason, setShowDeclineReason] = useState(false);
     const [declineReason, setDeclineReason] = useState('');
+    const [templates, setTemplates] = useState([]);
+    const [renderedHtml, setRenderedHtml] = useState(null);
+
+    // Fetch templates for rendering
+    useEffect(() => {
+        const q = query(collection(db, 'offerTemplates'));
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const templatesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            setTemplates(templatesData);
+        });
+        return () => unsubscribe();
+    }, []);
+
+    // Render template once both offer and templates are loaded
+    useEffect(() => {
+        if (offer) {
+            renderTemplate(offer.selectedTemplateId || null, templates, offer).then(html => {
+                setRenderedHtml(html);
+            });
+        }
+    }, [offer, templates]);
 
     useEffect(() => {
         const fetchOffer = async () => {
@@ -146,51 +169,24 @@ const CandidateOffer = () => {
                     <div className="lg:col-span-2 space-y-6">
                         <Card className="p-0 overflow-hidden border-none shadow-lg">
                             <div className="bg-primary-600 p-6 text-white text-center">
-                                <h2 className="text-2xl font- serif uppercase tracking-widest">Letter of Intent</h2>
+                                <h2 className="text-2xl font-serif uppercase tracking-widest">Letter of Intent</h2>
                                 <p className="opacity-80 text-sm mt-1">Official Employment Offer</p>
                             </div>
                             <div className="p-8 space-y-8 bg-white">
-                                <div className="space-y-4 border-b pb-8">
-                                    <p className="text-gray-600">Dear <strong>{offer.candidateName}</strong>,</p>
-                                    <p className="text-gray-800 leading-relaxed">
-                                        Following our recent discussions, we are pleased to offer you the full-time position of <strong>{offer.jobTitle}</strong> with <strong>Outvying</strong>. We were very impressed with your background and believe you will be a great addition to our <strong>{offer.department}</strong> team.
-                                    </p>
-                                </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                {renderedHtml ? (
+                                    <div
+                                        className="dynamic-offer-content"
+                                        dangerouslySetInnerHTML={{ __html: renderedHtml }}
+                                    />
+                                ) : (
                                     <div className="space-y-4">
-                                        <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Employment Details</h3>
-                                        <div className="space-y-3">
-                                            <div className="flex items-center gap-3 text-sm">
-                                                <Calendar className="text-primary-600" size={18} />
-                                                <span>Joining Date: <strong>{offer.joiningDate}</strong></span>
-                                            </div>
-                                            <div className="flex items-center gap-3 text-sm">
-                                                <Clock className="text-primary-600" size={18} />
-                                                <span>Shift: 9:00 AM - 6:00 PM</span>
-                                            </div>
-                                            <div className="flex items-center gap-3 text-sm">
-                                                <MapPin className="text-primary-600" size={18} />
-                                                <span>Location: Remote / Head Office</span>
-                                            </div>
-                                        </div>
+                                        <div className="h-4 bg-gray-200 rounded w-3/4 animate-pulse"></div>
+                                        <div className="h-4 bg-gray-200 rounded w-1/2 animate-pulse"></div>
+                                        <div className="h-4 bg-gray-200 rounded w-5/6 animate-pulse"></div>
                                     </div>
-                                    <div className="space-y-4">
-                                        <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Compensation</h3>
-                                        <div className="space-y-3">
-                                            <div className="flex items-center gap-3 text-sm">
-                                                <FileText className="text-primary-600" size={18} />
-                                                <span>Annual CTC: <strong>₹{offer.annualCTC.toLocaleString()}</strong></span>
-                                            </div>
-                                            <div className="p-3 bg-gray-50 rounded border text-xs space-y-1">
-                                                <div className="flex justify-between"><span>Basic Salary:</span><span>₹{offer.breakdown?.basic?.toLocaleString()}</span></div>
-                                                <div className="flex justify-between text-primary-600 font-bold border-t mt-1 pt-1"><span>Monthly Gross:</span><span>₹{offer.breakdown?.monthlyCTC?.toLocaleString()}</span></div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
+                                )}
 
-                                <div className="pt-8 text-gray-500 text-xs italic leading-relaxed border-t">
+                                <div className="pt-8 text-gray-500 text-xs italic leading-relaxed border-t mt-8">
                                     <p>* This offer is contingent upon successful verification of your professional credentials and background check. Please review the attached terms and conditions for full details on leaves, probation, and confidentiality.</p>
                                 </div>
                             </div>
