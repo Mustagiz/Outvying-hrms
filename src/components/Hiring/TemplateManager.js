@@ -19,12 +19,14 @@ const TemplateManager = ({ isOpen, onClose }) => {
     const [showPreviewModal, setShowPreviewModal] = useState(false);
 
     // Upload form state
+    const [uploadMode, setUploadMode] = useState('edit'); // 'edit' or 'file'
     const [uploadForm, setUploadForm] = useState({
         name: '',
         description: '',
         category: 'Full-time',
         htmlContent: ''
     });
+    const [batchFiles, setBatchFiles] = useState([]);
 
     // Sample data for preview
     const sampleData = {
@@ -135,59 +137,125 @@ const TemplateManager = ({ isOpen, onClose }) => {
         setUploadForm({ ...uploadForm, htmlContent: defaultHtml });
     };
 
-    const handleUpload = async () => {
-        if (!uploadForm.name || !uploadForm.htmlContent) {
-            showToast.error('Please provide template name and HTML content');
-            return;
+    const handleBatchFileSelect = (e) => {
+        const files = Array.from(e.target.files);
+        const validFiles = files.filter(file => file.type === 'text/html' || file.name.endsWith('.html'));
+
+        if (validFiles.length < files.length) {
+            showToast.warning(`${files.length - validFiles.length} files were skipped (not HTML)`);
         }
+        setBatchFiles(validFiles);
+    };
 
-        setUploading(true);
-        try {
-            const htmlContent = uploadForm.htmlContent;
-
-            // Validate template
-            const validation = validateTemplate(htmlContent);
-            if (!validation.isValid) {
-                showToast.error(`Template missing required variables: ${validation.missingVariables.join(', ')}`);
-                setUploading(false);
+    const handleUpload = async () => {
+        if (uploadMode === 'edit') {
+            if (!uploadForm.name || !uploadForm.htmlContent) {
+                showToast.error('Please provide template name and HTML content');
                 return;
             }
 
-            // Upload to Firebase Storage
-            const templateId = `template_${Date.now()}`;
-            const storageRef = ref(storage, `offerTemplates/${templateId}.html`);
-            const blob = new Blob([htmlContent], { type: 'text/html' });
+            setUploading(true);
+            try {
+                const htmlContent = uploadForm.htmlContent;
 
-            await uploadBytes(storageRef, blob);
-            const downloadURL = await getDownloadURL(storageRef);
+                // Validate template
+                const validation = validateTemplate(htmlContent);
+                if (!validation.isValid) {
+                    showToast.error(`Template missing required variables: ${validation.missingVariables.join(', ')}`);
+                    setUploading(false);
+                    return;
+                }
 
-            // Save metadata to Firestore
-            await addDoc(collection(db, 'offerTemplates'), {
-                name: uploadForm.name,
-                description: uploadForm.description,
-                category: uploadForm.category,
-                storageUrl: downloadURL,
-                storagePath: `offerTemplates/${templateId}.html`,
-                variables: extractVariables(htmlContent),
-                isDefault: templates.length === 0, // First template is default
-                createdBy: {
-                    uid: currentUser.uid,
-                    name: currentUser.name || currentUser.displayName,
-                    email: currentUser.email
-                },
-                createdAt: serverTimestamp(),
-                updatedAt: serverTimestamp()
-            });
+                await saveTemplateToFirebase(uploadForm.name, uploadForm.description, uploadForm.category, htmlContent);
 
-            showToast.success('Template saved successfully!');
-            setShowUploadModal(false);
-            setUploadForm({ name: '', description: '', category: 'Full-time', htmlContent: '' });
-        } catch (error) {
-            console.error('Error saving template:', error);
-            showToast.error('Failed to save template: ' + error.message);
-        } finally {
-            setUploading(false);
+                showToast.success('Template saved successfully!');
+                setShowUploadModal(false);
+                setUploadForm({ name: '', description: '', category: 'Full-time', htmlContent: '' });
+            } catch (error) {
+                console.error('Error saving template:', error);
+                showToast.error('Failed to save template: ' + error.message);
+            } finally {
+                setUploading(false);
+            }
+        } else {
+            // Batch File Upload
+            if (batchFiles.length === 0) {
+                showToast.error('Please select at least one HTML file');
+                return;
+            }
+
+            setUploading(true);
+            let successCount = 0;
+            let failCount = 0;
+
+            try {
+                for (const file of batchFiles) {
+                    try {
+                        const htmlContent = await new Promise((resolve, reject) => {
+                            const reader = new FileReader();
+                            reader.onload = (e) => resolve(e.target.result);
+                            reader.onerror = reject;
+                            reader.readAsText(file);
+                        });
+
+                        // Use filename (without extension) as template name for batch
+                        const templateName = file.name.replace(/\.[^/.]+$/, "");
+
+                        // Validate template for batch upload
+                        const validation = validateTemplate(htmlContent);
+                        if (!validation.isValid) {
+                            showToast.error(`Skipping "${templateName}": missing required variables: ${validation.missingVariables.join(', ')}`);
+                            failCount++;
+                            continue; // Skip this file and proceed to the next
+                        }
+
+                        await saveTemplateToFirebase(templateName, `Uploaded from ${file.name}`, 'Full-time', htmlContent);
+                        successCount++;
+                    } catch (err) {
+                        console.error(`Failed to upload ${file.name}:`, err);
+                        failCount++;
+                    }
+                }
+
+                if (successCount > 0) showToast.success(`Successfully uploaded ${successCount} templates`);
+                if (failCount > 0) showToast.error(`Failed to upload ${failCount} templates`);
+
+                setShowUploadModal(false);
+                setBatchFiles([]);
+            } catch (error) {
+                showToast.error('Batch upload failed: ' + error.message);
+            } finally {
+                setUploading(false);
+            }
         }
+    };
+
+    const saveTemplateToFirebase = async (name, description, category, htmlContent) => {
+        // Upload to Firebase Storage
+        const templateId = `template_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const storageRef = ref(storage, `offerTemplates/${templateId}.html`);
+        const blob = new Blob([htmlContent], { type: 'text/html' });
+
+        await uploadBytes(storageRef, blob);
+        const downloadURL = await getDownloadURL(storageRef);
+
+        // Save metadata to Firestore
+        return addDoc(collection(db, 'offerTemplates'), {
+            name,
+            description,
+            category,
+            storageUrl: downloadURL,
+            storagePath: `offerTemplates/${templateId}.html`,
+            variables: extractVariables(htmlContent),
+            isDefault: templates.length === 0, // First template is default
+            createdBy: {
+                uid: currentUser.uid,
+                name: currentUser.name || currentUser.displayName,
+                email: currentUser.email
+            },
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
+        });
     };
 
     const handleDelete = async (template) => {
@@ -355,70 +423,122 @@ const TemplateManager = ({ isOpen, onClose }) => {
                 <AccessibleModal
                     isOpen={showUploadModal}
                     onClose={() => setShowUploadModal(false)}
-                    title="Upload New Template"
+                    title="Add New Template(s)"
                     size="lg"
                 >
-                    <div className="space-y-4">
-                        <Input
-                            label="Template Name"
-                            value={uploadForm.name}
-                            onChange={(e) => setUploadForm({ ...uploadForm, name: e.target.value })}
-                            placeholder="e.g., Full-time Employee Offer"
-                        />
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                Description
-                            </label>
-                            <textarea
-                                value={uploadForm.description}
-                                onChange={(e) => setUploadForm({ ...uploadForm, description: e.target.value })}
-                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:text-white"
-                                rows={3}
-                                placeholder="Brief description of this template..."
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                Category
-                            </label>
-                            <select
-                                value={uploadForm.category}
-                                onChange={(e) => setUploadForm({ ...uploadForm, category: e.target.value })}
-                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:text-white"
+                    <div className="space-y-6">
+                        {/* Mode Selector Tabs */}
+                        <div className="flex border-b border-gray-200 dark:border-gray-700">
+                            <button
+                                className={`px-4 py-2 text-sm font-medium ${uploadMode === 'edit' ? 'border-b-2 border-primary-500 text-primary-600' : 'text-gray-500 hover:text-gray-700'}`}
+                                onClick={() => setUploadMode('edit')}
                             >
-                                <option value="Full-time">Full-time</option>
-                                <option value="Intern">Intern</option>
-                                <option value="Contract">Contract</option>
-                            </select>
+                                Write/Paste HTML
+                            </button>
+                            <button
+                                className={`px-4 py-2 text-sm font-medium ${uploadMode === 'file' ? 'border-b-2 border-primary-500 text-primary-600' : 'text-gray-500 hover:text-gray-700'}`}
+                                onClick={() => setUploadMode('file')}
+                            >
+                                Upload Files
+                            </button>
                         </div>
 
-                        <div>
-                            <div className="flex justify-between items-center mb-2">
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                    HTML Template Content
-                                </label>
-                                <button
-                                    type="button"
-                                    onClick={handleLoadDefault}
-                                    className="text-xs text-primary-600 hover:text-primary-700 font-medium"
-                                >
-                                    Load Default Structure
-                                </button>
+                        {uploadMode === 'edit' ? (
+                            <div className="space-y-4">
+                                <Input
+                                    label="Template Name"
+                                    value={uploadForm.name}
+                                    onChange={(e) => setUploadForm({ ...uploadForm, name: e.target.value })}
+                                    placeholder="e.g., Full-time Employee Offer"
+                                />
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        Description
+                                    </label>
+                                    <textarea
+                                        value={uploadForm.description}
+                                        onChange={(e) => setUploadForm({ ...uploadForm, description: e.target.value })}
+                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:text-white"
+                                        rows={2}
+                                        placeholder="Brief description..."
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="space-y-1">
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Category</label>
+                                        <select
+                                            value={uploadForm.category}
+                                            onChange={(e) => setUploadForm({ ...uploadForm, category: e.target.value })}
+                                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:text-white"
+                                        >
+                                            <option value="Full-time">Full-time</option>
+                                            <option value="Intern">Intern</option>
+                                            <option value="Contract">Contract</option>
+                                        </select>
+                                    </div>
+                                    <div className="flex items-end">
+                                        <button
+                                            type="button"
+                                            onClick={handleLoadDefault}
+                                            className="w-full py-2 px-3 text-sm text-primary-600 hover:text-primary-700 font-medium border border-primary-600 rounded-lg hover:bg-primary-50 dark:hover:bg-primary-900/10"
+                                        >
+                                            Load Default Structure
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        HTML Content
+                                    </label>
+                                    <textarea
+                                        value={uploadForm.htmlContent}
+                                        onChange={(e) => setUploadForm({ ...uploadForm, htmlContent: e.target.value })}
+                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:text-white font-mono text-xs h-64"
+                                        placeholder="Paste HTML here..."
+                                    />
+                                </div>
                             </div>
-                            <textarea
-                                value={uploadForm.htmlContent}
-                                onChange={(e) => setUploadForm({ ...uploadForm, htmlContent: e.target.value })}
-                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:text-white font-mono text-sm h-64"
-                                placeholder="Paste or write your HTML template here..."
-                            />
-                            {uploadForm.htmlContent && (
-                                <p className="mt-2 text-sm text-blue-600 dark:text-blue-400 flex items-center gap-1">
-                                    <CheckCircle size={14} /> {uploadForm.htmlContent.length} characters
-                                </p>
-                            )}
-                        </div>
+                        ) : (
+                            <div className="space-y-4">
+                                <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl p-8 text-center bg-gray-50 dark:bg-gray-800/50">
+                                    <Upload size={32} className="mx-auto text-gray-400 mb-2" />
+                                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                        Select one or more HTML files
+                                    </p>
+                                    <p className="text-xs text-gray-500 mb-4">
+                                        Templates will use their filename as the title
+                                    </p>
+                                    <input
+                                        type="file"
+                                        accept=".html"
+                                        multiple
+                                        onChange={handleBatchFileSelect}
+                                        className="hidden"
+                                        id="batch-file-upload"
+                                    />
+                                    <label
+                                        htmlFor="batch-file-upload"
+                                        className="cursor-pointer inline-flex items-center px-4 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600"
+                                    >
+                                        Select Files
+                                    </label>
+                                </div>
+
+                                {batchFiles.length > 0 && (
+                                    <div className="max-h-40 overflow-y-auto space-y-2 py-2">
+                                        {batchFiles.map((file, idx) => (
+                                            <div key={idx} className="flex items-center justify-between p-2 bg-gray-100 dark:bg-gray-700/50 rounded-lg text-xs">
+                                                <span className="truncate flex-1">{file.name}</span>
+                                                <span className="text-gray-500">{(file.size / 1024).toFixed(1)} KB</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
 
                         <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
                             <p className="text-sm font-medium text-blue-900 dark:text-blue-200 mb-2">Required Variables:</p>
