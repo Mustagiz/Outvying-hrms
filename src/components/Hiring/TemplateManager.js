@@ -9,6 +9,7 @@ import { showToast } from '../../utils/toast';
 import { useAuth } from '../../context/AuthContext';
 import AccessibleModal from '../AccessibleModal';
 import { auditLogger } from '../../utils/auditLogger';
+import { uploadString } from 'firebase/storage';
 
 const TemplateManager = ({ isOpen, onClose }) => {
     const { currentUser } = useAuth();
@@ -156,38 +157,46 @@ const TemplateManager = ({ isOpen, onClose }) => {
             }
 
             setUploading(true);
+
+            // Set a failsafe timeout (30 seconds)
+            const timeoutId = setTimeout(() => {
+                setUploading(false);
+                showToast.error('Upload is taking too long. Please check your network and try again.');
+            }, 30000);
+
             try {
                 const htmlContent = uploadForm.htmlContent;
-                console.log('[HANDLE_UPLOAD] Start:', { name: uploadForm.name, category: uploadForm.category });
+                console.log('[UPLOAD_START] Name:', uploadForm.name);
 
-                // Validate template (Soft validation - warn but don't block)
+                // Soft validation
                 const validation = validateTemplate(htmlContent);
                 if (!validation.isValid) {
-                    console.warn('[HANDLE_UPLOAD] Missing recommended variables:', validation.missingVariables);
-                    showToast.warning(`Template missing some recommended variables: ${validation.missingVariables.join(', ')}. Saving anyway.`);
+                    showToast.warning(`Note: Basic variables missing: ${validation.missingVariables.join(', ')}`);
                 }
 
-                console.log('[HANDLE_UPLOAD] Calling saveTemplateToFirebase...');
+                console.log('[UPLOAD] Saving to Firebase...');
                 await saveTemplateToFirebase(uploadForm.name, uploadForm.description, uploadForm.category, htmlContent);
-                console.log('[HANDLE_UPLOAD] saveTemplateToFirebase complete.');
 
-                console.log('[HANDLE_UPLOAD] Calling auditLogger.log...');
-                await auditLogger.log('TEMPLATE_CREATED', `Created custom template: ${uploadForm.name}`, currentUser);
-                console.log('[HANDLE_UPLOAD] auditLogger.log complete.');
+                // Clear timeout on success
+                clearTimeout(timeoutId);
+                console.log('[UPLOAD] Firebase save complete.');
+
+                // Non-blocking Audit Log
+                auditLogger.log('TEMPLATE_CREATED', `Created: ${uploadForm.name}`, currentUser)
+                    .catch(e => console.warn('Audit log failed (non-critical):', e));
 
                 showToast.success('Template saved successfully!');
                 setShowUploadModal(false);
                 setUploadForm({ name: '', description: '', category: 'Full-time', htmlContent: '' });
-                console.log('[HANDLE_UPLOAD] Process finished successfully.');
             } catch (error) {
-                console.error('[HANDLE_UPLOAD] Error:', error);
-                showToast.error('Failed to save template: ' + error.message);
+                clearTimeout(timeoutId);
+                console.error('[UPLOAD_ERROR]:', error);
+                showToast.error(`Upload failed: ${error.message || 'Unknown error'}`);
             } finally {
-                console.log('[HANDLE_UPLOAD] Resetting uploading state.');
                 setUploading(false);
             }
         } else {
-            // Batch File Upload
+            // Batch File Upload Logic
             if (batchFiles.length === 0) {
                 showToast.error('Please select at least one HTML file');
                 return;
@@ -207,17 +216,12 @@ const TemplateManager = ({ isOpen, onClose }) => {
                             reader.readAsText(file);
                         });
 
-                        // Use filename (without extension) as template name for batch
                         const templateName = file.name.replace(/\.[^/.]+$/, "");
-
-                        // Validate template for batch upload (Soft validation)
-                        const validation = validateTemplate(htmlContent);
-                        if (!validation.isValid) {
-                            console.warn(`Template "${templateName}" missing recommended variables: ${validation.missingVariables.join(', ')}`);
-                        }
-
                         await saveTemplateToFirebase(templateName, `Uploaded from ${file.name}`, 'Full-time', htmlContent);
-                        await auditLogger.log('TEMPLATE_UPLOADED', `Uploaded template file: ${file.name}`, currentUser);
+
+                        auditLogger.log('TEMPLATE_UPLOADED', `Uploaded: ${file.name}`, currentUser)
+                            .catch(e => console.warn('Audit log failed:', e));
+
                         successCount++;
                     } catch (err) {
                         console.error(`Failed to upload ${file.name}:`, err);
@@ -239,42 +243,32 @@ const TemplateManager = ({ isOpen, onClose }) => {
     };
 
     const saveTemplateToFirebase = async (name, description, category, htmlContent) => {
-        if (!currentUser) {
-            console.error('Upload failed: No currentUser');
-            throw new Error('You must be logged in to upload templates');
-        }
+        if (!currentUser) throw new Error('Authentication required');
 
-        console.log('[UPLOAD] Starting template upload:', { name, category, contentSize: htmlContent.length });
-
-        // Upload to Firebase Storage
-        const templateId = `template_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        const storageRef = ref(storage, `offerTemplates/${templateId}.html`);
-        const blob = new Blob([htmlContent], { type: 'text/html' });
+        console.log('[SAVE] Initiating upload flow...');
 
         try {
-            console.log('[UPLOAD] 1. Uploading HTML to Storage...');
-            const startTime = Date.now();
-            await uploadBytes(storageRef, blob);
-            console.log(`[UPLOAD] 2. Storage upload complete in ${Date.now() - startTime}ms`);
+            const templateId = `template_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            const storageRef = ref(storage, `offerTemplates/${templateId}.html`);
 
-            console.log('[UPLOAD] 3. Getting download URL...');
+            // Use uploadString for better reliability with HTML text
+            console.log('[SAVE] 1. Uploading HTML string to Storage...');
+            await uploadString(storageRef, htmlContent, 'raw', { contentType: 'text/html' });
+
+            console.log('[SAVE] 2. Getting download URL...');
             const downloadURL = await getDownloadURL(storageRef);
-            console.log('[UPLOAD] 4. Download URL received:', downloadURL);
 
-            // Save metadata to Firestore
-            console.log('[UPLOAD] 5. Extracting variables...');
+            console.log('[SAVE] 3. Saving metadata to Firestore...');
             const variables = extractVariables(htmlContent);
-            console.log('[UPLOAD] 6. Variables extracted:', variables);
 
-            console.log('[UPLOAD] 7. Saving to Firestore...');
-            const docRef = await addDoc(collection(db, 'offerTemplates'), {
+            const templateData = {
                 name,
                 description,
                 category,
                 storageUrl: downloadURL,
                 storagePath: `offerTemplates/${templateId}.html`,
                 variables,
-                isDefault: templates.length === 0,
+                isDefault: false, // Default logic can be handled separately
                 createdBy: {
                     uid: currentUser.uid,
                     name: currentUser.displayName || currentUser.email || 'Admin',
@@ -282,11 +276,13 @@ const TemplateManager = ({ isOpen, onClose }) => {
                 },
                 createdAt: serverTimestamp(),
                 updatedAt: serverTimestamp()
-            });
-            console.log('[UPLOAD] 8. Success! Firestore ID:', docRef.id);
+            };
+
+            const docRef = await addDoc(collection(db, 'offerTemplates'), templateData);
+            console.log('[SAVE] 4. Success! Template ID:', docRef.id);
             return docRef;
         } catch (error) {
-            console.error('[UPLOAD] FATAL ERROR:', error);
+            console.error('[SAVE_FATAL_ERROR]:', error);
             throw error;
         }
     };
