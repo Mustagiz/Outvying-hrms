@@ -259,7 +259,7 @@ const OfferLetters = () => {
                 imageTimeout: 15000
             });
 
-            // 4. Generate Multi-page PDF with Margins
+            // 4. Generate Multi-page PDF with Guaranteed Margins
             const imgData = canvas.toDataURL('image/jpeg', 0.85);
             const pdf = new jsPDF({
                 orientation: 'p',
@@ -270,24 +270,32 @@ const OfferLetters = () => {
 
             const pageWidth = pdf.internal.pageSize.getWidth();
             const pageHeight = pdf.internal.pageSize.getHeight();
-            const margin = 15; // 15mm top/bottom margin
+            const margin = 15; // 15mm margins
             const imgWidth = pageWidth;
             const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
-            // Height of physical content we show on one page
             const contentHeightPerPage = pageHeight - (margin * 2);
-
             let heightLeft = imgHeight;
-            let position = margin; // Starting position on first page
+            let position = margin;
 
-            // Add pages with intelligent slicing
+            // Helper to draw clean white margins over content
+            const applyMarginMasks = () => {
+                pdf.setFillColor(255, 255, 255);
+                pdf.rect(0, 0, pageWidth, margin, 'F'); // Top
+                pdf.rect(0, pageHeight - margin, pageWidth, margin, 'F'); // Bottom
+            };
+
+            // Page 1
             pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+            applyMarginMasks();
             heightLeft -= contentHeightPerPage;
 
+            // Subsequent Pages
             while (heightLeft > 0) {
                 position = margin - (imgHeight - heightLeft);
                 pdf.addPage();
                 pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+                applyMarginMasks();
                 heightLeft -= contentHeightPerPage;
             }
 
