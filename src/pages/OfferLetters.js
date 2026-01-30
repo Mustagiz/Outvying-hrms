@@ -218,6 +218,7 @@ const OfferLetters = () => {
                         line-height: 1.6;
                         background: white;
                         padding: 0;
+                        padding-bottom: 60px; /* Safety padding for footer */
                     }
                     .pdf-capture-root h1, .pdf-capture-root h2, .pdf-capture-root h3 {
                         color: #2d3748;
@@ -258,7 +259,7 @@ const OfferLetters = () => {
                 imageTimeout: 15000
             });
 
-            // 4. Generate Multi-page PDF
+            // 4. Generate Multi-page PDF with Margins
             const imgData = canvas.toDataURL('image/jpeg', 0.85);
             const pdf = new jsPDF({
                 orientation: 'p',
@@ -269,21 +270,25 @@ const OfferLetters = () => {
 
             const pageWidth = pdf.internal.pageSize.getWidth();
             const pageHeight = pdf.internal.pageSize.getHeight();
+            const margin = 15; // 15mm top/bottom margin
             const imgWidth = pageWidth;
             const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
-            let heightLeft = imgHeight;
-            let position = 0;
+            // Height of physical content we show on one page
+            const contentHeightPerPage = pageHeight - (margin * 2);
 
-            // Add pages
+            let heightLeft = imgHeight;
+            let position = margin; // Starting position on first page
+
+            // Add pages with intelligent slicing
             pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
-            heightLeft -= pageHeight;
+            heightLeft -= contentHeightPerPage;
 
             while (heightLeft > 0) {
-                position = heightLeft - imgHeight;
+                position = margin - (imgHeight - heightLeft);
                 pdf.addPage();
                 pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
-                heightLeft -= pageHeight;
+                heightLeft -= contentHeightPerPage;
             }
 
             const fileName = `Offer_${offer.candidateName.replace(/\s+/g, '_')}.pdf`;
