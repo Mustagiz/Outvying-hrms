@@ -187,7 +187,7 @@ const OfferLetters = () => {
 
     const handleDownloadPDF = async (offer) => {
         setActionLoading(true);
-        console.log('[PDF_GEN] Starting stabilized export for:', offer.candidateName);
+        showToast.info('Preparing official PDF...');
 
         let container = null;
         try {
@@ -195,11 +195,11 @@ const OfferLetters = () => {
             const html = await renderTemplate(offer.selectedTemplateId || null, templates, offer);
             if (!html) throw new Error('Could not render template content');
 
-            // 2. Setup Container (Fixed position to avoid layout shifts)
+            // 2. Setup Container 
             container = document.createElement('div');
             container.id = 'stable-pdf-container';
             Object.assign(container.style, {
-                width: '794px',
+                width: '740px', // Standard width (approx A4 at 96dpi)
                 padding: '40px',
                 position: 'fixed',
                 left: '-10000px',
@@ -215,30 +215,15 @@ const OfferLetters = () => {
                     .pdf-capture-root {
                         font-family: 'Times New Roman', Times, serif;
                         color: #1a202c;
-                        line-height: 1.6;
+                        line-height: 1.5;
                         background: white;
                         padding: 0;
-                        padding-bottom: 60px; /* Safety padding for footer */
+                        padding-bottom: 60px;
                     }
-                    .pdf-capture-root h1, .pdf-capture-root h2, .pdf-capture-root h3 {
-                        color: #2d3748;
-                        margin-top: 0;
-                    }
-                    .pdf-capture-root table {
-                        width: 100%;
-                        border-collapse: collapse;
-                        margin: 15px 0;
-                    }
-                    .pdf-capture-root th, .pdf-capture-root td {
-                        border: 1px solid #e2e8f0;
-                        padding: 10px;
-                        text-align: left;
-                        font-size: 14px;
-                    }
-                    .pdf-capture-root strong {
-                        color: #000;
-                    }
-                    .pdf-capture-root h1 { font-size: 28px; border-bottom: 2px solid #2d3748; padding-bottom: 10px; margin-bottom: 20px; text-align: center; }
+                    .pdf-capture-root h1, .pdf-capture-root h2, .pdf-capture-root h3 { color: #2d3748; margin-top: 0; }
+                    .pdf-capture-root table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+                    .pdf-capture-root th, .pdf-capture-root td { border: 1px solid #e2e8f0; padding: 6px 10px; text-align: left; font-size: 13px; }
+                    .pdf-capture-root h1 { font-size: 26px; border-bottom: 2px solid #2d3748; padding-bottom: 8px; margin-bottom: 15px; text-align: center; }
                 </style>
                 <div class="pdf-capture-root">
                     ${html}
@@ -246,21 +231,21 @@ const OfferLetters = () => {
             `;
             document.body.appendChild(container);
 
-            // Wait for resources
-            await new Promise(r => setTimeout(r, 600));
+            // Wait for resources (extended for fonts)
+            await new Promise(r => setTimeout(r, 1000));
 
-            // 3. Capture with html2canvas (Reduced scale for stability)
+            // 3. Capture with html2canvas (CRITICAL: Scale 1.0 for Stability)
             const canvas = await html2canvas(container, {
-                scale: 1.5,
+                scale: 1.0,
                 useCORS: true,
                 allowTaint: false,
                 logging: false,
                 backgroundColor: '#ffffff',
-                imageTimeout: 15000
+                imageTimeout: 20000
             });
 
-            // 4. Generate Multi-page PDF with Guaranteed Margins
-            const imgData = canvas.toDataURL('image/jpeg', 0.85);
+            // 4. Generate Multi-page PDF
+            const imgData = canvas.toDataURL('image/jpeg', 0.7); // Low quality for memory safety
             const pdf = new jsPDF({
                 orientation: 'p',
                 unit: 'mm',
@@ -278,19 +263,17 @@ const OfferLetters = () => {
             let heightLeft = imgHeight;
             let position = margin;
 
-            // Helper to draw clean white margins over content
             const applyMarginMasks = () => {
                 pdf.setFillColor(255, 255, 255);
-                pdf.rect(0, 0, pageWidth, margin, 'F'); // Top
-                pdf.rect(0, pageHeight - margin, pageWidth, margin, 'F'); // Bottom
+                pdf.rect(0, 0, pageWidth, margin, 'F');
+                pdf.rect(0, pageHeight - margin, pageWidth, margin, 'F');
             };
 
-            // Page 1
+            // Process Pages
             pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
             applyMarginMasks();
             heightLeft -= contentHeightPerPage;
 
-            // Subsequent Pages
             while (heightLeft > 0) {
                 position = margin - (imgHeight - heightLeft);
                 pdf.addPage();
@@ -301,12 +284,10 @@ const OfferLetters = () => {
 
             const fileName = `Offer_${offer.candidateName.replace(/\s+/g, '_')}.pdf`;
             pdf.save(fileName);
-            showToast.success('PDF downloaded successfully!');
+            showToast.success('Official PDF successfully downloaded!');
 
         } catch (error) {
             console.error('[PDF_GEN_ERROR]:', error);
-
-            // Fallback: Download as HTML if PDF fails
             try {
                 const html = await renderTemplate(offer.selectedTemplateId || null, templates, offer);
                 const blob = new Blob([html], { type: 'text/html' });
@@ -316,9 +297,9 @@ const OfferLetters = () => {
                 a.download = `Offer_${offer.candidateName.replace(/\s+/g, '_')}.html`;
                 a.click();
                 URL.revokeObjectURL(url);
-                showToast.warning('PDF generation had memory issues. Saved as HTML.');
+                showToast.warning('Browser limit reached. Saved as HTML.');
             } catch (fallbackError) {
-                showToast.error('Download failed: ' + error.message);
+                showToast.error('Download failed.');
             }
         } finally {
             if (container && container.parentNode) {
