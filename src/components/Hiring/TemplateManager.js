@@ -85,15 +85,26 @@ const TemplateManager = ({ isOpen, onClose }) => {
     };
 
     const extractVariables = (htmlContent) => {
-        const variableRegex = /\{\{(\w+)\}\}/g;
-        const variables = new Set();
-        let match;
+        try {
+            // More robust regex: covers {{var}}, {{ var }}, {{var_name}}, {{ varName }}
+            const variableRegex = /\{\{\s*(\w+)\s*\}\}/g;
+            const variables = new Set();
+            let match;
 
-        while ((match = variableRegex.exec(htmlContent)) !== null) {
-            variables.add(match[1]);
+            // Limit iterations to prevent infinite loops on extremely malformed HTML
+            let iterations = 0;
+            const MAX_ITERATIONS = 5000;
+
+            while ((match = variableRegex.exec(htmlContent)) !== null && iterations < MAX_ITERATIONS) {
+                variables.add(match[1]);
+                iterations++;
+            }
+
+            return Array.from(variables);
+        } catch (e) {
+            console.error('Error extracting variables:', e);
+            return [];
         }
-
-        return Array.from(variables);
     };
 
     const handleLoadDefault = () => {
@@ -158,15 +169,14 @@ const TemplateManager = ({ isOpen, onClose }) => {
 
             setUploading(true);
 
-            // Set a failsafe timeout (30 seconds)
-            const timeoutId = setTimeout(() => {
-                setUploading(false);
-                showToast.error('Upload is taking too long. Please check your network and try again.');
-            }, 30000);
-
             try {
                 const htmlContent = uploadForm.htmlContent;
-                console.log('[UPLOAD_START] Name:', uploadForm.name);
+                console.log('[UPLOAD] 1. Process started', { name: uploadForm.name });
+
+                // Detect variables first - identifies if large strings cause issues
+                console.log('[UPLOAD] 2. Detecting variables...');
+                const variables = extractVariables(htmlContent);
+                console.log('[UPLOAD] 3. Variables detected:', variables);
 
                 // Soft validation
                 const validation = validateTemplate(htmlContent);
@@ -174,24 +184,34 @@ const TemplateManager = ({ isOpen, onClose }) => {
                     showToast.warning(`Note: Basic variables missing: ${validation.missingVariables.join(', ')}`);
                 }
 
-                console.log('[UPLOAD] Saving to Firebase...');
-                await saveTemplateToFirebase(uploadForm.name, uploadForm.description, uploadForm.category, htmlContent);
+                // Helper for timeout
+                const withTimeout = (promise, ms, label) => {
+                    const timeout = new Promise((_, reject) =>
+                        setTimeout(() => reject(new Error(`${label} timed out after ${ms / 1000}s`)), ms)
+                    );
+                    return Promise.race([promise, timeout]);
+                };
 
-                // Clear timeout on success
-                clearTimeout(timeoutId);
-                console.log('[UPLOAD] Firebase save complete.');
+                console.log('[UPLOAD] 4. Starting Firebase sequence...');
+                await withTimeout(
+                    saveTemplateToFirebase(uploadForm.name, uploadForm.description, uploadForm.category, htmlContent, variables),
+                    25000,
+                    'Firebase Upload'
+                );
 
-                // Non-blocking Audit Log
+                console.log('[UPLOAD] 5. Firebase sequence complete.');
+
+                // Background Audit Log - non-blocking
                 auditLogger.log('TEMPLATE_CREATED', `Created: ${uploadForm.name}`, currentUser)
-                    .catch(e => console.warn('Audit log failed (non-critical):', e));
+                    .catch(e => console.warn('Audit log skip:', e));
 
                 showToast.success('Template saved successfully!');
                 setShowUploadModal(false);
                 setUploadForm({ name: '', description: '', category: 'Full-time', htmlContent: '' });
+                console.log('[UPLOAD] 6. Success.');
             } catch (error) {
-                clearTimeout(timeoutId);
-                console.error('[UPLOAD_ERROR]:', error);
-                showToast.error(`Upload failed: ${error.message || 'Unknown error'}`);
+                console.error('[UPLOAD_FATAL_ERROR]:', error);
+                showToast.error(`Upload failed: ${error.message || 'Check your connection'}`);
             } finally {
                 setUploading(false);
             }
@@ -242,24 +262,22 @@ const TemplateManager = ({ isOpen, onClose }) => {
         }
     };
 
-    const saveTemplateToFirebase = async (name, description, category, htmlContent) => {
+    const saveTemplateToFirebase = async (name, description, category, htmlContent, preExtractedVariables = null) => {
         if (!currentUser) throw new Error('Authentication required');
 
-        console.log('[SAVE] Initiating upload flow...');
+        console.log('[FIREBASE] 1. Preparing Storage reference...');
+        const templateId = `template_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const storageRef = ref(storage, `offerTemplates/${templateId}.html`);
 
         try {
-            const templateId = `template_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-            const storageRef = ref(storage, `offerTemplates/${templateId}.html`);
-
-            // Use uploadString for better reliability with HTML text
-            console.log('[SAVE] 1. Uploading HTML string to Storage...');
+            console.log('[FIREBASE] 2. Uploading HTML string...');
             await uploadString(storageRef, htmlContent, 'raw', { contentType: 'text/html' });
 
-            console.log('[SAVE] 2. Getting download URL...');
+            console.log('[FIREBASE] 3. Fetching download URL...');
             const downloadURL = await getDownloadURL(storageRef);
 
-            console.log('[SAVE] 3. Saving metadata to Firestore...');
-            const variables = extractVariables(htmlContent);
+            console.log('[FIREBASE] 4. Writing metadata to Firestore...');
+            const variables = preExtractedVariables || extractVariables(htmlContent);
 
             const templateData = {
                 name,
@@ -268,7 +286,7 @@ const TemplateManager = ({ isOpen, onClose }) => {
                 storageUrl: downloadURL,
                 storagePath: `offerTemplates/${templateId}.html`,
                 variables,
-                isDefault: false, // Default logic can be handled separately
+                isDefault: false,
                 createdBy: {
                     uid: currentUser.uid,
                     name: currentUser.displayName || currentUser.email || 'Admin',
@@ -279,10 +297,10 @@ const TemplateManager = ({ isOpen, onClose }) => {
             };
 
             const docRef = await addDoc(collection(db, 'offerTemplates'), templateData);
-            console.log('[SAVE] 4. Success! Template ID:', docRef.id);
+            console.log('[FIREBASE] 5. Metadata saved. ID:', docRef.id);
             return docRef;
         } catch (error) {
-            console.error('[SAVE_FATAL_ERROR]:', error);
+            console.error('[FIREBASE_INTERNAL_ERROR]:', error);
             throw error;
         }
     };
