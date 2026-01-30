@@ -2,15 +2,21 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../../config/firebase';
 import { storage } from '../../config/firebase';
 import { collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc, serverTimestamp, query, orderBy } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL, deleteObject, uploadString } from 'firebase/storage';
+import { ref, deleteObject, uploadString } from 'firebase/storage';
 import { Card, Button, Input, Spinner } from '../UI';
-import { Upload, Trash2, Eye, Edit2, FileText, CheckCircle, AlertCircle, X } from 'lucide-react';
+import { Upload, Trash2, Eye, Edit2, FileText, CheckCircle, AlertCircle } from 'lucide-react';
 import { showToast } from '../../utils/toast';
 import { useAuth } from '../../context/AuthContext';
 import AccessibleModal from '../AccessibleModal';
 import { auditLogger } from '../../utils/auditLogger';
 
-const TemplateManager = ({ isOpen, onClose }) => {
+const TemplateManager = ({
+    isOpen,
+    onClose,
+    collectionName = 'offerTemplates',
+    title = 'Template Manager',
+    categories = ['Full-time', 'Part-time', 'Internship', 'Contract']
+}) => {
     const { currentUser } = useAuth();
     const [templates, setTemplates] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -18,18 +24,17 @@ const TemplateManager = ({ isOpen, onClose }) => {
     const [showUploadModal, setShowUploadModal] = useState(false);
     const [previewTemplate, setPreviewTemplate] = useState(null);
     const [showPreviewModal, setShowPreviewModal] = useState(false);
+    const [editingTemplate, setEditingTemplate] = useState(null);
 
-    // Upload form state
-    const [uploadMode, setUploadMode] = useState('edit'); // 'edit' or 'file'
+    const [uploadMode, setUploadMode] = useState('edit');
     const [uploadForm, setUploadForm] = useState({
         name: '',
         description: '',
-        category: 'Full-time',
+        category: categories[0],
         htmlContent: ''
     });
     const [batchFiles, setBatchFiles] = useState([]);
 
-    // Sample data for preview
     const sampleData = {
         candidateName: 'John Doe',
         candidateEmail: 'john.doe@example.com',
@@ -53,7 +58,7 @@ const TemplateManager = ({ isOpen, onClose }) => {
     useEffect(() => {
         if (!isOpen) return;
 
-        const q = query(collection(db, 'offerTemplates'), orderBy('createdAt', 'desc'));
+        const q = query(collection(db, collectionName), orderBy('createdAt', 'desc'));
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const templatesData = snapshot.docs.map(doc => ({
                 id: doc.id,
@@ -64,21 +69,22 @@ const TemplateManager = ({ isOpen, onClose }) => {
         });
 
         return () => unsubscribe();
-    }, [isOpen]);
+    }, [isOpen, collectionName]);
 
     const validateTemplate = (htmlContent) => {
+        // Only validate specific variables if it's offer templates
+        // For generic HR docs, validation might be different or looser
+        if (collectionName !== 'offerTemplates') return { isValid: true, missingVariables: [] };
+
         const requiredVariables = ['candidateName', 'jobTitle', 'annualCTC'];
         const foundVariables = [];
-
         requiredVariables.forEach(variable => {
             if (htmlContent.includes(`{{${variable}}}`)) {
                 foundVariables.push(variable);
             }
         });
-
         return {
             isValid: foundVariables.length === requiredVariables.length,
-            foundVariables,
             missingVariables: requiredVariables.filter(v => !foundVariables.includes(v))
         };
     };
@@ -88,18 +94,13 @@ const TemplateManager = ({ isOpen, onClose }) => {
             const variableRegex = /\{\{\s*(\w+)\s*\}\}/g;
             const variables = new Set();
             let match;
-
             let iterations = 0;
-            const MAX_ITERATIONS = 5000;
-
-            while ((match = variableRegex.exec(htmlContent)) !== null && iterations < MAX_ITERATIONS) {
+            while ((match = variableRegex.exec(htmlContent)) !== null && iterations < 5000) {
                 variables.add(match[1]);
                 iterations++;
             }
-
             return Array.from(variables);
         } catch (e) {
-            console.error('Error extracting variables:', e);
             return [];
         }
     };
@@ -114,33 +115,18 @@ const TemplateManager = ({ isOpen, onClose }) => {
         .logo { font-size: 28px; font-weight: bold; color: #0056b3; }
         .content { background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
         .footer { margin-top: 40px; font-size: 12px; color: #666; text-align: center; border-top: 1px solid #eee; padding-top: 20px; }
-        .variable { color: #d63384; font-weight: 600; }
     </style>
 </head>
 <body>
     <div class="header">
         <div class="logo">{{companyName}}</div>
-        <h1>Letter of Intent</h1>
+        <h1>Template Title</h1>
     </div>
     <div class="content">
         <p>Date: {{currentDate}}</p>
-        <p>To,<br><strong>{{candidateName}}</strong><br>{{place}}</p>
-        
+        <p>To,<br><strong>{{candidateName}}</strong></p>
         <p>Dear {{candidateName}},</p>
-        <p>We are pleased to offer you the position of <strong>{{jobTitle}}</strong> at {{companyName}}. Your skills and experience will be a great asset to our {{department}} team.</p>
-        
-        <p><strong>Offer Details:</strong></p>
-        <ul>
-            <li>Annual CTC: ₹{{annualCTC}}</li>
-            <li>Monthly Fixed: ₹{{monthlyCTC}}</li>
-            <li>Joining Date: {{joiningDate}}</li>
-            <li>Location: {{workLocation}}</li>
-        </ul>
-        
-        <p>We look forward to having you on board!</p>
-    </div>
-    <div class="footer">
-        <p>© {{companyName}} - Confidential Offer Letter</p>
+        <p>This is a sample content body.</p>
     </div>
 </body>
 </html>`;
@@ -150,298 +136,139 @@ const TemplateManager = ({ isOpen, onClose }) => {
     const handleBatchFileSelect = (e) => {
         const files = Array.from(e.target.files);
         const validFiles = files.filter(file => file.type === 'text/html' || file.name.endsWith('.html'));
-
-        if (validFiles.length < files.length) {
-            showToast.warning(`${files.length - validFiles.length} files were skipped (not HTML)`);
-        }
         setBatchFiles(validFiles);
     };
 
     const handleUpload = async () => {
-        if (uploadMode === 'edit') {
-            if (!uploadForm.name || !uploadForm.htmlContent) {
-                showToast.error('Please provide template name and HTML content');
-                return;
-            }
+        setUploading(true);
+        try {
+            if (uploadMode === 'edit') {
+                if (!uploadForm.name || !uploadForm.htmlContent) {
+                    showToast.error('Please provide name and content');
+                    setUploading(false);
+                    return;
+                }
 
-            setUploading(true);
-
-            try {
-                const htmlContent = uploadForm.htmlContent;
-                console.log('[UPLOAD] 1. Process started', { name: uploadForm.name });
-
-                const variables = extractVariables(htmlContent);
-                console.log('[UPLOAD] 2. Variables detected:', variables);
-
-                const validation = validateTemplate(htmlContent);
+                const variables = extractVariables(uploadForm.htmlContent);
+                const validation = validateTemplate(uploadForm.htmlContent);
                 if (!validation.isValid) {
                     showToast.warning(`Note: Basic variables missing: ${validation.missingVariables.join(', ')}`);
                 }
 
-                // Timeout helper
-                const withTimeout = (promise, ms, label) => {
-                    const timeout = new Promise((_, reject) =>
-                        setTimeout(() => reject(new Error(`${label} timed out after ${ms / 1000}s`)), ms)
-                    );
-                    return Promise.race([promise, timeout]);
-                };
-
-                console.log('[UPLOAD] 3. Starting Firebase sequence...');
-                await withTimeout(
-                    saveTemplateToFirebase(uploadForm.name, uploadForm.description, uploadForm.category, htmlContent, variables),
-                    25000,
-                    'Firebase Upload'
-                );
-
-                console.log('[UPLOAD] 4. Firebase sequence complete.');
-
-                auditLogger.log('TEMPLATE_CREATED', `Created: ${uploadForm.name}`, currentUser)
-                    .catch(e => console.warn('Audit log skip:', e));
-
-                showToast.success('Template saved successfully!');
-                setShowUploadModal(false);
-                setUploadForm({ name: '', description: '', category: 'Full-time', htmlContent: '' });
-                console.log('[UPLOAD] 5. Success.');
-            } catch (error) {
-                console.error('[UPLOAD_FATAL_ERROR]:', error);
-                showToast.error(`Upload failed: ${error.message || 'Check your connection'}`);
-            } finally {
-                setUploading(false);
-            }
-        } else {
-            // Batch upload logic simplified for reliability
-            if (batchFiles.length === 0) {
-                showToast.error('Please select at least one HTML file');
-                return;
-            }
-
-            setUploading(true);
-            let successCount = 0;
-            let failCount = 0;
-
-            try {
-                for (const file of batchFiles) {
-                    try {
-                        const htmlContent = await new Promise((resolve, reject) => {
-                            const reader = new FileReader();
-                            reader.onload = (e) => resolve(e.target.result);
-                            reader.onerror = reject;
-                            reader.readAsText(file);
-                        });
-
-                        const templateName = file.name.replace(/\.[^/.]+$/, "");
-                        await saveTemplateToFirebase(templateName, `Uploaded from ${file.name}`, 'Full-time', htmlContent);
-                        successCount++;
-                    } catch (err) {
-                        console.error(`Failed to upload ${file.name}:`, err);
-                        failCount++;
-                    }
+                if (editingTemplate) {
+                    await updateDoc(doc(db, collectionName, editingTemplate.id), {
+                        name: uploadForm.name,
+                        description: uploadForm.description,
+                        category: uploadForm.category,
+                        htmlContent: uploadForm.htmlContent,
+                        variables: variables,
+                        updatedAt: serverTimestamp()
+                    });
+                    showToast.success('Template updated!');
+                } else {
+                    await saveTemplateToFirebase(uploadForm.name, uploadForm.description, uploadForm.category, uploadForm.htmlContent, variables);
+                    showToast.success('Template saved!');
                 }
 
-                if (successCount > 0) showToast.success(`Successfully uploaded ${successCount} templates`);
-                if (failCount > 0) showToast.error(`Failed to upload ${failCount} templates`);
-
+                setShowUploadModal(false);
+                setEditingTemplate(null);
+                setUploadForm({ name: '', description: '', category: categories[0], htmlContent: '' });
+            } else {
+                for (const file of batchFiles) {
+                    const content = await new Promise((resolve) => {
+                        const reader = new FileReader();
+                        reader.onload = (e) => resolve(e.target.result);
+                        reader.readAsText(file);
+                    });
+                    await saveTemplateToFirebase(file.name.replace('.html', ''), '', categories[0], content);
+                }
+                showToast.success('Batch upload complete');
                 setShowUploadModal(false);
                 setBatchFiles([]);
-            } catch (error) {
-                showToast.error('Batch upload failed: ' + error.message);
-            } finally {
-                setUploading(false);
             }
+        } catch (error) {
+            console.error(error);
+            showToast.error('Operation failed');
+        } finally {
+            setUploading(false);
         }
+    };
+
+    const handleEditClick = (template) => {
+        setEditingTemplate(template);
+        setUploadForm({
+            name: template.name || '',
+            description: template.description || '',
+            category: template.category || categories[0],
+            htmlContent: template.htmlContent || ''
+        });
+        setUploadMode('edit');
+        setShowUploadModal(true);
     };
 
     const saveTemplateToFirebase = async (name, description, category, htmlContent, preExtractedVariables = null) => {
-        if (!currentUser) throw new Error('Authentication required');
-
-        const templateId = `template_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         const variables = preExtractedVariables || extractVariables(htmlContent);
-
-        try {
-            console.log('[SAVE] Writing direct to Firestore...');
-            const templateData = {
-                name,
-                description,
-                category,
-                htmlContent, // Primary source: avoids fetch hangs
-                variables,
-                isDefault: false,
-                createdBy: {
-                    uid: currentUser.uid,
-                    name: currentUser.displayName || currentUser.email || 'Admin',
-                    email: currentUser.email
-                },
-                createdAt: serverTimestamp(),
-                updatedAt: serverTimestamp()
-            };
-
-            const docRef = await addDoc(collection(db, 'offerTemplates'), templateData);
-
-            // Redundant background Storage upload
-            try {
-                const storageRef = ref(storage, `offerTemplates/${templateId}.html`);
-                uploadString(storageRef, htmlContent, 'raw', { contentType: 'text/html' }).catch(() => { });
-            } catch (e) { }
-
-            return docRef;
-        } catch (error) {
-            console.error('[SAVE_FATAL_ERROR]:', error);
-            throw error;
-        }
+        const templateData = {
+            name, description, category, htmlContent, variables,
+            isDefault: false,
+            createdBy: { uid: currentUser.uid, name: currentUser.displayName || 'Admin' },
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
+        };
+        return await addDoc(collection(db, collectionName), templateData);
     };
 
     const handleDelete = async (template) => {
-        if (!window.confirm(`Are you sure you want to delete "${template.name}"?`)) return;
-
-        try {
-            if (template.storagePath) {
-                const storageRef = ref(storage, template.storagePath);
-                await deleteObject(storageRef).catch(() => { });
-            }
-            await deleteDoc(doc(db, 'offerTemplates', template.id));
-            auditLogger.log('TEMPLATE_DELETED', `Deleted: ${template.name}`, currentUser).catch(() => { });
-            showToast.success('Template deleted successfully');
-        } catch (error) {
-            console.error('Error deleting template:', error);
-            showToast.error('Failed to delete template: ' + error.message);
-        }
+        if (!window.confirm('Delete template?')) return;
+        await deleteDoc(doc(db, collectionName, template.id));
+        showToast.success('Deleted');
     };
 
     const handleSetDefault = async (templateId) => {
-        try {
-            const batch = templates.map(t =>
-                updateDoc(doc(db, 'offerTemplates', t.id), { isDefault: false })
-            );
-            await Promise.all(batch);
-            await updateDoc(doc(db, 'offerTemplates', templateId), { isDefault: true });
-            showToast.success('Default template updated');
-        } catch (error) {
-            console.error('Error setting default:', error);
-            showToast.error('Failed to set default template');
-        }
+        const batch = templates.map(t => updateDoc(doc(db, collectionName, t.id), { isDefault: false }));
+        await Promise.all(batch);
+        await updateDoc(doc(db, collectionName, templateId), { isDefault: true });
+        showToast.success('Default updated');
     };
 
     const handlePreview = async (template) => {
-        try {
-            let htmlContent = template.htmlContent;
-
-            if (!htmlContent && template.storageUrl) {
-                console.log('Fetching legacy template content...');
-                const response = await fetch(template.storageUrl);
-                htmlContent = await response.text();
-            }
-
-            if (!htmlContent) throw new Error('Template content not found');
-
-            let previewHtml = htmlContent;
-            Object.keys(sampleData).forEach(key => {
-                const regex = new RegExp(`\\{\\{${key}\\}\\}`, 'g');
-                previewHtml = previewHtml.replace(regex, sampleData[key]);
-            });
-
-            setPreviewTemplate({ ...template, previewHtml });
-            setShowPreviewModal(true);
-        } catch (error) {
-            console.error('Error loading template preview:', error);
-            showToast.error('Failed to load template preview: ' + error.message);
-        }
-    };
-
-    const getCategoryColor = (category) => {
-        const colors = {
-            'Full-time': 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
-            'Intern': 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
-            'Contract': 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200'
-        };
-        return colors[category] || colors['Full-time'];
+        let htmlContent = template.htmlContent;
+        if (!htmlContent) return showToast.error('No content');
+        let previewHtml = htmlContent;
+        Object.keys(sampleData).forEach(key => {
+            previewHtml = previewHtml.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), sampleData[key]);
+        });
+        setPreviewTemplate({ ...template, previewHtml });
+        setShowPreviewModal(true);
     };
 
     if (!isOpen) return null;
 
     return (
-        <AccessibleModal
-            isOpen={isOpen}
-            onClose={onClose}
-            title="Manage Offer Letter Templates"
-            size="xl"
-        >
+        <AccessibleModal isOpen={isOpen} onClose={onClose} title={title} size="xl">
             <div className="space-y-6">
                 <div className="flex justify-between items-center">
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Upload custom HTML templates with variable placeholders like <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded">{'{{candidateName}}'}</code>
-                    </p>
+                    <p className="text-sm text-gray-500">Manage your {title.toLowerCase()}</p>
                     <Button onClick={() => setShowUploadModal(true)} className="flex items-center gap-2">
-                        <Upload size={18} />
-                        Upload Template
+                        <Upload size={18} /> Upload Template
                     </Button>
                 </div>
 
-                {loading ? (
-                    <div className="flex justify-center py-8">
-                        <Spinner />
-                    </div>
-                ) : templates.length === 0 ? (
-                    <div className="text-center py-12 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                        <FileText size={48} className="mx-auto text-gray-400 mb-4" />
-                        <p className="text-gray-600 dark:text-gray-400">No templates uploaded yet</p>
-                        <Button onClick={() => setShowUploadModal(true)} className="mt-4">
-                            Upload Your First Template
-                        </Button>
-                    </div>
-                ) : (
+                {loading ? <Spinner /> : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {templates.map(template => (
-                            <Card key={template.id} className="p-4 hover:shadow-lg transition-shadow">
-                                <div className="flex justify-between items-start mb-3">
-                                    <div className="flex-1">
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <h3 className="font-semibold text-gray-900 dark:text-white">{template.name}</h3>
-                                            {template.isDefault && (
-                                                <span className="px-2 py-0.5 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs rounded-full flex items-center gap-1">
-                                                    <CheckCircle size={12} /> Default
-                                                </span>
-                                            )}
-                                        </div>
-                                        <p className="text-sm text-gray-600 dark:text-gray-400">{template.description}</p>
+                        {templates.map(t => (
+                            <Card key={t.id} className="p-4">
+                                <div className="flex justify-between mb-3">
+                                    <div>
+                                        <h3 className="font-bold">{t.name} {t.isDefault && '✅'}</h3>
+                                        <p className="text-sm text-gray-500">{t.description}</p>
                                     </div>
-                                    <span className={`px-2 py-1 text-xs rounded-full ${getCategoryColor(template.category)}`}>
-                                        {template.category}
-                                    </span>
+                                    <span className="text-xs px-2 py-1 bg-gray-100 rounded">{t.category}</span>
                                 </div>
-
-                                <div className="flex items-center gap-2 text-xs text-gray-500 mb-3">
-                                    <span>{template.variables?.length || 0} variables</span>
-                                    <span>•</span>
-                                    <span>by {template.createdBy?.name}</span>
-                                </div>
-
                                 <div className="flex gap-2">
-                                    <Button
-                                        variant="secondary"
-                                        size="sm"
-                                        onClick={() => handlePreview(template)}
-                                        className="flex-1 flex items-center justify-center gap-1"
-                                    >
-                                        <Eye size={14} /> Preview
-                                    </Button>
-                                    {!template.isDefault && (
-                                        <Button
-                                            variant="secondary"
-                                            size="sm"
-                                            onClick={() => handleSetDefault(template.id)}
-                                            className="flex-1"
-                                        >
-                                            Set Default
-                                        </Button>
-                                    )}
-                                    <Button
-                                        variant="danger"
-                                        size="sm"
-                                        onClick={() => handleDelete(template)}
-                                        className="flex items-center justify-center"
-                                    >
-                                        <Trash2 size={14} />
-                                    </Button>
+                                    <Button variant="secondary" size="sm" onClick={() => handlePreview(t)}><Eye size={14} /> Preview</Button>
+                                    <Button variant="secondary" size="sm" onClick={() => handleEditClick(t)} className="text-amber-600"><Edit2 size={14} /> Edit</Button>
+                                    <Button variant="danger" size="sm" onClick={() => handleDelete(t)}><Trash2 size={14} /></Button>
                                 </div>
                             </Card>
                         ))}
@@ -452,185 +279,35 @@ const TemplateManager = ({ isOpen, onClose }) => {
             {showUploadModal && (
                 <AccessibleModal
                     isOpen={showUploadModal}
-                    onClose={() => setShowUploadModal(false)}
-                    title="Add New Template(s)"
-                    size="lg"
+                    onClose={() => { setShowUploadModal(false); setEditingTemplate(null); }}
+                    title={editingTemplate ? "Edit Template" : "Add Template"}
                 >
-                    <div className="space-y-6">
-                        <div className="flex border-b border-gray-200 dark:border-gray-700">
-                            <button
-                                className={`px-4 py-2 text-sm font-medium ${uploadMode === 'edit' ? 'border-b-2 border-primary-500 text-primary-600' : 'text-gray-500 hover:text-gray-700'}`}
-                                onClick={() => setUploadMode('edit')}
-                            >
-                                Write/Paste HTML
-                            </button>
-                            <button
-                                className={`px-4 py-2 text-sm font-medium ${uploadMode === 'file' ? 'border-b-2 border-primary-500 text-primary-600' : 'text-gray-500 hover:text-gray-700'}`}
-                                onClick={() => setUploadMode('file')}
-                            >
-                                Upload Files
-                            </button>
-                        </div>
-
-                        {uploadMode === 'edit' ? (
-                            <div className="space-y-4">
-                                <Input
-                                    label="Template Name"
-                                    value={uploadForm.name}
-                                    onChange={(e) => setUploadForm({ ...uploadForm, name: e.target.value })}
-                                    placeholder="e.g., Full-time Employee Offer"
-                                />
-
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                        Description
-                                    </label>
-                                    <textarea
-                                        value={uploadForm.description}
-                                        onChange={(e) => setUploadForm({ ...uploadForm, description: e.target.value })}
-                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:text-white"
-                                        rows={2}
-                                        placeholder="Brief description..."
-                                    />
-                                </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div className="space-y-1">
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Category</label>
-                                        <select
-                                            value={uploadForm.category}
-                                            onChange={(e) => setUploadForm({ ...uploadForm, category: e.target.value })}
-                                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:text-white"
-                                        >
-                                            <option value="Full-time">Full-time</option>
-                                            <option value="Intern">Intern</option>
-                                            <option value="Contract">Contract</option>
-                                        </select>
-                                    </div>
-                                    <div className="flex items-end">
-                                        <button
-                                            type="button"
-                                            onClick={handleLoadDefault}
-                                            className="w-full py-2 px-3 text-sm text-primary-600 hover:text-primary-700 font-medium border border-primary-600 rounded-lg hover:bg-primary-50 dark:hover:bg-primary-900/10"
-                                        >
-                                            Load Default Structure
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                        HTML Content
-                                    </label>
-                                    <textarea
-                                        value={uploadForm.htmlContent}
-                                        onChange={(e) => setUploadForm({ ...uploadForm, htmlContent: e.target.value })}
-                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:text-white font-mono text-xs h-64"
-                                        placeholder="Paste HTML here..."
-                                    />
-                                </div>
+                    <div className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                            <Input label="Name" value={uploadForm.name} onChange={e => setUploadForm({ ...uploadForm, name: e.target.value })} />
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                                <select
+                                    className="w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                                    value={uploadForm.category}
+                                    onChange={e => setUploadForm({ ...uploadForm, category: e.target.value })}
+                                >
+                                    {categories.map(cat => (
+                                        <option key={cat} value={cat}>{cat}</option>
+                                    ))}
+                                </select>
                             </div>
-                        ) : (
-                            <div className="space-y-4">
-                                <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl p-8 text-center bg-gray-50 dark:bg-gray-800/50">
-                                    <Upload size={32} className="mx-auto text-gray-400 mb-2" />
-                                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                        Select one or more HTML files
-                                    </p>
-                                    <input
-                                        type="file"
-                                        accept=".html"
-                                        multiple
-                                        onChange={handleBatchFileSelect}
-                                        className="hidden"
-                                        id="batch-file-upload"
-                                    />
-                                    <label
-                                        htmlFor="batch-file-upload"
-                                        className="cursor-pointer inline-flex items-center px-4 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600"
-                                    >
-                                        Select Files
-                                    </label>
-                                </div>
-
-                                {batchFiles.length > 0 && (
-                                    <div className="max-h-40 overflow-y-auto space-y-2 py-2">
-                                        {batchFiles.map((file, idx) => (
-                                            <div key={idx} className="flex items-center justify-between p-2 bg-gray-100 dark:bg-gray-700/50 rounded-lg text-xs">
-                                                <span className="truncate flex-1">{file.name}</span>
-                                                <span className="text-gray-500">{(file.size / 1024).toFixed(1)} KB</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
-                        <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
-                            <p className="text-sm font-medium text-blue-900 dark:text-blue-200 mb-2">Required Variables:</p>
-                            <ul className="text-xs text-blue-800 dark:text-blue-300 space-y-1 mb-3">
-                                <li><code>{'{{candidateName}}'}</code> - Candidate's name</li>
-                                <li><code>{'{{jobTitle}}'}</code> - Job position</li>
-                                <li><code>{'{{annualCTC}}'}</code> - Annual compensation</li>
-                            </ul>
-
-                            <details className="mt-3">
-                                <summary className="text-sm font-medium text-blue-900 dark:text-blue-200 cursor-pointer hover:text-blue-700 dark:hover:text-blue-100">
-                                    View All Available Variables (20+)
-                                </summary>
-                                <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-blue-800 dark:text-blue-300">
-                                    <div>
-                                        <p className="font-semibold mb-1">Candidate Info:</p>
-                                        <ul className="space-y-0.5 ml-2">
-                                            <li><code>{'{{candidateName}}'}</code> - Full name</li>
-                                            <li><code>{'{{candidateEmail}}'}</code> - Email address</li>
-                                        </ul>
-                                    </div>
-                                    <div>
-                                        <p className="font-semibold mb-1">Position Details:</p>
-                                        <ul className="space-y-0.5 ml-2">
-                                            <li><code>{'{{jobTitle}}'}</code> - Job title</li>
-                                            <li><code>{'{{designation}}'}</code> - Designation</li>
-                                            <li><code>{'{{department}}'}</code> - Department</li>
-                                            <li><code>{'{{reportingManager}}'}</code> - Manager name</li>
-                                        </ul>
-                                    </div>
-                                    <div>
-                                        <p className="font-semibold mb-1">Compensation:</p>
-                                        <ul className="space-y-0.5 ml-2">
-                                            <li><code>{'{{annualCTC}}'}</code> - Annual CTC</li>
-                                            <li><code>{'{{monthlyCTC}}'}</code> - Monthly CTC</li>
-                                            <li><code>{'{{basicSalary}}'}</code> - Basic salary</li>
-                                            <li><code>{'{{hra}}'}</code> - HRA amount</li>
-                                        </ul>
-                                    </div>
-                                    <div>
-                                        <p className="font-semibold mb-1">Dates & Location:</p>
-                                        <ul className="space-y-0.5 ml-2">
-                                            <li><code>{'{{joiningDate}}'}</code> - Joining date</li>
-                                            <li><code>{'{{currentDate}}'}</code> - Today's date</li>
-                                            <li><code>{'{{place}}'}</code> - City</li>
-                                            <li><code>{'{{workLocation}}'}</code> - Full location</li>
-                                        </ul>
-                                    </div>
-                                    <div>
-                                        <p className="font-semibold mb-1">Employment Terms:</p>
-                                        <ul className="space-y-0.5 ml-2">
-                                            <li><code>{'{{probationPeriod}}'}</code> - Probation</li>
-                                            <li><code>{'{{noticePeriod}}'}</code> - Notice period</li>
-                                            <li><code>{'{{companyName}}'}</code> - Company</li>
-                                        </ul>
-                                    </div>
-                                </div>
-                            </details>
                         </div>
-
-                        <div className="flex gap-2 justify-end">
-                            <Button variant="secondary" onClick={() => setShowUploadModal(false)}>
-                                Cancel
-                            </Button>
+                        <Input label="Description" value={uploadForm.description} onChange={e => setUploadForm({ ...uploadForm, description: e.target.value })} />
+                        <textarea
+                            value={uploadForm.htmlContent}
+                            onChange={e => setUploadForm({ ...uploadForm, htmlContent: e.target.value })}
+                            className="w-full h-64 font-mono text-sm p-3 border rounded"
+                        />
+                        <div className="flex justify-end gap-2">
+                            <Button variant="secondary" onClick={() => setShowUploadModal(false)}>Cancel</Button>
                             <Button onClick={handleUpload} disabled={uploading}>
-                                {uploading ? <><Spinner size="sm" className="mr-2" /> Uploading...</> : 'Upload Template'}
+                                {uploading ? <Spinner size="sm" /> : (editingTemplate ? 'Update' : 'Save')}
                             </Button>
                         </div>
                     </div>
@@ -638,24 +315,8 @@ const TemplateManager = ({ isOpen, onClose }) => {
             )}
 
             {showPreviewModal && previewTemplate && (
-                <AccessibleModal
-                    isOpen={showPreviewModal}
-                    onClose={() => setShowPreviewModal(false)}
-                    title={`Preview: ${previewTemplate.name}`}
-                    size="xl"
-                >
-                    <div className="space-y-4">
-                        <div className="bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded-lg flex items-start gap-2">
-                            <AlertCircle size={18} className="text-yellow-600 dark:text-yellow-400 mt-0.5" />
-                            <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                                This is a preview with sample data. Actual offers will use real candidate information.
-                            </p>
-                        </div>
-                        <div
-                            className="border border-gray-200 dark:border-gray-700 rounded-lg p-6 bg-white dark:bg-gray-800 max-h-96 overflow-y-auto"
-                            dangerouslySetInnerHTML={{ __html: previewTemplate.previewHtml }}
-                        />
-                    </div>
+                <AccessibleModal isOpen={showPreviewModal} onClose={() => setShowPreviewModal(false)} title="Preview">
+                    <div className="border p-4 bg-white overflow-auto max-h-[500px]" dangerouslySetInnerHTML={{ __html: previewTemplate.previewHtml }} />
                 </AccessibleModal>
             )}
         </AccessibleModal>

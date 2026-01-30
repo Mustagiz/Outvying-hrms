@@ -5,7 +5,7 @@ import { Card, Button, Badge } from '../UI';
 import { UserPlus, Clock, CheckCircle, FileText, ArrowRight } from 'lucide-react';
 import { showToast } from '../../utils/toast';
 
-const OnboardingQueue = ({ onPromote }) => {
+const OnboardingQueue = ({ onPromote, onSelect, selectedCandidateId }) => {
     const [joiners, setJoiners] = useState([]);
     const [loading, setLoading] = useState(true);
 
@@ -28,11 +28,11 @@ const OnboardingQueue = ({ onPromote }) => {
                     <Clock size={22} /> Onboarding Queue
                 </h3>
                 <p className="text-primary-100 text-sm opacity-80 mt-1">
-                    Candidates who have accepted offers and are waiting to join.
+                    Candidates who have accepted offers. Click to manage checklist.
                 </p>
             </div>
 
-            <div className="divide-y dark:divide-gray-800">
+            <div className="divide-y dark:divide-gray-800 bg-white dark:bg-gray-900">
                 {joiners.length === 0 ? (
                     <div className="p-12 text-center text-gray-500">
                         <UserPlus size={48} className="mx-auto opacity-20 mb-4" />
@@ -40,7 +40,14 @@ const OnboardingQueue = ({ onPromote }) => {
                     </div>
                 ) : (
                     joiners.map((joiner) => (
-                        <div key={joiner.id} className="p-6 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-6">
+                        <div
+                            key={joiner.id}
+                            onClick={() => onSelect && onSelect(joiner)}
+                            className={`p-6 transition-all flex flex-col md:flex-row md:items-center justify-between gap-6 cursor-pointer border-l-4 ${selectedCandidateId === joiner.id
+                                    ? 'bg-primary-50 dark:bg-primary-900/20 border-primary-500'
+                                    : 'hover:bg-gray-50 dark:hover:bg-gray-800/50 border-transparent'
+                                }`}
+                        >
                             <div className="flex items-center gap-4">
                                 <div className="w-12 h-12 rounded-full bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center text-primary-600 font-bold text-lg">
                                     {joiner.candidateName[0]}
@@ -51,7 +58,7 @@ const OnboardingQueue = ({ onPromote }) => {
                                     <div className="flex items-center gap-3 mt-1">
                                         <Badge variant="outline" className="text-[10px] uppercase font-bold border-green-200 text-green-600 bg-green-50">Offer Accepted</Badge>
                                         <span className="text-[10px] text-gray-400 flex items-center gap-1">
-                                            <Calendar size={10} /> Joined on {new Date(joiner.joiningDate).toLocaleDateString()}
+                                            <Calendar size={10} /> Joined on {joiner.joiningDate}
                                         </span>
                                     </div>
                                 </div>
@@ -62,16 +69,22 @@ const OnboardingQueue = ({ onPromote }) => {
                                     variant="secondary"
                                     size="sm"
                                     className="flex items-center gap-1"
-                                    onClick={() => window.open(`/offer/${joiner.id}`, '_blank')}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        window.open(`/offer/${joiner.id}`, '_blank');
+                                    }}
                                 >
                                     <FileText size={14} /> View Offer
                                 </Button>
                                 <Button
                                     size="sm"
                                     className="bg-green-600 hover:bg-green-700 text-white flex items-center gap-1 shadow-md shadow-green-500/20"
-                                    onClick={() => onPromote(joiner)}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onPromote(joiner);
+                                    }}
                                 >
-                                    <UserPlus size={14} /> Promote to Employee <ArrowRight size={14} />
+                                    <UserPlus size={14} /> Promote
                                 </Button>
                             </div>
                         </div>

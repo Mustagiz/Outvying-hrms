@@ -58,7 +58,8 @@ const Layout = ({ children }) => {
       { path: '/reports', icon: BarChart2, label: 'Reports' },
       { path: '/courses', icon: GraduationCap, label: 'Training & Development' },
       { path: '/lms', icon: BookOpen, label: 'Learning Center' },
-      { path: '/culture', icon: Globe, label: 'Culture Hub' }
+      { path: '/culture', icon: Globe, label: 'Culture Hub' },
+      { path: '/document-templates', icon: BookOpen, label: 'Doc Templates' }
     ],
     admin: [
       { path: '/dashboard', icon: Home, label: 'Dashboard' },
@@ -96,7 +97,8 @@ const Layout = ({ children }) => {
       { path: '/webhooks', icon: Globe, label: 'Webhooks & Integrations' },
       { path: '/courses', icon: GraduationCap, label: 'Training Management' },
       { path: '/lms', icon: BookOpen, label: 'LMS Center' },
-      { path: '/culture', icon: Globe, label: 'Culture Hub' }
+      { path: '/culture', icon: Globe, label: 'Culture Hub' },
+      { path: '/document-templates', icon: BookOpen, label: 'Doc Templates' }
     ],
 
     manager: [

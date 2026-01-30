@@ -84,6 +84,10 @@ const CTCBuilder = ({ annualCTC, onChange }) => {
                         <span className="text-gray-500">Insurance</span>
                         <span className="font-medium">₹{breakdown.insurance.toLocaleString()}</span>
                     </div>
+                    <div className="flex justify-between p-2 rounded bg-white dark:bg-gray-900 border border-gray-50 dark:border-gray-800">
+                        <span className="text-gray-500">Professional Tax (PT)</span>
+                        <span className="font-medium text-red-600 dark:text-red-400">- ₹{breakdown.professionalTax.toLocaleString()}</span>
+                    </div>
                 </div>
             </div>
 

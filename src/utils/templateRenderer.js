@@ -105,12 +105,39 @@ export const renderTemplate = async (templateId, templates, offerData) => {
             ...offerData.customData // Inject custom variables
         };
 
+        // Handle Digital Signature
+        if (offerData.signature) {
+            variables['signature'] = `<img src="${offerData.signature}" alt="Signed" style="max-height: 60px; max-width: 200px; display: block; margin-top: 10px;" />`;
+        } else {
+            variables['signature'] = '<div style="border-bottom: 1px dashed #ccc; width: 200px; height: 40px; margin-top: 10px;"></div><small style="color:#999;">(Candidate Signature)</small>';
+        }
+
         // Replace all variables
         Object.keys(variables).forEach(key => {
             const regex = new RegExp(`\\{\\{${key}\\}\\}`, 'g');
             const value = variables[key] !== undefined ? variables[key] : `[${key}]`;
             htmlContent = htmlContent.replace(regex, value);
         });
+
+        // Auto-append signature if not present in template but exists in data
+        if (offerData.signature && !htmlContent.includes('{{signature}}') && !htmlContent.includes('alt="Signed"')) {
+            const signatureBlock = `
+                <div style="margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px;">
+                    <p><strong>Accepted & Signed By:</strong></p>
+                    ${variables['signature']}
+                    <p style="font-size: 12px; color: #666; margin-top: 5px;">
+                        Signed on: ${offerData.acceptedAt ? new Date(offerData.acceptedAt.seconds * 1000).toLocaleString() : new Date().toLocaleString()}<br/>
+                        IP: ${offerData.acceptanceIP || 'N/A'}
+                    </p>
+                </div>
+            `;
+            // Insert before end of body or at the end
+            if (htmlContent.includes('</body>')) {
+                htmlContent = htmlContent.replace('</body>', `${signatureBlock}</body>`);
+            } else {
+                htmlContent += signatureBlock;
+            }
+        }
 
         return htmlContent;
     } catch (error) {
