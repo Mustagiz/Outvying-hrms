@@ -53,7 +53,6 @@ const Courses = lazy(() => import('./pages/Courses'));
 const Assets = lazy(() => import('./pages/Assets'));
 const OfferLetters = lazy(() => import('./pages/OfferLetters'));
 const Applicants = lazy(() => import('./pages/Applicants'));
-const Applicants = lazy(() => import('./pages/Applicants'));
 const CandidateOffer = lazy(() => import('./pages/CandidateOffer'));
 const DocumentTemplates = lazy(() => import('./pages/DocumentTemplates'));
 
