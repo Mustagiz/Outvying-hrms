@@ -167,6 +167,8 @@ const TemplateManager = ({ isOpen, onClose }) => {
 
                 await saveTemplateToFirebase(uploadForm.name, uploadForm.description, uploadForm.category, htmlContent);
 
+                await auditLogger.log('TEMPLATE_CREATED', `Created custom template: ${uploadForm.name}`, currentUser);
+
                 showToast.success('Template saved successfully!');
                 setShowUploadModal(false);
                 setUploadForm({ name: '', description: '', category: 'Full-time', htmlContent: '' });

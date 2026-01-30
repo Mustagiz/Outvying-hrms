@@ -41,3 +41,16 @@ export const logAuditAction = async ({
         console.error('Failed to log audit action:', error);
     }
 };
+
+// Convenient object export for simpler API: auditLogger.log({...})
+export const auditLogger = {
+    log: (action, description, currentUser, targetId = 'SYSTEM', category = 'SYSTEM') => {
+        return logAuditAction({
+            action,
+            performedBy: currentUser,
+            targetId: targetId,
+            targetName: description,
+            category
+        });
+    }
+};
