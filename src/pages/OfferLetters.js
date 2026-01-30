@@ -37,8 +37,11 @@ const OfferLetters = () => {
         joiningDate: '',
         templateType: 'Full-time',
         status: 'Sent',
+        place: 'Mumbai',
+        reportingManager: '',
         breakdown: {},
-        selectedTemplate: null
+        customData: {},
+        selectedTemplateId: null
     });
 
     const location = useLocation();
@@ -95,6 +98,22 @@ const OfferLetters = () => {
         }
     }, [currentStep, selectedTemplateId, templates, newOffer]);
 
+    // Detect custom variables from selected template
+    const getCustomVariables = () => {
+        if (!selectedTemplateId) return [];
+        const template = templates.find(t => t.id === selectedTemplateId);
+        if (!template || !template.variables) return [];
+
+        const standardVariables = [
+            'candidateName', 'candidateEmail', 'jobTitle', 'department',
+            'annualCTC', 'monthlyCTC', 'joiningDate', 'basicSalary',
+            'hra', 'companyName', 'currentDate', 'place', 'workLocation',
+            'reportingManager', 'probationPeriod', 'noticePeriod', 'designation'
+        ];
+
+        return template.variables.filter(v => !standardVariables.includes(v));
+    };
+
     const handleCreateOffer = async () => {
         // Basic Validation
         if (!newOffer.candidateName || !newOffer.candidateEmail || !newOffer.jobTitle || !newOffer.department || !newOffer.joiningDate) {
@@ -148,7 +167,11 @@ const OfferLetters = () => {
             joiningDate: '',
             templateType: 'Full-time',
             status: 'Sent',
-            breakdown: {}
+            place: 'Mumbai',
+            reportingManager: '',
+            breakdown: {},
+            customData: {},
+            selectedTemplateId: null
         });
         setCurrentStep(1);
     };
@@ -185,9 +208,33 @@ const OfferLetters = () => {
                                 />
                             </div>
                         </div>
+
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-1">
-                                <label className="text-xs font-bold text-gray-500 uppercase">Job Title</label>
+                                <label className="text-xs font-bold text-gray-500 uppercase">Joining Date</label>
+                                <Input
+                                    type="date"
+                                    value={newOffer.joiningDate}
+                                    onChange={(e) => setNewOffer({ ...newOffer, joiningDate: e.target.value })}
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-gray-500 uppercase">Template Type</label>
+                                <select
+                                    value={newOffer.templateType}
+                                    onChange={(e) => setNewOffer({ ...newOffer, templateType: e.target.value })}
+                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:text-white"
+                                >
+                                    <option value="Full-time">Full-time Employee</option>
+                                    <option value="Intern">Internship</option>
+                                    <option value="Contract">Contractual</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-gray-500 uppercase">Job Title / Designation</label>
                                 <select
                                     value={newOffer.jobTitle}
                                     onChange={(e) => setNewOffer({ ...newOffer, jobTitle: e.target.value })}
@@ -211,24 +258,20 @@ const OfferLetters = () => {
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-1">
-                                <label className="text-xs font-bold text-gray-500 uppercase">Joining Date</label>
+                                <label className="text-xs font-bold text-gray-500 uppercase">Place / Location</label>
                                 <Input
-                                    type="date"
-                                    value={newOffer.joiningDate}
-                                    onChange={(e) => setNewOffer({ ...newOffer, joiningDate: e.target.value })}
+                                    placeholder="e.g. Mumbai"
+                                    value={newOffer.place}
+                                    onChange={(e) => setNewOffer({ ...newOffer, place: e.target.value })}
                                 />
                             </div>
                             <div className="space-y-1">
-                                <label className="text-xs font-bold text-gray-500 uppercase">Template Type</label>
-                                <select
-                                    value={newOffer.templateType}
-                                    onChange={(e) => setNewOffer({ ...newOffer, templateType: e.target.value })}
-                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:text-white"
-                                >
-                                    <option value="Full-time">Full-time Employee</option>
-                                    <option value="Intern">Internship</option>
-                                    <option value="Contract">Contractual</option>
-                                </select>
+                                <label className="text-xs font-bold text-gray-500 uppercase">Reporting Manager</label>
+                                <Input
+                                    placeholder="Manager Name"
+                                    value={newOffer.reportingManager}
+                                    onChange={(e) => setNewOffer({ ...newOffer, reportingManager: e.target.value })}
+                                />
                             </div>
                         </div>
 
@@ -262,6 +305,31 @@ const OfferLetters = () => {
                                 </p>
                             )}
                         </div>
+
+                        {/* Custom Variables Section */}
+                        {getCustomVariables().length > 0 && (
+                            <div className="p-4 bg-primary-50 dark:bg-primary-900/10 rounded-xl space-y-4 border border-primary-100 dark:border-primary-800">
+                                <h4 className="text-xs font-bold text-primary-700 dark:text-primary-300 uppercase">Custom Template Fields</h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {getCustomVariables().map(variable => (
+                                        <div key={variable} className="space-y-1">
+                                            <label className="text-xs font-bold text-gray-500 uppercase">{variable.replace(/([A-Z])/g, ' $1').trim()}</label>
+                                            <Input
+                                                placeholder={`Enter ${variable}`}
+                                                value={newOffer.customData?.[variable] || ''}
+                                                onChange={(e) => setNewOffer({
+                                                    ...newOffer,
+                                                    customData: {
+                                                        ...newOffer.customData,
+                                                        [variable]: e.target.value
+                                                    }
+                                                })}
+                                            />
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 );
             case 2:

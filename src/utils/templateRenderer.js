@@ -38,17 +38,19 @@ export const renderTemplate = async (templateId, templates, offerData) => {
             hra: offerData.breakdown?.hra?.toLocaleString('en-IN') || '0',
             companyName: 'Outvying',
             currentDate: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }),
-            place: 'Mumbai',
-            workLocation: 'Mumbai, Maharashtra',
+            place: offerData.place || 'Mumbai',
+            workLocation: offerData.place || 'Mumbai, Maharashtra',
             reportingManager: offerData.reportingManager || 'HR Department',
             probationPeriod: '6 months',
-            noticePeriod: '30 days'
+            noticePeriod: '30 days',
+            ...offerData.customData // Inject custom variables
         };
 
         // Replace all variables
         Object.keys(variables).forEach(key => {
             const regex = new RegExp(`\\{\\{${key}\\}\\}`, 'g');
-            htmlContent = htmlContent.replace(regex, variables[key]);
+            const value = variables[key] !== undefined ? variables[key] : `[${key}]`;
+            htmlContent = htmlContent.replace(regex, value);
         });
 
         return htmlContent;

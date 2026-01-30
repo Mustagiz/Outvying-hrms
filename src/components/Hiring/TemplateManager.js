@@ -8,6 +8,7 @@ import { Upload, Trash2, Eye, Edit2, FileText, CheckCircle, AlertCircle, X } fro
 import { showToast } from '../../utils/toast';
 import { useAuth } from '../../context/AuthContext';
 import AccessibleModal from '../AccessibleModal';
+import { auditLogger } from '../../utils/auditLogger';
 
 const TemplateManager = ({ isOpen, onClose }) => {
     const { currentUser } = useAuth();
@@ -158,12 +159,10 @@ const TemplateManager = ({ isOpen, onClose }) => {
             try {
                 const htmlContent = uploadForm.htmlContent;
 
-                // Validate template
+                // Validate template (Soft validation - warn but don't block)
                 const validation = validateTemplate(htmlContent);
                 if (!validation.isValid) {
-                    showToast.error(`Template missing required variables: ${validation.missingVariables.join(', ')}`);
-                    setUploading(false);
-                    return;
+                    showToast.warning(`Template missing some recommended variables: ${validation.missingVariables.join(', ')}. Saving anyway.`);
                 }
 
                 await saveTemplateToFirebase(uploadForm.name, uploadForm.description, uploadForm.category, htmlContent);
@@ -201,15 +200,14 @@ const TemplateManager = ({ isOpen, onClose }) => {
                         // Use filename (without extension) as template name for batch
                         const templateName = file.name.replace(/\.[^/.]+$/, "");
 
-                        // Validate template for batch upload
+                        // Validate template for batch upload (Soft validation)
                         const validation = validateTemplate(htmlContent);
                         if (!validation.isValid) {
-                            showToast.error(`Skipping "${templateName}": missing required variables: ${validation.missingVariables.join(', ')}`);
-                            failCount++;
-                            continue; // Skip this file and proceed to the next
+                            console.warn(`Template "${templateName}" missing recommended variables: ${validation.missingVariables.join(', ')}`);
                         }
 
                         await saveTemplateToFirebase(templateName, `Uploaded from ${file.name}`, 'Full-time', htmlContent);
+                        await auditLogger.log('TEMPLATE_UPLOADED', `Uploaded template file: ${file.name}`, currentUser);
                         successCount++;
                     } catch (err) {
                         console.error(`Failed to upload ${file.name}:`, err);
@@ -231,31 +229,47 @@ const TemplateManager = ({ isOpen, onClose }) => {
     };
 
     const saveTemplateToFirebase = async (name, description, category, htmlContent) => {
+        if (!currentUser) {
+            throw new Error('You must be logged in to upload templates');
+        }
+
+        console.log('Starting template upload to Firebase:', { name, category, contentSize: htmlContent.length });
+
         // Upload to Firebase Storage
         const templateId = `template_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         const storageRef = ref(storage, `offerTemplates/${templateId}.html`);
         const blob = new Blob([htmlContent], { type: 'text/html' });
 
-        await uploadBytes(storageRef, blob);
-        const downloadURL = await getDownloadURL(storageRef);
+        try {
+            console.log('Uploading HTML blob to Storage...');
+            await uploadBytes(storageRef, blob);
+            console.log('Getting download URL...');
+            const downloadURL = await getDownloadURL(storageRef);
 
-        // Save metadata to Firestore
-        return addDoc(collection(db, 'offerTemplates'), {
-            name,
-            description,
-            category,
-            storageUrl: downloadURL,
-            storagePath: `offerTemplates/${templateId}.html`,
-            variables: extractVariables(htmlContent),
-            isDefault: templates.length === 0, // First template is default
-            createdBy: {
-                uid: currentUser.uid,
-                name: currentUser.name || currentUser.displayName,
-                email: currentUser.email
-            },
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp()
-        });
+            // Save metadata to Firestore
+            console.log('Saving metadata to Firestore...');
+            const docRef = await addDoc(collection(db, 'offerTemplates'), {
+                name,
+                description,
+                category,
+                storageUrl: downloadURL,
+                storagePath: `offerTemplates/${templateId}.html`,
+                variables: extractVariables(htmlContent),
+                isDefault: templates.length === 0,
+                createdBy: {
+                    uid: currentUser.uid,
+                    name: currentUser.displayName || currentUser.email || 'Admin',
+                    email: currentUser.email
+                },
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp()
+            });
+            console.log('Template saved successfully with ID:', docRef.id);
+            return docRef;
+        } catch (error) {
+            console.error('Firebase error during template save:', error);
+            throw error;
+        }
     };
 
     const handleDelete = async (template) => {
@@ -268,6 +282,8 @@ const TemplateManager = ({ isOpen, onClose }) => {
 
             // Delete from Firestore
             await deleteDoc(doc(db, 'offerTemplates', template.id));
+
+            await auditLogger.log('TEMPLATE_DELETED', `Deleted template: ${template.name}`, currentUser);
 
             showToast.success('Template deleted successfully');
         } catch (error) {
