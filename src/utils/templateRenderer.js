@@ -21,8 +21,15 @@ export const renderTemplate = async (templateId, templates, offerData) => {
     if (!template) return null;
 
     try {
-        const response = await fetch(template.storageUrl);
-        let htmlContent = await response.text();
+        let htmlContent = template.htmlContent;
+
+        // If not in Firestore, fetch from Storage (legacy fallback)
+        if (!htmlContent && template.storageUrl) {
+            const response = await fetch(template.storageUrl);
+            htmlContent = await response.text();
+        }
+
+        if (!htmlContent) return null;
 
         // Variable replacement map
         const variables = {

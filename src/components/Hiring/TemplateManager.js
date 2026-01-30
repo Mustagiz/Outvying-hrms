@@ -2,14 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../../config/firebase';
 import { storage } from '../../config/firebase';
 import { collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc, serverTimestamp, query, orderBy } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { ref, uploadBytes, getDownloadURL, deleteObject, uploadString } from 'firebase/storage';
 import { Card, Button, Input, Spinner } from '../UI';
 import { Upload, Trash2, Eye, Edit2, FileText, CheckCircle, AlertCircle, X } from 'lucide-react';
 import { showToast } from '../../utils/toast';
 import { useAuth } from '../../context/AuthContext';
 import AccessibleModal from '../AccessibleModal';
 import { auditLogger } from '../../utils/auditLogger';
-import { uploadString } from 'firebase/storage';
 
 const TemplateManager = ({ isOpen, onClose }) => {
     const { currentUser } = useAuth();
@@ -86,12 +85,10 @@ const TemplateManager = ({ isOpen, onClose }) => {
 
     const extractVariables = (htmlContent) => {
         try {
-            // More robust regex: covers {{var}}, {{ var }}, {{var_name}}, {{ varName }}
             const variableRegex = /\{\{\s*(\w+)\s*\}\}/g;
             const variables = new Set();
             let match;
 
-            // Limit iterations to prevent infinite loops on extremely malformed HTML
             let iterations = 0;
             const MAX_ITERATIONS = 5000;
 
@@ -173,18 +170,15 @@ const TemplateManager = ({ isOpen, onClose }) => {
                 const htmlContent = uploadForm.htmlContent;
                 console.log('[UPLOAD] 1. Process started', { name: uploadForm.name });
 
-                // Detect variables first - identifies if large strings cause issues
-                console.log('[UPLOAD] 2. Detecting variables...');
                 const variables = extractVariables(htmlContent);
-                console.log('[UPLOAD] 3. Variables detected:', variables);
+                console.log('[UPLOAD] 2. Variables detected:', variables);
 
-                // Soft validation
                 const validation = validateTemplate(htmlContent);
                 if (!validation.isValid) {
                     showToast.warning(`Note: Basic variables missing: ${validation.missingVariables.join(', ')}`);
                 }
 
-                // Helper for timeout
+                // Timeout helper
                 const withTimeout = (promise, ms, label) => {
                     const timeout = new Promise((_, reject) =>
                         setTimeout(() => reject(new Error(`${label} timed out after ${ms / 1000}s`)), ms)
@@ -192,23 +186,22 @@ const TemplateManager = ({ isOpen, onClose }) => {
                     return Promise.race([promise, timeout]);
                 };
 
-                console.log('[UPLOAD] 4. Starting Firebase sequence...');
+                console.log('[UPLOAD] 3. Starting Firebase sequence...');
                 await withTimeout(
                     saveTemplateToFirebase(uploadForm.name, uploadForm.description, uploadForm.category, htmlContent, variables),
                     25000,
                     'Firebase Upload'
                 );
 
-                console.log('[UPLOAD] 5. Firebase sequence complete.');
+                console.log('[UPLOAD] 4. Firebase sequence complete.');
 
-                // Background Audit Log - non-blocking
                 auditLogger.log('TEMPLATE_CREATED', `Created: ${uploadForm.name}`, currentUser)
                     .catch(e => console.warn('Audit log skip:', e));
 
                 showToast.success('Template saved successfully!');
                 setShowUploadModal(false);
                 setUploadForm({ name: '', description: '', category: 'Full-time', htmlContent: '' });
-                console.log('[UPLOAD] 6. Success.');
+                console.log('[UPLOAD] 5. Success.');
             } catch (error) {
                 console.error('[UPLOAD_FATAL_ERROR]:', error);
                 showToast.error(`Upload failed: ${error.message || 'Check your connection'}`);
@@ -216,7 +209,7 @@ const TemplateManager = ({ isOpen, onClose }) => {
                 setUploading(false);
             }
         } else {
-            // Batch File Upload Logic
+            // Batch upload logic simplified for reliability
             if (batchFiles.length === 0) {
                 showToast.error('Please select at least one HTML file');
                 return;
@@ -238,10 +231,6 @@ const TemplateManager = ({ isOpen, onClose }) => {
 
                         const templateName = file.name.replace(/\.[^/.]+$/, "");
                         await saveTemplateToFirebase(templateName, `Uploaded from ${file.name}`, 'Full-time', htmlContent);
-
-                        auditLogger.log('TEMPLATE_UPLOADED', `Uploaded: ${file.name}`, currentUser)
-                            .catch(e => console.warn('Audit log failed:', e));
-
                         successCount++;
                     } catch (err) {
                         console.error(`Failed to upload ${file.name}:`, err);
@@ -265,26 +254,16 @@ const TemplateManager = ({ isOpen, onClose }) => {
     const saveTemplateToFirebase = async (name, description, category, htmlContent, preExtractedVariables = null) => {
         if (!currentUser) throw new Error('Authentication required');
 
-        console.log('[FIREBASE] 1. Preparing Storage reference...');
         const templateId = `template_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        const storageRef = ref(storage, `offerTemplates/${templateId}.html`);
+        const variables = preExtractedVariables || extractVariables(htmlContent);
 
         try {
-            console.log('[FIREBASE] 2. Uploading HTML string...');
-            await uploadString(storageRef, htmlContent, 'raw', { contentType: 'text/html' });
-
-            console.log('[FIREBASE] 3. Fetching download URL...');
-            const downloadURL = await getDownloadURL(storageRef);
-
-            console.log('[FIREBASE] 4. Writing metadata to Firestore...');
-            const variables = preExtractedVariables || extractVariables(htmlContent);
-
+            console.log('[SAVE] Writing direct to Firestore...');
             const templateData = {
                 name,
                 description,
                 category,
-                storageUrl: downloadURL,
-                storagePath: `offerTemplates/${templateId}.html`,
+                htmlContent, // Primary source: avoids fetch hangs
                 variables,
                 isDefault: false,
                 createdBy: {
@@ -297,10 +276,16 @@ const TemplateManager = ({ isOpen, onClose }) => {
             };
 
             const docRef = await addDoc(collection(db, 'offerTemplates'), templateData);
-            console.log('[FIREBASE] 5. Metadata saved. ID:', docRef.id);
+
+            // Redundant background Storage upload
+            try {
+                const storageRef = ref(storage, `offerTemplates/${templateId}.html`);
+                uploadString(storageRef, htmlContent, 'raw', { contentType: 'text/html' }).catch(() => { });
+            } catch (e) { }
+
             return docRef;
         } catch (error) {
-            console.error('[FIREBASE_INTERNAL_ERROR]:', error);
+            console.error('[SAVE_FATAL_ERROR]:', error);
             throw error;
         }
     };
@@ -309,15 +294,12 @@ const TemplateManager = ({ isOpen, onClose }) => {
         if (!window.confirm(`Are you sure you want to delete "${template.name}"?`)) return;
 
         try {
-            // Delete from Storage
-            const storageRef = ref(storage, template.storagePath);
-            await deleteObject(storageRef);
-
-            // Delete from Firestore
+            if (template.storagePath) {
+                const storageRef = ref(storage, template.storagePath);
+                await deleteObject(storageRef).catch(() => { });
+            }
             await deleteDoc(doc(db, 'offerTemplates', template.id));
-
-            await auditLogger.log('TEMPLATE_DELETED', `Deleted template: ${template.name}`, currentUser);
-
+            auditLogger.log('TEMPLATE_DELETED', `Deleted: ${template.name}`, currentUser).catch(() => { });
             showToast.success('Template deleted successfully');
         } catch (error) {
             console.error('Error deleting template:', error);
@@ -327,15 +309,11 @@ const TemplateManager = ({ isOpen, onClose }) => {
 
     const handleSetDefault = async (templateId) => {
         try {
-            // Unset all defaults
             const batch = templates.map(t =>
                 updateDoc(doc(db, 'offerTemplates', t.id), { isDefault: false })
             );
             await Promise.all(batch);
-
-            // Set new default
             await updateDoc(doc(db, 'offerTemplates', templateId), { isDefault: true });
-
             showToast.success('Default template updated');
         } catch (error) {
             console.error('Error setting default:', error);
@@ -345,10 +323,16 @@ const TemplateManager = ({ isOpen, onClose }) => {
 
     const handlePreview = async (template) => {
         try {
-            const response = await fetch(template.storageUrl);
-            const htmlContent = await response.text();
+            let htmlContent = template.htmlContent;
 
-            // Replace variables with sample data
+            if (!htmlContent && template.storageUrl) {
+                console.log('Fetching legacy template content...');
+                const response = await fetch(template.storageUrl);
+                htmlContent = await response.text();
+            }
+
+            if (!htmlContent) throw new Error('Template content not found');
+
             let previewHtml = htmlContent;
             Object.keys(sampleData).forEach(key => {
                 const regex = new RegExp(`\\{\\{${key}\\}\\}`, 'g');
@@ -358,8 +342,8 @@ const TemplateManager = ({ isOpen, onClose }) => {
             setPreviewTemplate({ ...template, previewHtml });
             setShowPreviewModal(true);
         } catch (error) {
-            console.error('Error loading template:', error);
-            showToast.error('Failed to load template preview');
+            console.error('Error loading template preview:', error);
+            showToast.error('Failed to load template preview: ' + error.message);
         }
     };
 
@@ -382,7 +366,6 @@ const TemplateManager = ({ isOpen, onClose }) => {
             size="xl"
         >
             <div className="space-y-6">
-                {/* Header Actions */}
                 <div className="flex justify-between items-center">
                     <p className="text-sm text-gray-600 dark:text-gray-400">
                         Upload custom HTML templates with variable placeholders like <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded">{'{{candidateName}}'}</code>
@@ -393,7 +376,6 @@ const TemplateManager = ({ isOpen, onClose }) => {
                     </Button>
                 </div>
 
-                {/* Templates List */}
                 {loading ? (
                     <div className="flex justify-center py-8">
                         <Spinner />
@@ -467,7 +449,6 @@ const TemplateManager = ({ isOpen, onClose }) => {
                 )}
             </div>
 
-            {/* Upload Modal */}
             {showUploadModal && (
                 <AccessibleModal
                     isOpen={showUploadModal}
@@ -476,7 +457,6 @@ const TemplateManager = ({ isOpen, onClose }) => {
                     size="lg"
                 >
                     <div className="space-y-6">
-                        {/* Mode Selector Tabs */}
                         <div className="flex border-b border-gray-200 dark:border-gray-700">
                             <button
                                 className={`px-4 py-2 text-sm font-medium ${uploadMode === 'edit' ? 'border-b-2 border-primary-500 text-primary-600' : 'text-gray-500 hover:text-gray-700'}`}
@@ -556,9 +536,6 @@ const TemplateManager = ({ isOpen, onClose }) => {
                                     <Upload size={32} className="mx-auto text-gray-400 mb-2" />
                                     <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
                                         Select one or more HTML files
-                                    </p>
-                                    <p className="text-xs text-gray-500 mb-4">
-                                        Templates will use their filename as the title
                                     </p>
                                     <input
                                         type="file"
@@ -660,7 +637,6 @@ const TemplateManager = ({ isOpen, onClose }) => {
                 </AccessibleModal>
             )}
 
-            {/* Preview Modal */}
             {showPreviewModal && previewTemplate && (
                 <AccessibleModal
                     isOpen={showPreviewModal}
