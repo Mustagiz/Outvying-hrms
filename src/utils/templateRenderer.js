@@ -1,7 +1,18 @@
-// Template rendering utility
 export const renderTemplate = async (templateId, templates, offerData) => {
-    if (!templateId) {
-        // Return default template
+    let template = null;
+
+    // 1. Try to find the specific template by ID
+    if (templateId) {
+        template = templates.find(t => t.id === templateId);
+    }
+
+    // 2. If no specific ID or not found, try to find a database-defined "Default" template
+    if (!template && templates && templates.length > 0) {
+        template = templates.find(t => t.isDefault === true);
+    }
+
+    // 3. If still nothing, return the hardcoded "Sample" format
+    if (!template) {
         return `
             <div className="space-y-4 text-sm text-gray-700 dark:text-gray-300 leading-relaxed font-sans">
                 <p>Dear <strong>${offerData.candidateName || '[Name]'}</strong>,</p>
@@ -16,9 +27,6 @@ export const renderTemplate = async (templateId, templates, offerData) => {
             </div>
         `;
     }
-
-    const template = templates.find(t => t.id === templateId);
-    if (!template) return null;
 
     try {
         let htmlContent = template.htmlContent;
