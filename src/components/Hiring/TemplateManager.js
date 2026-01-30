@@ -23,7 +23,7 @@ const TemplateManager = ({ isOpen, onClose }) => {
         name: '',
         description: '',
         category: 'Full-time',
-        file: null
+        htmlContent: ''
     });
 
     // Sample data for preview
@@ -92,79 +92,99 @@ const TemplateManager = ({ isOpen, onClose }) => {
         return Array.from(variables);
     };
 
-    const handleFileSelect = (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        if (file.type !== 'text/html' && !file.name.endsWith('.html')) {
-            showToast.error('Please upload an HTML file');
-            return;
-        }
-
-        if (file.size > 500 * 1024) { // 500KB limit
-            showToast.error('File size must be less than 500KB');
-            return;
-        }
-
-        setUploadForm({ ...uploadForm, file });
+    const handleLoadDefault = () => {
+        const defaultHtml = `<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 0 auto; padding: 40px; }
+        .header { text-align: center; border-bottom: 2px solid #0056b3; padding-bottom: 20px; margin-bottom: 30px; }
+        .logo { font-size: 28px; font-weight: bold; color: #0056b3; }
+        .content { background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        .footer { margin-top: 40px; font-size: 12px; color: #666; text-align: center; border-top: 1px solid #eee; padding-top: 20px; }
+        .variable { color: #d63384; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo">{{companyName}}</div>
+        <h1>Letter of Intent</h1>
+    </div>
+    <div class="content">
+        <p>Date: {{currentDate}}</p>
+        <p>To,<br><strong>{{candidateName}}</strong><br>{{place}}</p>
+        
+        <p>Dear {{candidateName}},</p>
+        <p>We are pleased to offer you the position of <strong>{{jobTitle}}</strong> at {{companyName}}. Your skills and experience will be a great asset to our {{department}} team.</p>
+        
+        <p><strong>Offer Details:</strong></p>
+        <ul>
+            <li>Annual CTC: ₹{{annualCTC}}</li>
+            <li>Monthly Fixed: ₹{{monthlyCTC}}</li>
+            <li>Joining Date: {{joiningDate}}</li>
+            <li>Location: {{workLocation}}</li>
+        </ul>
+        
+        <p>We look forward to having you on board!</p>
+    </div>
+    <div class="footer">
+        <p>© {{companyName}} - Confidential Offer Letter</p>
+    </div>
+</body>
+</html>`;
+        setUploadForm({ ...uploadForm, htmlContent: defaultHtml });
     };
 
     const handleUpload = async () => {
-        if (!uploadForm.name || !uploadForm.file) {
-            showToast.error('Please provide template name and file');
+        if (!uploadForm.name || !uploadForm.htmlContent) {
+            showToast.error('Please provide template name and HTML content');
             return;
         }
 
         setUploading(true);
         try {
-            // Read file content
-            const reader = new FileReader();
-            reader.onload = async (e) => {
-                const htmlContent = e.target.result;
+            const htmlContent = uploadForm.htmlContent;
 
-                // Validate template
-                const validation = validateTemplate(htmlContent);
-                if (!validation.isValid) {
-                    showToast.error(`Template missing required variables: ${validation.missingVariables.join(', ')}`);
-                    setUploading(false);
-                    return;
-                }
+            // Validate template
+            const validation = validateTemplate(htmlContent);
+            if (!validation.isValid) {
+                showToast.error(`Template missing required variables: ${validation.missingVariables.join(', ')}`);
+                setUploading(false);
+                return;
+            }
 
-                // Upload to Firebase Storage
-                const templateId = `template_${Date.now()}`;
-                const storageRef = ref(storage, `offerTemplates/${templateId}.html`);
-                const blob = new Blob([htmlContent], { type: 'text/html' });
+            // Upload to Firebase Storage
+            const templateId = `template_${Date.now()}`;
+            const storageRef = ref(storage, `offerTemplates/${templateId}.html`);
+            const blob = new Blob([htmlContent], { type: 'text/html' });
 
-                await uploadBytes(storageRef, blob);
-                const downloadURL = await getDownloadURL(storageRef);
+            await uploadBytes(storageRef, blob);
+            const downloadURL = await getDownloadURL(storageRef);
 
-                // Save metadata to Firestore
-                await addDoc(collection(db, 'offerTemplates'), {
-                    name: uploadForm.name,
-                    description: uploadForm.description,
-                    category: uploadForm.category,
-                    storageUrl: downloadURL,
-                    storagePath: `offerTemplates/${templateId}.html`,
-                    variables: extractVariables(htmlContent),
-                    isDefault: templates.length === 0, // First template is default
-                    createdBy: {
-                        uid: currentUser.uid,
-                        name: currentUser.name || currentUser.displayName,
-                        email: currentUser.email
-                    },
-                    createdAt: serverTimestamp(),
-                    updatedAt: serverTimestamp()
-                });
+            // Save metadata to Firestore
+            await addDoc(collection(db, 'offerTemplates'), {
+                name: uploadForm.name,
+                description: uploadForm.description,
+                category: uploadForm.category,
+                storageUrl: downloadURL,
+                storagePath: `offerTemplates/${templateId}.html`,
+                variables: extractVariables(htmlContent),
+                isDefault: templates.length === 0, // First template is default
+                createdBy: {
+                    uid: currentUser.uid,
+                    name: currentUser.name || currentUser.displayName,
+                    email: currentUser.email
+                },
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp()
+            });
 
-                showToast.success('Template uploaded successfully!');
-                setShowUploadModal(false);
-                setUploadForm({ name: '', description: '', category: 'Full-time', file: null });
-            };
-
-            reader.readAsText(uploadForm.file);
+            showToast.success('Template saved successfully!');
+            setShowUploadModal(false);
+            setUploadForm({ name: '', description: '', category: 'Full-time', htmlContent: '' });
         } catch (error) {
-            console.error('Error uploading template:', error);
-            showToast.error('Failed to upload template: ' + error.message);
+            console.error('Error saving template:', error);
+            showToast.error('Failed to save template: ' + error.message);
         } finally {
             setUploading(false);
         }
@@ -375,18 +395,27 @@ const TemplateManager = ({ isOpen, onClose }) => {
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                HTML Template File
-                            </label>
-                            <input
-                                type="file"
-                                accept=".html"
-                                onChange={handleFileSelect}
-                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:text-white"
+                            <div className="flex justify-between items-center mb-2">
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    HTML Template Content
+                                </label>
+                                <button
+                                    type="button"
+                                    onClick={handleLoadDefault}
+                                    className="text-xs text-primary-600 hover:text-primary-700 font-medium"
+                                >
+                                    Load Default Structure
+                                </button>
+                            </div>
+                            <textarea
+                                value={uploadForm.htmlContent}
+                                onChange={(e) => setUploadForm({ ...uploadForm, htmlContent: e.target.value })}
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:text-white font-mono text-sm h-64"
+                                placeholder="Paste or write your HTML template here..."
                             />
-                            {uploadForm.file && (
-                                <p className="mt-2 text-sm text-green-600 dark:text-green-400 flex items-center gap-1">
-                                    <CheckCircle size={14} /> {uploadForm.file.name} ({(uploadForm.file.size / 1024).toFixed(2)} KB)
+                            {uploadForm.htmlContent && (
+                                <p className="mt-2 text-sm text-blue-600 dark:text-blue-400 flex items-center gap-1">
+                                    <CheckCircle size={14} /> {uploadForm.htmlContent.length} characters
                                 </p>
                             )}
                         </div>
