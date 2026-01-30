@@ -209,7 +209,40 @@ const OfferLetters = () => {
                 zIndex: '-9999',
                 fontFamily: 'serif'
             });
-            container.innerHTML = html;
+
+            container.innerHTML = `
+                <style>
+                    .pdf-capture-root {
+                        font-family: 'Times New Roman', Times, serif;
+                        color: #1a202c;
+                        line-height: 1.6;
+                        background: white;
+                        padding: 0;
+                    }
+                    .pdf-capture-root h1, .pdf-capture-root h2, .pdf-capture-root h3 {
+                        color: #2d3748;
+                        margin-top: 0;
+                    }
+                    .pdf-capture-root table {
+                        width: 100%;
+                        border-collapse: collapse;
+                        margin: 15px 0;
+                    }
+                    .pdf-capture-root th, .pdf-capture-root td {
+                        border: 1px solid #e2e8f0;
+                        padding: 10px;
+                        text-align: left;
+                        font-size: 14px;
+                    }
+                    .pdf-capture-root strong {
+                        color: #000;
+                    }
+                    .pdf-capture-root h1 { font-size: 28px; border-bottom: 2px solid #2d3748; padding-bottom: 10px; margin-bottom: 20px; text-align: center; }
+                </style>
+                <div class="pdf-capture-root">
+                    ${html}
+                </div>
+            `;
             document.body.appendChild(container);
 
             // Wait for resources

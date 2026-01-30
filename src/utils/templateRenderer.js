@@ -14,16 +14,52 @@ export const renderTemplate = async (templateId, templates, offerData) => {
     // 3. If still nothing, return the hardcoded "Sample" format
     if (!template) {
         return `
-            <div className="space-y-4 text-sm text-gray-700 dark:text-gray-300 leading-relaxed font-sans">
+            <div style="font-family: 'Times New Roman', Times, serif; color: #333; line-height: 1.6;">
+                <div style="text-align: center; border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 30px;">
+                    <h1 style="margin: 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px;">Offer Letter</h1>
+                    <p style="margin: 5px 0 0 0; font-size: 14px; color: #666;">Corporate Employment Agreement</p>
+                </div>
+
+                <div style="margin-bottom: 20px;">
+                    <p><strong>Date:</strong> ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+                    <p><strong>To:</strong><br/>
+                    ${offerData.candidateName || '[Name]'}<br/>
+                    ${offerData.candidateEmail || '[Email]'}</p>
+                </div>
+
                 <p>Dear <strong>${offerData.candidateName || '[Name]'}</strong>,</p>
-                <p>We are delighted to offer you the position of <strong>${offerData.jobTitle || '[Role]'}</strong> in our <strong>${offerData.department || '[Dept]'}</strong> department at Outvying. Your joining date is confirmed as <strong>${offerData.joiningDate || '[Date]'}</strong>.</p>
-                <p>Your total annual compensation package will be <strong>₹${offerData.annualCTC?.toLocaleString() || '0'}</strong>, with a monthly gross of <strong>₹${Math.round((offerData.annualCTC || 0) / 12).toLocaleString()}</strong>.</p>
-                <ul className="list-disc pl-5 mt-2 space-y-1">
-                    <li>Basic Salary: ₹${offerData.breakdown?.basic?.toLocaleString() || '0'}</li>
-                    <li>Provident Fund: Comprehensive protection plan</li>
-                    <li>Probation Period: 6 Months</li>
-                </ul>
-                <p className="mt-4 italic">Welcome to the team!</p>
+                
+                <p>We are delighted to offer you the position of <strong>${offerData.jobTitle || '[Role]'}</strong> in our <strong>${offerData.department || '[Dept]'}</strong> department at <strong>Outvying</strong>. Your expertise and background make you an ideal fit for our team.</p>
+                
+                <div style="background: #f8fafc; padding: 20px; border-radius: 8px; margin: 25px 0;">
+                    <h3 style="margin-top: 0; color: #2d3748; font-size: 16px; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px;">Employment Terms</h3>
+                    <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+                        <tr>
+                            <td style="padding: 5px 0;"><strong>Joining Date:</strong></td>
+                            <td style="padding: 5px 0;">${offerData.joiningDate || '[Date]'}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 5px 0;"><strong>Annual CTC:</strong></td>
+                            <td style="padding: 5px 0;">₹${offerData.annualCTC?.toLocaleString() || '0'}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 5px 0;"><strong>Monthly Gross:</strong></td>
+                            <td style="padding: 5px 0;">₹${Math.round((offerData.annualCTC || 0) / 12).toLocaleString()}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 5px 0;"><strong>Probation Period:</strong></td>
+                            <td style="padding: 5px 0;">6 Months</td>
+                        </tr>
+                    </table>
+                </div>
+
+                <p>During your employment, you will be expected to adhere to the company's policies and maintaining the highest standards of professional conduct.</p>
+                
+                <p>We look forward to having you join us and contribute to our mutual success. Please sign and return a copy of this letter to confirm your acceptance.</p>
+                
+                <p style="margin-top: 40px;">Sincerely,<br/>
+                <strong>HR Department</strong><br/>
+                Outvying Pvt. Ltd.</p>
             </div>
         `;
     }
