@@ -158,24 +158,32 @@ const TemplateManager = ({ isOpen, onClose }) => {
             setUploading(true);
             try {
                 const htmlContent = uploadForm.htmlContent;
+                console.log('[HANDLE_UPLOAD] Start:', { name: uploadForm.name, category: uploadForm.category });
 
                 // Validate template (Soft validation - warn but don't block)
                 const validation = validateTemplate(htmlContent);
                 if (!validation.isValid) {
+                    console.warn('[HANDLE_UPLOAD] Missing recommended variables:', validation.missingVariables);
                     showToast.warning(`Template missing some recommended variables: ${validation.missingVariables.join(', ')}. Saving anyway.`);
                 }
 
+                console.log('[HANDLE_UPLOAD] Calling saveTemplateToFirebase...');
                 await saveTemplateToFirebase(uploadForm.name, uploadForm.description, uploadForm.category, htmlContent);
+                console.log('[HANDLE_UPLOAD] saveTemplateToFirebase complete.');
 
+                console.log('[HANDLE_UPLOAD] Calling auditLogger.log...');
                 await auditLogger.log('TEMPLATE_CREATED', `Created custom template: ${uploadForm.name}`, currentUser);
+                console.log('[HANDLE_UPLOAD] auditLogger.log complete.');
 
                 showToast.success('Template saved successfully!');
                 setShowUploadModal(false);
                 setUploadForm({ name: '', description: '', category: 'Full-time', htmlContent: '' });
+                console.log('[HANDLE_UPLOAD] Process finished successfully.');
             } catch (error) {
-                console.error('Error saving template:', error);
+                console.error('[HANDLE_UPLOAD] Error:', error);
                 showToast.error('Failed to save template: ' + error.message);
             } finally {
+                console.log('[HANDLE_UPLOAD] Resetting uploading state.');
                 setUploading(false);
             }
         } else {
@@ -232,10 +240,11 @@ const TemplateManager = ({ isOpen, onClose }) => {
 
     const saveTemplateToFirebase = async (name, description, category, htmlContent) => {
         if (!currentUser) {
+            console.error('Upload failed: No currentUser');
             throw new Error('You must be logged in to upload templates');
         }
 
-        console.log('Starting template upload to Firebase:', { name, category, contentSize: htmlContent.length });
+        console.log('[UPLOAD] Starting template upload:', { name, category, contentSize: htmlContent.length });
 
         // Upload to Firebase Storage
         const templateId = `template_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -243,20 +252,28 @@ const TemplateManager = ({ isOpen, onClose }) => {
         const blob = new Blob([htmlContent], { type: 'text/html' });
 
         try {
-            console.log('Uploading HTML blob to Storage...');
+            console.log('[UPLOAD] 1. Uploading HTML to Storage...');
+            const startTime = Date.now();
             await uploadBytes(storageRef, blob);
-            console.log('Getting download URL...');
+            console.log(`[UPLOAD] 2. Storage upload complete in ${Date.now() - startTime}ms`);
+
+            console.log('[UPLOAD] 3. Getting download URL...');
             const downloadURL = await getDownloadURL(storageRef);
+            console.log('[UPLOAD] 4. Download URL received:', downloadURL);
 
             // Save metadata to Firestore
-            console.log('Saving metadata to Firestore...');
+            console.log('[UPLOAD] 5. Extracting variables...');
+            const variables = extractVariables(htmlContent);
+            console.log('[UPLOAD] 6. Variables extracted:', variables);
+
+            console.log('[UPLOAD] 7. Saving to Firestore...');
             const docRef = await addDoc(collection(db, 'offerTemplates'), {
                 name,
                 description,
                 category,
                 storageUrl: downloadURL,
                 storagePath: `offerTemplates/${templateId}.html`,
-                variables: extractVariables(htmlContent),
+                variables,
                 isDefault: templates.length === 0,
                 createdBy: {
                     uid: currentUser.uid,
@@ -266,10 +283,10 @@ const TemplateManager = ({ isOpen, onClose }) => {
                 createdAt: serverTimestamp(),
                 updatedAt: serverTimestamp()
             });
-            console.log('Template saved successfully with ID:', docRef.id);
+            console.log('[UPLOAD] 8. Success! Firestore ID:', docRef.id);
             return docRef;
         } catch (error) {
-            console.error('Firebase error during template save:', error);
+            console.error('[UPLOAD] FATAL ERROR:', error);
             throw error;
         }
     };
