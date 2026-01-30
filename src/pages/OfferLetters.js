@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { db } from '../config/firebase';
-import { collection, onSnapshot, query, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, onSnapshot, query, addDoc, serverTimestamp, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 import { Card, Button, Input, Spinner } from '../components/UI';
-import { FileText, Send, CheckCircle, XCircle, Clock, Plus, Search, Filter, ArrowRight, ArrowLeft, Download, Copy, Mail } from 'lucide-react';
+import { FileText, Send, CheckCircle, XCircle, Clock, Plus, Search, Filter, ArrowRight, ArrowLeft, Download, Copy, Mail, Pencil, Trash2 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { showToast } from '../utils/toast';
@@ -28,6 +28,7 @@ const OfferLetters = () => {
     const [templates, setTemplates] = useState([]);
     const [selectedTemplateId, setSelectedTemplateId] = useState(null);
     const [renderedTemplate, setRenderedTemplate] = useState(null);
+    const [editingOffer, setEditingOffer] = useState(null);
 
     // Offer State
     const [newOffer, setNewOffer] = useState({
@@ -123,39 +124,85 @@ const OfferLetters = () => {
             return;
         }
 
-        if (isNaN(newOffer.annualCTC) || newOffer.annualCTC <= 0) {
-            showToast.error('Please enter a valid Annual CTC');
-            return;
-        }
-
         setActionLoading(true);
         try {
-            const docRef = await addDoc(collection(db, 'offers'), {
+            const offerData = {
                 ...newOffer,
-                selectedTemplateId: selectedTemplateId, // Ensure template association is saved
-                createdAt: serverTimestamp()
-            });
+                selectedTemplateId: selectedTemplateId,
+                updatedAt: serverTimestamp()
+            };
 
-            await logAuditAction({
-                action: 'CREATE_OFFER',
-                category: 'HIRING',
-                performedBy: currentUser,
-                targetId: docRef.id,
-                targetName: newOffer.candidateName,
-                details: {
-                    role: newOffer.jobTitle,
-                    ctc: newOffer.annualCTC,
-                    email: newOffer.candidateEmail,
-                    template: selectedTemplateId || 'Default'
-                }
-            });
+            if (editingOffer) {
+                // Update Existing Offer
+                await updateDoc(doc(db, 'offers', editingOffer.id), offerData);
+                await logAuditAction({
+                    action: 'UPDATE_OFFER',
+                    category: 'HIRING',
+                    performedBy: currentUser,
+                    targetId: editingOffer.id,
+                    targetName: newOffer.candidateName,
+                    details: { role: newOffer.jobTitle, status: newOffer.status }
+                });
+                showToast.success('Offer updated successfully!');
+            } else {
+                // Create New Offer
+                const docRef = await addDoc(collection(db, 'offers'), {
+                    ...offerData,
+                    createdAt: serverTimestamp()
+                });
 
-            showToast.success('Offer letter generated and sent successfully!');
+                await logAuditAction({
+                    action: 'CREATE_OFFER',
+                    category: 'HIRING',
+                    performedBy: currentUser,
+                    targetId: docRef.id,
+                    targetName: newOffer.candidateName,
+                    details: { role: newOffer.jobTitle, ctc: newOffer.annualCTC }
+                });
+                showToast.success('Offer generated successfully!');
+            }
+
             setShowCreateModal(false);
             resetForm();
         } catch (error) {
-            console.error('Error creating offer:', error);
-            showToast.error('Failed to generate offer: ' + error.message);
+            console.error('Error saving offer:', error);
+            showToast.error('Operation failed: ' + error.message);
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const handleEditOffer = (offer) => {
+        setEditingOffer(offer);
+        setNewOffer({
+            candidateName: offer.candidateName || '',
+            candidateEmail: offer.candidateEmail || '',
+            jobTitle: offer.jobTitle || '',
+            department: offer.department || '',
+            annualCTC: offer.annualCTC || 0,
+            joiningDate: offer.joiningDate || '',
+            templateType: offer.templateType || 'Full-time',
+            status: offer.status || 'Sent',
+            place: offer.place || 'Mumbai',
+            reportingManager: offer.reportingManager || '',
+            breakdown: offer.breakdown || {},
+            customData: offer.customData || {},
+            selectedTemplateId: offer.selectedTemplateId || null
+        });
+        setSelectedTemplateId(offer.selectedTemplateId || null);
+        setCurrentStep(1);
+        setShowCreateModal(true);
+    };
+
+    const handleDeleteOffer = async (offerId) => {
+        if (!window.confirm('Are you sure you want to delete this offer?')) return;
+
+        setActionLoading(true);
+        try {
+            await deleteDoc(doc(db, 'offers', offerId));
+            showToast.success('Offer deleted successfully');
+        } catch (error) {
+            showToast.error('Delete failed: ' + error.message);
         } finally {
             setActionLoading(false);
         }
@@ -305,11 +352,14 @@ const OfferLetters = () => {
             if (container && container.parentNode) {
                 document.body.removeChild(container);
             }
+            // Explicit memory cleanup for large objects
+            container = null;
             setActionLoading(false);
         }
     };
 
     const resetForm = () => {
+        setEditingOffer(null);
         setNewOffer({
             candidateName: '',
             candidateEmail: '',
@@ -610,6 +660,24 @@ const OfferLetters = () => {
                                             <Button
                                                 variant="ghost"
                                                 size="sm"
+                                                className="h-8 w-8 p-0 text-amber-600 hover:text-amber-700"
+                                                title="Edit Offer"
+                                                onClick={() => handleEditOffer(offer)}
+                                            >
+                                                <Pencil size={16} />
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                                                title="Delete Offer"
+                                                onClick={() => handleDeleteOffer(offer.id)}
+                                            >
+                                                <Trash2 size={16} />
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
                                                 className="h-8 w-8 p-0"
                                                 title="Copy Offer Link"
                                                 onClick={() => {
@@ -653,7 +721,7 @@ const OfferLetters = () => {
             <AccessibleModal
                 isOpen={showCreateModal}
                 onClose={() => { setShowCreateModal(false); resetForm(); }}
-                title="Generate Employment Offer"
+                title={editingOffer ? "Edit Employment Offer" : "Generate Employment Offer"}
                 size="lg"
             >
                 <div className="space-y-6">
@@ -695,7 +763,7 @@ const OfferLetters = () => {
                                 ) : (
                                     <Send size={18} />
                                 )}
-                                {actionLoading ? 'Generating...' : 'Generate & Send Offer'}
+                                {actionLoading ? (editingOffer ? 'Updating...' : 'Generating...') : (editingOffer ? 'Update & Save Offer' : 'Generate & Send Offer')}
                             </Button>
                         )}
                     </div>
