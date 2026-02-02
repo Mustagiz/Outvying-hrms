@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Card, Button, Modal } from '../components/UI';
-import { Users, Filter, Download, FileText, Plus } from 'lucide-react';
+import { Users, Filter, Download, FileText, Plus, Edit2, Trash2 } from 'lucide-react';
 import { showToast } from '../utils/toast';
 
 const Applicants = () => {
