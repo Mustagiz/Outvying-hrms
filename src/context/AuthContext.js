@@ -1131,7 +1131,13 @@ export const AuthProvider = ({ children }) => {
       if (secondaryApp) {
         try { await deleteApp(secondaryApp); } catch (err) { console.error("Error cleanup:", err); }
       }
-      return { success: false, message: 'Error adding user: ' + e.message };
+
+      let errorMessage = e.message;
+      if (e.code === 'auth/email-already-in-use') {
+        errorMessage = 'This email address is already registered to another account.';
+      }
+
+      return { success: false, message: 'Error adding user: ' + errorMessage };
     }
   };
 

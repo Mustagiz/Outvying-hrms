@@ -58,6 +58,13 @@ const UserManagement = () => {
         return;
       }
 
+      // Pre-check if user already exists in the local state
+      const existingUser = allUsers.find(u => (u.email || '').toLowerCase() === emailToUse.toLowerCase());
+      if (existingUser) {
+        setAlert({ type: 'error', message: 'A user with this email already exists in the system.' });
+        return;
+      }
+
       // Ensure email is populated for Auth
       const finalData = {
         ...formData,
