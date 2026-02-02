@@ -12,6 +12,7 @@ import {
   EmailAuthProvider,
   reauthenticateWithCredential
 } from 'firebase/auth';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import {
   collection,
   onSnapshot,
@@ -1159,21 +1160,16 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // For direct password override (if admin provides temporary password):
-  const forceUpdatePassword = async (email, oldPassword, newPassword) => {
-    let secondaryApp = null;
+  // New Administrative Password Reset (Uses Cloud Function)
+  const resetPasswordAdmin = async (targetUserId, newPassword) => {
     try {
-      secondaryApp = initializeApp(firebaseConfig, "PasswordResetApp");
-      const secondaryAuth = getAuth(secondaryApp);
-      const userCredential = await signInWithEmailAndPassword(secondaryAuth, email, oldPassword);
-      await updatePassword(userCredential.user, newPassword);
-
-      await signOut(secondaryAuth);
-      await deleteApp(secondaryApp);
-      return { success: true, message: 'Password updated successfully' };
+      const functions = getFunctions();
+      const resetFn = httpsCallable(functions, 'resetUserPassword');
+      const result = await resetFn({ targetUid: targetUserId, newPassword });
+      return { success: true, message: result.data.message };
     } catch (e) {
-      if (secondaryApp) await deleteApp(secondaryApp);
-      return { success: false, message: 'Update failed: ' + e.message };
+      console.error("Admin Password Reset Error:", e);
+      return { success: false, message: 'Reset failed: ' + (e.message || 'Unknown error') };
     }
   };
 
@@ -1414,7 +1410,8 @@ export const AuthProvider = ({ children }) => {
     updateUser,
     updateUserProfile: updateUser,
     resetPassword,
-    forceUpdatePassword,
+    resetPasswordAdmin,
+    forceUpdatePassword: resetPasswordAdmin, // Map existing function to the new admin-only method
     changePassword,
     updateUserId,
     deleteUser,

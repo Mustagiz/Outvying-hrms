@@ -77,6 +77,8 @@ const Applicants = () => {
         : applicants.filter((a) => a.stage === selectedStage);
 
     const [showAddModal, setShowAddModal] = useState(false);
+    const [isEditing, setIsEditing] = useState(false);
+    const [currentCandidateId, setCurrentCandidateId] = useState(null);
     const [newCandidate, setNewCandidate] = useState({
         name: '',
         email: '',
@@ -85,24 +87,57 @@ const Applicants = () => {
         stage: 'Applied'
     });
 
-    const handleAddCandidate = () => {
+    const openAddModal = () => {
+        setIsEditing(false);
+        setCurrentCandidateId(null);
+        setNewCandidate({ name: '', email: '', phone: '', jobTitle: '', stage: 'Applied' });
+        setShowAddModal(true);
+    };
+
+    const openEditModal = (candidate) => {
+        setIsEditing(true);
+        setCurrentCandidateId(candidate.id);
+        setNewCandidate({
+            name: candidate.name,
+            email: candidate.email,
+            phone: candidate.phone,
+            jobTitle: candidate.jobTitle,
+            stage: candidate.stage
+        });
+        setShowAddModal(true);
+    };
+
+    const handleSaveCandidate = () => {
         if (!newCandidate.name || !newCandidate.email || !newCandidate.jobTitle) {
             showToast.error("Please fill in all required fields");
             return;
         }
 
-        const candidate = {
-            id: Date.now().toString(),
-            ...newCandidate,
-            score: 0, // Default score
-            appliedDate: new Date().toISOString().split('T')[0],
-            resumeUrl: '#'
-        };
+        if (isEditing) {
+            setApplicants(applicants.map(app =>
+                app.id === currentCandidateId ? { ...app, ...newCandidate } : app
+            ));
+            showToast.success("Candidate updated successfully");
+        } else {
+            const candidate = {
+                id: Date.now().toString(),
+                ...newCandidate,
+                score: 0,
+                appliedDate: new Date().toISOString().split('T')[0],
+                resumeUrl: '#'
+            };
+            setApplicants([candidate, ...applicants]);
+            showToast.success("Candidate added successfully");
+        }
 
-        setApplicants([candidate, ...applicants]);
         setShowAddModal(false);
-        setNewCandidate({ name: '', email: '', phone: '', jobTitle: '', stage: 'Applied' });
-        showToast.success("Candidate added successfully");
+    };
+
+    const handleDeleteCandidate = (id) => {
+        if (window.confirm("Are you sure you want to delete this candidate?")) {
+            setApplicants(applicants.filter(app => app.id !== id));
+            showToast.success("Candidate deleted");
+        }
     };
 
     const moveToStage = (applicantId, newStage) => {
@@ -125,7 +160,7 @@ const Applicants = () => {
                     </p>
                 </div>
                 <div className="flex gap-3">
-                    <Button onClick={() => setShowAddModal(true)} className="flex items-center gap-2">
+                    <Button onClick={openAddModal} className="flex items-center gap-2">
                         <Plus size={18} /> Add Candidate
                     </Button>
                     <Button variant="secondary">
@@ -269,6 +304,20 @@ const Applicants = () => {
                                     <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStageColor(applicant.stage)}`}>
                                         {applicant.stage}
                                     </span>
+                                    <button
+                                        className="text-gray-500 hover:text-blue-600 p-1"
+                                        title="Edit Candidate"
+                                        onClick={() => openEditModal(applicant)}
+                                    >
+                                        <Edit2 size={16} />
+                                    </button>
+                                    <button
+                                        className="text-gray-500 hover:text-red-600 p-1"
+                                        title="Delete Candidate"
+                                        onClick={() => handleDeleteCandidate(applicant.id)}
+                                    >
+                                        <Trash2 size={16} />
+                                    </button>
                                     <span className={`text-sm font-semibold ${getScoreColor(applicant.score)}`}>
                                         Score: {applicant.score}/100
                                     </span>
@@ -306,8 +355,8 @@ const Applicants = () => {
                 ))}
             </div>
 
-            {/* Add Candidate Modal */}
-            <Modal isOpen={showAddModal} onClose={() => setShowAddModal(false)} title="Add New Candidate">
+            {/* Add/Edit Candidate Modal */}
+            <Modal isOpen={showAddModal} onClose={() => setShowAddModal(false)} title={isEditing ? "Edit Candidate" : "Add New Candidate"}>
                 <div className="space-y-4">
                     <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Full Name *</label>
@@ -350,7 +399,7 @@ const Applicants = () => {
                         />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Initial Stage</label>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Current Stage</label>
                         <select
                             value={newCandidate.stage}
                             onChange={e => setNewCandidate({ ...newCandidate, stage: e.target.value })}
@@ -361,7 +410,9 @@ const Applicants = () => {
                     </div>
                     <div className="flex justify-end gap-2 pt-4">
                         <Button variant="secondary" onClick={() => setShowAddModal(false)}>Cancel</Button>
-                        <Button variant="primary" onClick={handleAddCandidate}>Add Candidate</Button>
+                        <Button variant="primary" onClick={handleSaveCandidate}>
+                            {isEditing ? "Update Candidate" : "Add Candidate"}
+                        </Button>
                     </div>
                 </div>
             </Modal>

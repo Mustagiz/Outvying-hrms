@@ -166,12 +166,12 @@ const UserManagement = () => {
   };
 
   const handleManualPasswordReset = async () => {
-    if (!formData.password || !formData.newPassword) {
-      setAlert({ type: 'error', message: 'Both current (old) password and new password are required.' });
+    if (!formData.newPassword) {
+      setAlert({ type: 'error', message: 'New password is required.' });
       return;
     }
 
-    const result = await forceUpdatePassword(selectedUser.email, formData.password, formData.newPassword);
+    const result = await forceUpdatePassword(selectedUser.uid || selectedUser.id, formData.newPassword);
     setAlert({ type: result.success ? 'success' : 'error', message: result.message });
 
     if (result.success) {
@@ -515,18 +515,10 @@ const UserManagement = () => {
           ) : (
             <>
               <p className="text-sm text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20 p-2 rounded">
-                Choose an option to reset password for <strong>{selectedUser?.name}</strong>.
+                Type a new password for <strong>{selectedUser?.name}</strong>. Admins can override passwords without the old one.
               </p>
 
               <div className="space-y-4 pt-2 border-t dark:border-gray-700">
-                <p className="text-xs font-bold text-gray-500 uppercase">Option 1: Manual Overwrite</p>
-                <input
-                  type="password"
-                  placeholder="Old/Current Password of User"
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
-                />
                 <input
                   type="password"
                   placeholder="NEW Password"
@@ -535,12 +527,12 @@ const UserManagement = () => {
                   className="w-full px-4 py-2 border border-primary-300 dark:border-primary-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm font-bold"
                 />
                 <Button onClick={handleManualPasswordReset} className="w-full bg-primary-600">
-                  Update Password Manually
+                  Update Password Immediately
                 </Button>
               </div>
 
               <div className="pt-4 space-y-2 border-t dark:border-gray-700">
-                <p className="text-xs font-bold text-gray-500 uppercase">Option 2: Email Reset Link</p>
+                <p className="text-xs font-bold text-gray-500 uppercase">Backup Option: Email Reset Link</p>
                 <Button onClick={handleResetPassword} variant="secondary" className="w-full">
                   Send Reset Link to {selectedUser?.email}
                 </Button>

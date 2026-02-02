@@ -11,7 +11,7 @@ const AdminManagement = () => {
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [selectedAdmin, setSelectedAdmin] = useState(null);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
-  const [passwordData, setPasswordData] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
+  const [passwordData, setPasswordData] = useState({ newPassword: '', confirmPassword: '' });
   const [showPassword, setShowPassword] = useState(false);
   const [alert, setAlert] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -543,25 +543,17 @@ const AdminManagement = () => {
         </div>
       </Modal>
 
-      {/* Password Change Modal */}
       <Modal isOpen={showPasswordModal} onClose={() => {
         setShowPasswordModal(false);
-        setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+        setPasswordData({ newPassword: '', confirmPassword: '' });
       }} title="Change Admin Password">
         <div className="space-y-4">
           <p className="text-gray-600 dark:text-gray-400">
             Change password for <strong>{selectedAdmin?.name}</strong>
           </p>
           <p className="text-sm text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 p-2 rounded">
-            Enter the admin's current password and a new password to update it immediately.
+            Enter a new password to update it immediately. No old password is required.
           </p>
-          <input
-            type="password"
-            placeholder="Current Password"
-            value={passwordData.currentPassword}
-            onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
-            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-          />
           <input
             type="password"
             placeholder="New Password (min 6 characters)"
@@ -579,7 +571,7 @@ const AdminManagement = () => {
           <div className="flex justify-end gap-2 pt-4 border-t">
             <Button onClick={() => {
               setShowPasswordModal(false);
-              setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+              setPasswordData({ newPassword: '', confirmPassword: '' });
             }} variant="secondary">Cancel</Button>
             <Button onClick={async () => {
               if (passwordData.newPassword !== passwordData.confirmPassword) {
@@ -592,12 +584,12 @@ const AdminManagement = () => {
                 setTimeout(() => setAlert(null), 3000);
                 return;
               }
-              const result = await forceUpdatePassword(selectedAdmin.email, passwordData.currentPassword, passwordData.newPassword);
+              const result = await forceUpdatePassword(selectedAdmin.id || selectedAdmin.uid, passwordData.newPassword);
               setAlert({ type: result.success ? 'success' : 'error', message: result.message });
               if (result.success) {
                 setShowPasswordModal(false);
                 setSelectedAdmin(null);
-                setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+                setPasswordData({ newPassword: '', confirmPassword: '' });
               }
               setTimeout(() => setAlert(null), 3000);
             }} variant="primary">
