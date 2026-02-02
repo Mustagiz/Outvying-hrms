@@ -47,6 +47,13 @@ exports.resetUserPassword = functions.https.onCall(async (data, context) => {
         return { success: true, message: `Password for user ${targetUid} has been reset successfully.` };
     } catch (error) {
         console.error('Error resetting password:', error);
-        throw new functions.https.HttpsError('internal', error.message);
+
+        // If it's already an HttpsError, re-throw it
+        if (error instanceof functions.https.HttpsError) {
+            throw error;
+        }
+
+        // Otherwise, throw a generic internal error with the message
+        throw new functions.https.HttpsError('internal', error.message || 'An unexpected error occurred during password reset.');
     }
 });

@@ -1169,7 +1169,16 @@ export const AuthProvider = ({ children }) => {
       return { success: true, message: result.data.message };
     } catch (e) {
       console.error("Admin Password Reset Error:", e);
-      return { success: false, message: 'Reset failed: ' + (e.message || 'Unknown error') };
+      let errorMessage = e.message || 'Unknown error';
+
+      // If it's a Firebase Functions error, it might have details or a more specific code
+      if (e.code && e.code !== 'internal') {
+        errorMessage = `${e.code}: ${e.message}`;
+      } else if (e.details) {
+        errorMessage = e.details;
+      }
+
+      return { success: false, message: 'Reset failed: ' + errorMessage };
     }
   };
 
