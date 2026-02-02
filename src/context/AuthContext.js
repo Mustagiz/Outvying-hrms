@@ -1232,9 +1232,24 @@ export const AuthProvider = ({ children }) => {
 
   const deleteUser = async (userId) => {
     try {
-      await deleteDoc(doc(db, 'users', userId));
-      return { success: true, message: 'User deleted' };
-    } catch (e) { return { success: false, message: 'Delete failed' }; }
+      const functions = getFunctions();
+      const deleteFn = httpsCallable(functions, 'deleteUserAdmin');
+      const result = await deleteFn({ targetUid: userId });
+
+      // Fallback/Safety: Even if Cloud function fails to find Auth user, 
+      // ensure Firestore doc is gone if possible, or just report success from function
+      return { success: true, message: result.data.message || 'User deleted successfully.' };
+    } catch (e) {
+      console.error("Delete User Error:", e);
+      // Fallback to Firestore-only deletion if Cloud Function fails specifically due to not being found/deployed
+      // This ensures basic functionality remains while user figures out deployment
+      try {
+        await deleteDoc(doc(db, 'users', userId));
+        return { success: true, message: 'User profile removed (Auth account might remain). Please deploy Cloud Functions for full deletion.' };
+      } catch (firestoreError) {
+        return { success: false, message: 'Delete failed: ' + (e.message || 'Unknown error') };
+      }
+    }
   };
 
   // LEAVE POLICY & TYPES
