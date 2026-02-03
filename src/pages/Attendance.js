@@ -404,20 +404,16 @@ const Attendance = () => {
 
   const filteredAttendance = useMemo(() => {
     const role = (currentUser.role || '').toLowerCase();
-    const teamUserIds = new Set(
-      allUsers
-        .filter(u => {
-          if (role === 'manager') {
-            // Direct reports check (case-insensitive name comparison)
-            return (u.reportingTo || '').toLowerCase() === (currentUser.name || '').toLowerCase();
-          }
-          return true;
-        })
-        .map(u => String(u.id))
-    );
+    const teamUserIds = new Set();
+    allUsers.forEach(u => {
+      const isSelf = String(u.id) === String(currentUser.id);
+      const isReport = role === 'manager' && (u.reportingTo || '').toLowerCase().trim() === (currentUser.name || '').toLowerCase().trim();
 
-    // Always include self in the viewable list
-    teamUserIds.add(String(currentUser.id));
+      if (isSelf || isReport || (role !== 'employee' && role !== 'manager')) {
+        if (u.id) teamUserIds.add(String(u.id));
+        if (u.employeeId) teamUserIds.add(String(u.employeeId));
+      }
+    });
 
     let records = attendance.filter(a => teamUserIds.has(String(a.employeeId)));
     const today = new Date().toISOString().split('T')[0];
@@ -490,27 +486,45 @@ const Attendance = () => {
 
   const attendanceStats = useMemo(() => {
     // 1. Get relevant employees based on role (Same scope as the table)
-    const role = (currentUser.role || '').toLowerCase();
-    const relevantEmployees = allUsers.filter(u => {
-      if (role === 'employee') return String(u.id) === String(currentUser.id);
-      if (role === 'manager') {
-        const isManagerOf = (u.reportingTo || '').toLowerCase() === (currentUser.name || '').toLowerCase();
-        return isManagerOf || String(u.id) === String(currentUser.id);
+    const role = (currentUser.role || '').toLowerCase().trim();
+    const relevantEmpIds = new Set();
+
+    allUsers.forEach(u => {
+      const isEmployee = u.role === 'employee' || u.role === 'hr' || u.role === 'manager';
+      if (!isEmployee) return;
+
+      const isSelf = String(u.id) === String(currentUser.id);
+      const isReport = role === 'manager' && (u.reportingTo || '').toLowerCase().trim() === (currentUser.name || '').toLowerCase().trim();
+
+      if (role === 'employee') {
+        if (isSelf) {
+          if (u.id) relevantEmpIds.add(String(u.id));
+          if (u.employeeId) relevantEmpIds.add(String(u.employeeId));
+        }
+      } else if (role === 'manager') {
+        if (isSelf || isReport) {
+          if (u.id) relevantEmpIds.add(String(u.id));
+          if (u.employeeId) relevantEmpIds.add(String(u.employeeId));
+        }
+      } else {
+        // Admin/HR
+        if (u.id) relevantEmpIds.add(String(u.id));
+        if (u.employeeId) relevantEmpIds.add(String(u.employeeId));
       }
-      // Admin/HR see all employees/managers etc.
-      return u.role !== 'admin' && u.role !== 'super_admin';
     });
-    const relevantEmpIds = new Set(relevantEmployees.map(u => String(u.id)));
 
     // 2. Filter and deduplicate attendance records for the selected stats date
     // (Deduplication prevents double-counting if an employee has two records for same date)
     const dailyRecordsMap = new Map();
     attendance.forEach(a => {
       if (a.date === statsDate && relevantEmpIds.has(String(a.employeeId))) {
-        const empId = String(a.employeeId);
+        // Get canonical ID (UID) for deduplication
+        const user = allUsers.find(u => String(u.id) === String(a.employeeId) || String(u.employeeId) === String(a.employeeId));
+        const canonicalId = user ? String(user.id) : String(a.employeeId);
+
         // If multiple records, prefer the one that is NOT virtual or has an actual clock-in
-        if (!dailyRecordsMap.has(empId) || (!a.isVirtual && dailyRecordsMap.get(empId).isVirtual)) {
-          dailyRecordsMap.set(empId, a);
+        if (!dailyRecordsMap.has(canonicalId) || (!a.isVirtual && dailyRecordsMap.get(canonicalId).isVirtual)) {
+          dailyRecordsMap.set(canonicalId, a);
         }
       }
     });
@@ -532,7 +546,9 @@ const Attendance = () => {
 
     // Identify Absent: People who are expected (have roster) but have no non-virtual record OR record status is 'Absent'
     const absentCount = dailyRosters.filter(r => {
-      const record = dailyRecordsMap.get(String(r.employeeId));
+      const user = allUsers.find(u => String(u.id) === String(r.employeeId) || String(u.employeeId) === String(r.employeeId));
+      const canonicalId = user ? String(user.id) : String(r.employeeId);
+      const record = dailyRecordsMap.get(canonicalId);
       return !record || record.isVirtual || record.status === 'Absent';
     }).length;
 
@@ -557,12 +573,12 @@ const Attendance = () => {
       {
         header: 'Emp ID',
         accessor: 'employeeId',
-        render: (row) => allUsers.find(u => String(u.id) === String(row.employeeId))?.employeeId || 'N/A'
+        render: (row) => allUsers.find(u => String(u.id) === String(row.employeeId) || String(u.employeeId) === String(row.employeeId))?.employeeId || row.employeeId || 'N/A'
       },
       {
         header: 'Employee',
         accessor: 'employeeId',
-        render: (row) => allUsers.find(u => String(u.id) === String(row.employeeId))?.name || 'Unknown'
+        render: (row) => allUsers.find(u => String(u.id) === String(row.employeeId) || String(u.employeeId) === String(row.employeeId))?.name || 'Unknown'
       }
     ] : []),
     { header: 'Clock In', accessor: 'clockIn', render: (row) => row.clockIn || 'N/A' },

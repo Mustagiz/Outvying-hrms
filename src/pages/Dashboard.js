@@ -64,8 +64,11 @@ const Dashboard = () => {
 
   const activeAttendance = useMemo(() => {
     const today = getTodayLocal();
+    const myId = String(currentUser.id);
+    const myEmpId = String(currentUser.employeeId);
+
     // Prioritize today's record
-    const todayRecord = attendance.find(a => String(a.employeeId) === String(currentUser.id) && a.date === today);
+    const todayRecord = attendance.find(a => (String(a.employeeId) === myId || String(a.employeeId) === myEmpId) && a.date === today);
 
     // Check if the record has an open session
     if (todayRecord) {
@@ -77,7 +80,7 @@ const Dashboard = () => {
 
     // Otherwise look for ANY open session (e.g. from yesterday)
     const anyOpen = attendance.find(a =>
-      String(a.employeeId) === String(currentUser.id) &&
+      (String(a.employeeId) === myId || String(a.employeeId) === myEmpId) &&
       a.sessions &&
       a.sessions.length > 0 &&
       !a.sessions[a.sessions.length - 1].out
@@ -107,15 +110,18 @@ const Dashboard = () => {
     const currentYear = now.getFullYear();
 
     if (currentUser.role === 'employee') {
-      const myAttendance = attendance.filter(a => String(a.employeeId) === String(currentUser.id));
+      const myId = String(currentUser.id);
+      const myEmpId = String(currentUser.employeeId);
+
+      const myAttendance = attendance.filter(a => String(a.employeeId) === myId || String(a.employeeId) === myEmpId);
       const monthAttendance = myAttendance.filter(a => {
         const date = new Date(a.date);
         return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
       });
       const presentDays = monthAttendance.filter(a => a.status === 'Present' || a.status === 'Late' || a.status === 'Half Day').length;
-      const myLeaves = leaves.filter(l => String(l.employeeId) === String(currentUser.id));
+      const myLeaves = leaves.filter(l => String(l.employeeId) === myId || String(l.employeeId) === myEmpId);
       const pendingLeaves = myLeaves.filter(l => l.status === 'Pending').length;
-      const myBalance = leaveBalances.find(lb => String(lb.employeeId) === String(currentUser.id));
+      const myBalance = leaveBalances.find(lb => String(lb.employeeId) === myId || String(lb.employeeId) === myEmpId);
       const totalLeaveBalance = myBalance
         ? (myBalance.paidLeave?.available || 0) + (myBalance.casualLeave?.available || 0)
         : 0;
@@ -136,9 +142,12 @@ const Dashboard = () => {
       const dailyRecordsMap = new Map();
       attendance.forEach(a => {
         if (a.date === today || (a.date === yesterdayStr && !a.clockOut)) {
-          const empId = String(a.employeeId);
-          if (!dailyRecordsMap.has(empId)) {
-            dailyRecordsMap.set(empId, a);
+          // Canonical ID (UID) matching
+          const user = allUsers.find(u => String(u.id) === String(a.employeeId) || String(u.employeeId) === String(a.employeeId));
+          const canonicalId = user ? String(user.id) : String(a.employeeId);
+
+          if (!dailyRecordsMap.has(canonicalId)) {
+            dailyRecordsMap.set(canonicalId, a);
           }
         }
       });
@@ -214,9 +223,11 @@ const Dashboard = () => {
     const dailyRecordsMap = new Map();
     attendance.forEach(a => {
       if (a.date === today) {
-        const empId = String(a.employeeId);
-        if (!dailyRecordsMap.has(empId) || (!a.isVirtual && dailyRecordsMap.get(empId).isVirtual)) {
-          dailyRecordsMap.set(empId, a);
+        const user = allUsers.find(u => String(u.id) === String(a.employeeId) || String(u.employeeId) === String(a.employeeId));
+        const canonicalId = user ? String(user.id) : String(a.employeeId);
+
+        if (!dailyRecordsMap.has(canonicalId) || (!a.isVirtual && dailyRecordsMap.get(canonicalId).isVirtual)) {
+          dailyRecordsMap.set(canonicalId, a);
         }
       }
     });
