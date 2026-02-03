@@ -131,13 +131,21 @@ const Dashboard = () => {
       // Must be from today OR from yesterday but still clocked in
       const yesterdayDate = new Date();
       yesterdayDate.setDate(yesterdayDate.getDate() - 1);
-      const yesterdayStr = yesterdayDate.getFullYear() + '-' + String(yesterdayDate.getMonth() + 1).padStart(2, '0') + '-' + String(yesterdayDate.getDate()).padStart(2, '0');
+      const yesterdayStr = yesterdayDate.toISOString().split('T')[0];
 
-      const presentToday = attendance.filter(a => {
-        const isToday = a.date === today;
-        const isActiveYesterday = a.date === yesterdayStr && !a.clockOut;
+      const dailyRecordsMap = new Map();
+      attendance.forEach(a => {
+        if (a.date === today || (a.date === yesterdayStr && !a.clockOut)) {
+          const empId = String(a.employeeId);
+          if (!dailyRecordsMap.has(empId)) {
+            dailyRecordsMap.set(empId, a);
+          }
+        }
+      });
+
+      const presentToday = Array.from(dailyRecordsMap.values()).filter(a => {
         const hasActiveStatus = a.status === 'Present' || a.status === 'Late' || a.status === 'Pending' || !a.clockOut;
-        return (isToday || isActiveYesterday) && hasActiveStatus;
+        return hasActiveStatus;
       }).length;
 
       const pendingLeaves = leaves.filter(l => l.status === 'Pending').length;
@@ -201,10 +209,22 @@ const Dashboard = () => {
 
   const attendanceMixData = useMemo(() => {
     const today = getTodayLocal();
-    const todayAtt = attendance.filter(a => a.date === today);
+
+    // Deduplicate today's records
+    const dailyRecordsMap = new Map();
+    attendance.forEach(a => {
+      if (a.date === today) {
+        const empId = String(a.employeeId);
+        if (!dailyRecordsMap.has(empId) || (!a.isVirtual && dailyRecordsMap.get(empId).isVirtual)) {
+          dailyRecordsMap.set(empId, a);
+        }
+      }
+    });
+    const todayAtt = Array.from(dailyRecordsMap.values());
+
     const presentCount = todayAtt.filter(a => a.status === 'Present' || a.status === 'Late').length;
     const halfDayCount = todayAtt.filter(a => a.status === 'Half Day').length;
-    const absentCount = allUsers.filter(u => u.role === 'employee').length - todayAtt.length;
+    const absentCount = allUsers.filter(u => u.role === 'employee').length - todayAtt.filter(a => !a.isVirtual).length;
 
     return {
       labels: ['Present', 'Half Day', 'Absent'],

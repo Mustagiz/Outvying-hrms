@@ -175,7 +175,7 @@ export const processBiometricSync = (rosters = [], attendance = []) => {
     );
 
     const record = {
-      id: `${data.employeeId}-${effectiveDate}`,
+      id: `${data.employeeId}_${effectiveDate}`,
       employeeId: data.employeeId,
       date: effectiveDate, // Store under Business Day
       istDate: data.date, // Preserve IST for audit
@@ -257,7 +257,7 @@ export const processBiometricImport = (importedRows, users, rosters, currentAtte
 
     // Create Attendance Record
     const record = {
-      id: `${user.employeeId}-${group.date}`,
+      id: `${user.employeeId}_${group.date}`,
       employeeId: user.employeeId, // Keep string/number consistent
       uid: user.id || user.uid, // Store Firestore UID if available
       name: user.name || user.displayName,

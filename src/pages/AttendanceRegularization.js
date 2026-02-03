@@ -168,7 +168,7 @@ const AttendanceRegularization = () => {
             }
           } else {
             // No record exists, creating new with standard ID
-            const docId = `${employeeId}-${date}`;
+            const docId = `${employeeId}_${date}`;
             await setDoc(doc(db, 'attendance', docId), {
               employeeId,
               date,

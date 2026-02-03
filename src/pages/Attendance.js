@@ -266,7 +266,7 @@ const Attendance = () => {
               }
             }
           } else {
-            const newId = `${empId}-${date}`;
+            const newId = `${empId}_${date}`;
             await setDoc(doc(db, 'attendance', newId), {
               employeeId: empId,
               date,
@@ -375,7 +375,7 @@ const Attendance = () => {
             updatedAt: serverTimestamp()
           };
 
-          const docId = `${empId}-${date}`;
+          const docId = `${empId}_${date}`;
           await setDoc(doc(db, 'attendance', docId), attendanceUpdate, { merge: true });
           successCount++;
         }
@@ -489,15 +489,40 @@ const Attendance = () => {
   }, [filteredAttendance, currentPage]);
 
   const attendanceStats = useMemo(() => {
-    // 1. Get all employees (excluding admins)
-    const employees = allUsers.filter(u => u.role === 'employee' || u.role === 'hr' || u.role === 'manager');
+    // 1. Get relevant employees based on role (Same scope as the table)
+    const role = (currentUser.role || '').toLowerCase();
+    const relevantEmployees = allUsers.filter(u => {
+      if (role === 'employee') return String(u.id) === String(currentUser.id);
+      if (role === 'manager') {
+        const isManagerOf = (u.reportingTo || '').toLowerCase() === (currentUser.name || '').toLowerCase();
+        return isManagerOf || String(u.id) === String(currentUser.id);
+      }
+      // Admin/HR see all employees/managers etc.
+      return u.role !== 'admin' && u.role !== 'super_admin';
+    });
+    const relevantEmpIds = new Set(relevantEmployees.map(u => String(u.id)));
 
-    // 2. Filter attendance records for the selected stats date
-    const dailyRecords = attendance.filter(a => a.date === statsDate);
+    // 2. Filter and deduplicate attendance records for the selected stats date
+    // (Deduplication prevents double-counting if an employee has two records for same date)
+    const dailyRecordsMap = new Map();
+    attendance.forEach(a => {
+      if (a.date === statsDate && relevantEmpIds.has(String(a.employeeId))) {
+        const empId = String(a.employeeId);
+        // If multiple records, prefer the one that is NOT virtual or has an actual clock-in
+        if (!dailyRecordsMap.has(empId) || (!a.isVirtual && dailyRecordsMap.get(empId).isVirtual)) {
+          dailyRecordsMap.set(empId, a);
+        }
+      }
+    });
+    const dailyRecords = Array.from(dailyRecordsMap.values());
 
     // 3. Find who HAS rosters for today (to identify expected attendance)
-    const dailyRosters = rosters.filter(r => r.date === statsDate && r.shiftName !== 'Weekly Off' && r.shiftName !== 'Holiday');
-    const expectedEmpIds = new Set(dailyRosters.map(r => String(r.employeeId)));
+    const dailyRosters = rosters.filter(r =>
+      r.date === statsDate &&
+      relevantEmpIds.has(String(r.employeeId)) &&
+      r.shiftName !== 'Weekly Off' &&
+      r.shiftName !== 'Holiday'
+    );
 
     // 4. Calculate stats
     const presentOnly = dailyRecords.filter(a => a.status === 'Present').length;
@@ -505,11 +530,10 @@ const Attendance = () => {
     const halfDay = dailyRecords.filter(a => a.status === 'Half Day').length;
     const lwp = dailyRecords.filter(a => a.status === 'LWP').length;
 
-    // Identify Absent: People who are expected (have roster) but have no record OR record status is 'Absent'
-    const recordEmpIds = new Set(dailyRecords.map(a => String(a.employeeId)));
+    // Identify Absent: People who are expected (have roster) but have no non-virtual record OR record status is 'Absent'
     const absentCount = dailyRosters.filter(r => {
-      const record = dailyRecords.find(a => String(a.employeeId) === String(r.employeeId));
-      return !record || record.status === 'Absent';
+      const record = dailyRecordsMap.get(String(r.employeeId));
+      return !record || record.isVirtual || record.status === 'Absent';
     }).length;
 
     const totalHours = dailyRecords.reduce((sum, a) => sum + parseFloat(a.workHours || 0), 0);
@@ -517,15 +541,15 @@ const Attendance = () => {
     const workingDays = dailyRecords.reduce((sum, a) => sum + parseFloat(a.workingDays || 0), 0);
 
     return {
-      present: presentOnly + late, // Total present includes late arrivals
+      present: presentOnly + late,
       late,
       halfDay,
-      lwp: lwp + absentCount, // Group LWP and Absent as per the card label
+      lwp: lwp + absentCount,
       totalHours: totalHours.toFixed(1),
       totalOvertime: totalOvertime.toFixed(1),
       workingDays: workingDays.toFixed(1)
     };
-  }, [attendance, statsDate, allUsers, rosters]);
+  }, [attendance, statsDate, allUsers, rosters, currentUser]);
 
   const columns = [
     { header: 'Date', accessor: 'date', render: (row) => formatDate(row.date) },
