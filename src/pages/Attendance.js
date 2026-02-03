@@ -9,7 +9,7 @@ import { doc, setDoc, updateDoc, deleteDoc, collection, query, where, getDocs, s
 import { db } from '../config/firebase';
 
 const Attendance = () => {
-  const { currentUser, attendance, rosters, clockIn, clockOut, syncBiometric, allUsers, attendanceRules } = useAuth();
+  const { currentUser, attendance, rosters, clockIn, clockOut, syncBiometric, allUsers, attendanceRules, leaves } = useAuth();
   const [alert, setAlert] = useState(null);
   const [isSyncing, setIsSyncing] = useState(false);
 
@@ -490,6 +490,9 @@ const Attendance = () => {
     const relevantEmpIds = new Set();
 
     allUsers.forEach(u => {
+      // 1a. Filter out deleted users
+      if (u.isDeleted) return;
+
       const isEmployee = u.role === 'employee' || u.role === 'hr' || u.role === 'manager';
       if (!isEmployee) return;
 
@@ -531,12 +534,21 @@ const Attendance = () => {
     const dailyRecords = Array.from(dailyRecordsMap.values());
 
     // 3. Find who HAS rosters for today (to identify expected attendance)
-    const dailyRosters = rosters.filter(r =>
-      r.date === statsDate &&
-      relevantEmpIds.has(String(r.employeeId)) &&
-      r.shiftName !== 'Weekly Off' &&
-      r.shiftName !== 'Holiday'
-    );
+    // 3. Find who HAS rosters for today (to identify expected attendance)
+    // Deduplicate by employee to avoid double counting if duplicate rosters exist
+    const dailyRostersMap = new Map();
+    rosters.forEach(r => {
+      if (r.date === statsDate && relevantEmpIds.has(String(r.employeeId))) {
+        const hasWorkingHours = r.fullDayHours > 0 || (r.shiftName !== 'Weekly Off' && r.shiftName !== 'Holiday');
+        if (hasWorkingHours) {
+          const empId = String(r.employeeId);
+          if (!dailyRostersMap.has(empId)) {
+            dailyRostersMap.set(empId, r);
+          }
+        }
+      }
+    });
+    const dailyRosters = Array.from(dailyRostersMap.values());
 
     // 4. Calculate stats
     const presentOnly = dailyRecords.filter(a => a.status === 'Present').length;
@@ -548,6 +560,17 @@ const Attendance = () => {
     const absentCount = dailyRosters.filter(r => {
       const user = allUsers.find(u => String(u.id) === String(r.employeeId) || String(u.employeeId) === String(r.employeeId));
       const canonicalId = user ? String(user.id) : String(r.employeeId);
+
+      // Check if employee has an approved leave for this date
+      const onLeave = leaves.find(l =>
+        (String(l.employeeId) === String(user?.id) || String(l.employeeId) === String(user?.employeeId)) &&
+        l.status === 'Approved' &&
+        l.startDate <= statsDate &&
+        l.endDate >= statsDate
+      );
+
+      if (onLeave) return false; // Not absent if on approved leave
+
       const record = dailyRecordsMap.get(canonicalId);
       return !record || record.isVirtual || record.status === 'Absent';
     }).length;
@@ -565,7 +588,7 @@ const Attendance = () => {
       totalOvertime: totalOvertime.toFixed(1),
       workingDays: workingDays.toFixed(1)
     };
-  }, [attendance, statsDate, allUsers, rosters, currentUser]);
+  }, [attendance, statsDate, allUsers, rosters, currentUser, leaves]);
 
   const columns = [
     { header: 'Date', accessor: 'date', render: (row) => formatDate(row.date) },

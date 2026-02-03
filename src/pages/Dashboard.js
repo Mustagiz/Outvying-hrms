@@ -144,6 +144,7 @@ const Dashboard = () => {
         if (a.date === today || (a.date === yesterdayStr && !a.clockOut)) {
           // Canonical ID (UID) matching
           const user = allUsers.find(u => String(u.id) === String(a.employeeId) || String(u.employeeId) === String(a.employeeId));
+          if (user?.isDeleted) return;
           const canonicalId = user ? String(user.id) : String(a.employeeId);
 
           if (!dailyRecordsMap.has(canonicalId)) {
@@ -235,7 +236,37 @@ const Dashboard = () => {
 
     const presentCount = todayAtt.filter(a => a.status === 'Present' || a.status === 'Late').length;
     const halfDayCount = todayAtt.filter(a => a.status === 'Half Day').length;
-    const absentCount = allUsers.filter(u => u.role === 'employee').length - todayAtt.filter(a => !a.isVirtual).length;
+
+    // Robust Absence Logic (Matching Attendance.js)
+    // Deduplicate rosters by employee to avoid double counting
+    const drMap = new Map();
+    rosters.forEach(r => {
+      if (r.date === today && (r.fullDayHours > 0 || (r.shiftName !== 'Weekly Off' && r.shiftName !== 'Holiday'))) {
+        const empId = String(r.employeeId);
+        if (!drMap.has(empId)) {
+          drMap.set(empId, r);
+        }
+      }
+    });
+    const dailyRosters = Array.from(drMap.values());
+
+    const absentCount = dailyRosters.filter(r => {
+      const user = allUsers.find(u => String(u.id) === String(r.employeeId) || String(u.employeeId) === String(r.employeeId));
+      const canonicalId = user ? String(user.id) : String(r.employeeId);
+
+      // Check if employee has an approved leave for today
+      const onLeave = leaves.find(l =>
+        (String(l.employeeId) === String(user?.id) || String(l.employeeId) === String(user?.employeeId)) &&
+        l.status === 'Approved' &&
+        l.startDate <= today &&
+        l.endDate >= today
+      );
+
+      if (onLeave) return false;
+
+      const record = dailyRecordsMap.get(canonicalId);
+      return !record || record.isVirtual || record.status === 'Absent';
+    }).length;
 
     return {
       labels: ['Present', 'Half Day', 'Absent'],
@@ -247,7 +278,7 @@ const Dashboard = () => {
         }
       ]
     };
-  }, [attendance, allUsers]);
+  }, [attendance, allUsers, rosters, leaves]);
 
   const headcountGrowthData = useMemo(() => {
     // Group employees by joining month
