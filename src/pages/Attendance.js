@@ -586,7 +586,8 @@ const Attendance = () => {
       lwp: lwp + absentCount,
       totalHours: totalHours.toFixed(1),
       totalOvertime: totalOvertime.toFixed(1),
-      workingDays: workingDays.toFixed(1)
+      workingDays: workingDays.toFixed(1),
+      isPersonal: role === 'employee'
     };
   }, [attendance, statsDate, allUsers, rosters, currentUser, leaves]);
 
@@ -736,38 +737,44 @@ const Attendance = () => {
           </div>
 
           <div className={`grid grid-cols-1 sm:grid-cols-2 ${currentUser.role !== 'manager' ? 'lg:grid-cols-3' : 'lg:grid-cols-2'} gap-4`}>
-            <div className="group p-5 bg-gradient-to-br from-green-50 to-white dark:from-green-900/10 dark:to-gray-800 rounded-2xl border border-green-100 dark:border-green-900/30 hover:shadow-md transition-all">
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-xs font-bold text-green-700 uppercase tracking-widest">Present</p>
-                <div className="p-2 bg-green-100 dark:bg-green-900/40 rounded-lg text-green-600">
-                  <Calendar size={20} />
+            {currentUser.role !== 'employee' && (
+              <div className="group p-5 bg-gradient-to-br from-green-50 to-white dark:from-green-900/10 dark:to-gray-800 rounded-2xl border border-green-100 dark:border-green-900/30 hover:shadow-md transition-all">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-xs font-bold text-green-700 uppercase tracking-widest">Present</p>
+                  <div className="p-2 bg-green-100 dark:bg-green-900/40 rounded-lg text-green-600">
+                    <Calendar size={20} />
+                  </div>
                 </div>
+                <p className="text-3xl font-extrabold text-green-700 dark:text-green-300">{attendanceStats.present}</p>
+                <p className="text-[10px] text-green-600/60 mt-1 italic">Employees present today</p>
               </div>
-              <p className="text-3xl font-extrabold text-green-700 dark:text-green-300">{attendanceStats.present}</p>
-              <p className="text-[10px] text-green-600/60 mt-1 italic">Employees present today</p>
-            </div>
+            )}
 
-            <div className="group p-5 bg-gradient-to-br from-yellow-50 to-white dark:from-yellow-900/10 dark:to-gray-800 rounded-2xl border border-yellow-100 dark:border-yellow-900/30 hover:shadow-md transition-all">
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-xs font-bold text-yellow-700 uppercase tracking-widest">Late</p>
-                <div className="p-2 bg-yellow-100 dark:bg-yellow-900/40 rounded-lg text-yellow-600">
-                  <Clock size={20} />
+            {currentUser.role !== 'employee' && (
+              <div className="group p-5 bg-gradient-to-br from-yellow-50 to-white dark:from-yellow-900/10 dark:to-gray-800 rounded-2xl border border-yellow-100 dark:border-yellow-900/30 hover:shadow-md transition-all">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-xs font-bold text-yellow-700 uppercase tracking-widest">Late</p>
+                  <div className="p-2 bg-yellow-100 dark:bg-yellow-900/40 rounded-lg text-yellow-600">
+                    <Clock size={20} />
+                  </div>
                 </div>
+                <p className="text-3xl font-extrabold text-yellow-700 dark:text-yellow-300">{attendanceStats.late}</p>
+                <p className="text-[10px] text-yellow-600/60 mt-1 italic">Late arrivals today</p>
               </div>
-              <p className="text-3xl font-extrabold text-yellow-700 dark:text-yellow-300">{attendanceStats.late}</p>
-              <p className="text-[10px] text-yellow-600/60 mt-1 italic">Late arrivals today</p>
-            </div>
+            )}
 
-            <div className="group p-5 bg-gradient-to-br from-orange-50 to-white dark:from-orange-900/10 dark:to-gray-800 rounded-2xl border border-orange-100 dark:border-orange-900/30 hover:shadow-md transition-all">
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-xs font-bold text-orange-700 uppercase tracking-widest">Half Days</p>
-                <div className="p-2 bg-orange-100 dark:bg-orange-900/40 rounded-lg text-orange-600">
-                  <Calendar size={20} />
+            {currentUser.role !== 'employee' && (
+              <div className="group p-5 bg-gradient-to-br from-orange-50 to-white dark:from-orange-900/10 dark:to-gray-800 rounded-2xl border border-orange-100 dark:border-orange-900/30 hover:shadow-md transition-all">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-xs font-bold text-orange-700 uppercase tracking-widest">Half Days</p>
+                  <div className="p-2 bg-orange-100 dark:bg-orange-900/40 rounded-lg text-orange-600">
+                    <Calendar size={20} />
+                  </div>
                 </div>
+                <p className="text-3xl font-extrabold text-orange-700 dark:text-orange-300">{attendanceStats.halfDay}</p>
+                <p className="text-[10px] text-orange-600/60 mt-1 italic">Half day attendance</p>
               </div>
-              <p className="text-3xl font-extrabold text-orange-700 dark:text-orange-300">{attendanceStats.halfDay}</p>
-              <p className="text-[10px] text-orange-600/60 mt-1 italic">Half day attendance</p>
-            </div>
+            )}
 
             <div className="group p-5 bg-gradient-to-br from-red-50 to-white dark:from-red-900/10 dark:to-gray-800 rounded-2xl border border-red-100 dark:border-red-900/30 hover:shadow-md transition-all">
               <div className="flex items-center justify-between mb-3">
@@ -777,7 +784,9 @@ const Attendance = () => {
                 </div>
               </div>
               <p className="text-3xl font-extrabold text-red-700 dark:text-red-300">{attendanceStats.lwp}</p>
-              <p className="text-[10px] text-red-600/60 mt-1 italic">Leave without pay today</p>
+              <p className="text-[10px] text-red-600/60 mt-1 italic">
+                {attendanceStats.isPersonal ? 'Your absence/LWP status' : 'Leave without pay today'}
+              </p>
             </div>
 
             <div className="group p-5 bg-gradient-to-br from-blue-50 to-white dark:from-blue-900/10 dark:to-gray-800 rounded-2xl border border-blue-100 dark:border-blue-900/30 hover:shadow-md transition-all">
@@ -791,7 +800,9 @@ const Attendance = () => {
                 <p className="text-3xl font-extrabold text-blue-700 dark:text-blue-300">{attendanceStats.totalHours}</p>
                 <span className="text-xs font-bold text-blue-500/60">HRS</span>
               </div>
-              <p className="text-[10px] text-blue-600/60 mt-1 italic">Total hours worked today</p>
+              <p className="text-[10px] text-blue-600/60 mt-1 italic">
+                {attendanceStats.isPersonal ? 'Your total work hours' : 'Total hours worked today'}
+              </p>
             </div>
 
             <div className="group p-5 bg-gradient-to-br from-purple-50 to-white dark:from-purple-900/10 dark:to-gray-800 rounded-2xl border border-purple-100 dark:border-purple-900/30 hover:shadow-md transition-all">
@@ -802,7 +813,9 @@ const Attendance = () => {
                 </div>
               </div>
               <p className="text-3xl font-extrabold text-purple-700 dark:text-purple-300">{attendanceStats.workingDays}</p>
-              <p className="text-[10px] text-purple-600/60 mt-1 italic">Billable days count</p>
+              <p className="text-[10px] text-purple-600/60 mt-1 italic">
+                {attendanceStats.isPersonal ? 'Your billable days' : 'Billable days count'}
+              </p>
             </div>
           </div>
         </Card>
