@@ -100,7 +100,7 @@ const EmployeeDirectory = () => {
 
     // Managers only see their direct reports
     if (role === 'manager') {
-      return allUsers.filter(u => u.reportingTo === currentUser.name);
+      return allUsers.filter(u => !u.isDeleted && u.reportingTo === currentUser.name);
     }
 
     // Admins and Super Admins see everyone
@@ -108,10 +108,10 @@ const EmployeeDirectory = () => {
       return allUsers;
     }
 
-    // Default: Show common employee roles
+    // Default: Show common employee roles (filtering out deleted)
     return allUsers.filter(u => {
       const uRole = (u.role || '').toLowerCase();
-      return uRole === 'employee' || uRole === 'hr' || uRole === 'manager';
+      return !u.isDeleted && (uRole === 'employee' || uRole === 'hr' || uRole === 'manager');
     });
   }, [allUsers, currentUser]);
 

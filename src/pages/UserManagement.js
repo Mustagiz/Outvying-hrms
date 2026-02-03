@@ -25,8 +25,10 @@ const UserManagement = () => {
   const itemsPerPage = 10;
 
   const filteredUsers = allUsers.filter(u =>
-    (u.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (u.employeeId || '').toLowerCase().includes(searchTerm.toLowerCase())
+    !u.isDeleted && (
+      (u.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (u.employeeId || '').toLowerCase().includes(searchTerm.toLowerCase())
+    )
   );
 
   const paginatedUsers = React.useMemo(() => {
@@ -464,7 +466,7 @@ const UserManagement = () => {
           >
             <option value="">Select Reporting Manager (Optional)</option>
             {[...allUsers]
-              .filter(u => u && u.name)
+              .filter(u => u && u.name && !u.isDeleted)
               .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
               .map(u => (
                 <option key={u.id || u.uid} value={u.name}>{u.name} ({u.role || u.designation})</option>

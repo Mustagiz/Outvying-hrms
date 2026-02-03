@@ -1115,13 +1115,13 @@ const Roster = () => {
                                         type="checkbox"
                                         className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                                         onChange={handleSelectAll}
-                                        checked={allUsers.filter(u => ROSTERABLE_ROLES.includes(u.role)).length > 0 && formData.selectedEmployees.length === allUsers.filter(u => ROSTERABLE_ROLES.includes(u.role)).length}
+                                        checked={allUsers.filter(u => ROSTERABLE_ROLES.includes(u.role) && !u.isDeleted).length > 0 && formData.selectedEmployees.length === allUsers.filter(u => ROSTERABLE_ROLES.includes(u.role) && !u.isDeleted).length}
                                     />
                                     <span>Select All</span>
                                 </label>
                             </div>
                             <div className="border border-gray-300 dark:border-gray-600 rounded-lg max-h-48 overflow-y-auto p-2 bg-white dark:bg-gray-700">
-                                {allUsers.filter(u => ROSTERABLE_ROLES.includes(u.role)).map(u => (
+                                {allUsers.filter(u => ROSTERABLE_ROLES.includes(u.role) && !u.isDeleted).map(u => (
                                     <label key={u.id} className="flex items-center space-x-3 p-2 hover:bg-gray-50 dark:hover:bg-gray-600 rounded cursor-pointer transition-colors border-b border-gray-100 dark:border-gray-600 last:border-0">
                                         <input
                                             type="checkbox"
@@ -1132,7 +1132,7 @@ const Roster = () => {
                                         <span className="text-sm text-gray-700 dark:text-gray-200 font-medium">{u.name} <span className="text-xs text-gray-500 dark:text-gray-400 font-normal">({u.role === 'employee' ? u.employeeId : u.role})</span></span>
                                     </label>
                                 ))}
-                                {allUsers.filter(u => ROSTERABLE_ROLES.includes(u.role)).length === 0 && (
+                                {allUsers.filter(u => ROSTERABLE_ROLES.includes(u.role) && !u.isDeleted).length === 0 && (
                                     <p className="text-sm text-gray-500 text-center py-2">No users found</p>
                                 )}
                             </div>

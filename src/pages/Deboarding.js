@@ -5,7 +5,7 @@ import { deboardingTasks } from '../data/mockData';
 import { CheckCircle, Circle, UserMinus, Eye, Edit2, Trash2, Star, CheckSquare } from 'lucide-react';
 
 const Deboarding = () => {
-  const { allUsers } = useAuth();
+  const { allUsers, updateUser } = useAuth();
   const [tasks, setTasks] = useState(deboardingTasks);
   const [showModal, setShowModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
@@ -113,10 +113,18 @@ const Deboarding = () => {
     exitedStatuses[formData.employeeId] = formData.exitStatus;
     localStorage.setItem('exitedEmployeeStatuses', JSON.stringify(exitedStatuses));
 
-    setShowModal(false);
-    resetForm();
-    alert(isEditing ? 'Exit record updated successfully' : 'Employee exit record saved successfully');
-    window.location.reload();
+    // Update Firestore to mark user as deleted/deboarded
+    updateUser(formData.employeeId, {
+      isDeleted: true,
+      status: 'Exited',
+      exitStatus: formData.exitStatus,
+      lastWorkingDay: formData.lastWorkingDay
+    }).then(() => {
+      setShowModal(false);
+      resetForm();
+      alert(isEditing ? 'Exit record updated successfully' : 'Employee exit record saved successfully');
+      // No need for window.location.reload() if using real-time Firestore updates
+    });
   };
 
   const resetForm = () => {
@@ -172,8 +180,8 @@ const Deboarding = () => {
       header: 'Status',
       render: (row) => (
         <span className={`px-2 py-1 rounded-full text-xs font-medium ${row.exitStatus === 'Resigned' ? 'bg-blue-100 text-blue-800' :
-            row.exitStatus === 'Terminated' ? 'bg-red-100 text-red-800' :
-              'bg-gray-100 text-gray-800'
+          row.exitStatus === 'Terminated' ? 'bg-red-100 text-red-800' :
+            'bg-gray-100 text-gray-800'
           }`}>
           {row.exitStatus}
         </span>
@@ -236,8 +244,8 @@ const Deboarding = () => {
               <div
                 key={task.id}
                 className={`flex items-center space-x-3 p-3 rounded-xl cursor-pointer transition-all border ${task.completed
-                    ? 'bg-green-50/50 border-green-100 dark:bg-green-900/10 dark:border-green-900/20'
-                    : 'bg-gray-50 dark:bg-gray-800/50 border-gray-100 dark:border-gray-700/50 hover:border-primary-200'
+                  ? 'bg-green-50/50 border-green-100 dark:bg-green-900/10 dark:border-green-900/20'
+                  : 'bg-gray-50 dark:bg-gray-800/50 border-gray-100 dark:border-gray-700/50 hover:border-primary-200'
                   }`}
                 onClick={() => toggleTask(task.id)}
               >
@@ -391,8 +399,8 @@ const Deboarding = () => {
                       clearance: { ...formData.clearance, [dept]: !formData.clearance[dept] }
                     })}
                     className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all ${formData.clearance[dept]
-                        ? 'bg-white dark:bg-gray-800 border-blue-200 shadow-sm'
-                        : 'bg-transparent border-dashed border-gray-200 dark:border-gray-700'
+                      ? 'bg-white dark:bg-gray-800 border-blue-200 shadow-sm'
+                      : 'bg-transparent border-dashed border-gray-200 dark:border-gray-700'
                       }`}
                   >
                     <span className="text-xs font-bold text-gray-700 dark:text-gray-200 uppercase">{dept} Clearance</span>

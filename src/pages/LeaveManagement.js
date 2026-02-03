@@ -145,10 +145,10 @@ const LeaveManagement = () => {
 
     // Manager Filter: Only show leaves from direct reports
     if (currentUser.role === 'manager') {
-      const myTeamIds = allUsers.filter(u => u.reportingTo === currentUser.name).map(u => u.id); // Assuming ID match
+      const myTeamIds = allUsers.filter(u => u.reportingTo === currentUser.name && !u.isDeleted).map(u => u.id); // Assuming ID match
       // Fallback to name match if IDs don't align, but safe to assume we filter by employeeId if we had it.
       // Since leaves store employeeId, let's match that.
-      const team = allUsers.filter(u => u.reportingTo === currentUser.name);
+      const team = allUsers.filter(u => u.reportingTo === currentUser.name && !u.isDeleted);
       const teamIds = new Set(team.map(t => String(t.id)).concat(team.map(t => String(t.uid))));
 
       filtered = filtered.filter(l => teamIds.has(String(l.employeeId)));
@@ -684,7 +684,7 @@ const LeaveManagement = () => {
             label="Employee"
             value={allocationData.employeeId}
             onChange={(e) => setAllocationData(prev => ({ ...prev, employeeId: e.target.value }))}
-            options={[...allUsers].sort((a, b) => (a.name || '').localeCompare(b.name || '')).map(u => ({ value: String(u.uid || u.id), label: `${u.name} (${u.employeeId})` }))}
+            options={[...allUsers].filter(u => !u.isDeleted).sort((a, b) => (a.name || '').localeCompare(b.name || '')).map(u => ({ value: String(u.uid || u.id), label: `${u.name} (${u.employeeId})` }))}
             required
           />
           <Select
