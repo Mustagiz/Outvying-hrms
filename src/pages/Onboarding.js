@@ -249,16 +249,116 @@ const Onboarding = () => {
 
           {showForm && (
             <Card title="New Employee Registration" className="mb-6">
-              <form onSubmit={handleSubmit} className="p-4">
-                {/* ... form fields ... */}
-                <div className="grid grid-cols-2 gap-4">
-                  <Input label="First Name" name="firstName" value={formData.firstName} onChange={handleInputChange} required />
-                  <Input label="Last Name" name="lastName" value={formData.lastName} onChange={handleInputChange} required />
-                  {/* Simplified for brevity while keeping functionality */}
+              <form onSubmit={handleSubmit} className="p-6 space-y-6">
+                {/* Personal Information */}
+                <div>
+                  <h3 className="text-sm font-bold text-primary-600 uppercase tracking-wider mb-4 border-b pb-2">Personal Information</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Input label="First Name" name="firstName" value={formData.firstName} onChange={handleInputChange} required />
+                    <Input label="Last Name" name="lastName" value={formData.lastName} onChange={handleInputChange} required />
+                    <Input label="Email Address" type="email" name="email" value={formData.email} onChange={handleInputChange} required />
+                    <Input label="Phone Number" name="phone" value={formData.phone} onChange={handleInputChange} required />
+                    <Input label="Employee ID (Optional)" name="employeeId" value={formData.employeeId} onChange={handleInputChange} placeholder="Auto-generated if empty" />
+                    <Select
+                      label="Blood Group"
+                      name="bloodGroup"
+                      value={formData.bloodGroup}
+                      onChange={handleInputChange}
+                      options={['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map(bg => ({ value: bg, label: bg }))}
+                    />
+                  </div>
                 </div>
-                <div className="mt-4 flex justify-end gap-2">
+
+                {/* Job Details */}
+                <div>
+                  <h3 className="text-sm font-bold text-primary-600 uppercase tracking-wider mb-4 border-b pb-2">Employment Details</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Select
+                      label="Department"
+                      name="department"
+                      value={formData.department}
+                      onChange={handleInputChange}
+                      options={[...departmentsList.map(d => ({ value: d, label: d })), { value: 'Other', label: 'Other/Custom' }]}
+                    />
+                    {formData.department === 'Other' && (
+                      <Input label="Custom Department" name="customDepartment" value={formData.customDepartment} onChange={handleInputChange} required />
+                    )}
+                    <Select
+                      label="Designation"
+                      name="designation"
+                      value={formData.designation}
+                      onChange={handleInputChange}
+                      options={[...designations.map(d => ({ value: d, label: d })), { value: 'Other', label: 'Other/Custom' }]}
+                    />
+                    {formData.designation === 'Other' && (
+                      <Input label="Custom Designation" name="customDesignation" value={formData.customDesignation} onChange={handleInputChange} required />
+                    )}
+                    <Select
+                      label="Reporting To"
+                      name="reportingTo"
+                      value={formData.reportingTo}
+                      onChange={handleInputChange}
+                      options={[
+                        { value: 'Admin', label: 'Admin' },
+                        ...departmentsList.map(d => ({ value: `${d} Head`, label: `${d} Head` }))
+                      ]}
+                    />
+                    <Select
+                      label="Access Role"
+                      name="role"
+                      value={formData.role}
+                      onChange={handleInputChange}
+                      options={[
+                        { value: 'employee', label: 'Employee' },
+                        { value: 'hr', label: 'HR Admin' },
+                        { value: 'manager', label: 'Manager' }
+                      ]}
+                    />
+                  </div>
+                </div>
+
+                {/* Address Information */}
+                <div>
+                  <h3 className="text-sm font-bold text-primary-600 uppercase tracking-wider mb-4 border-b pb-2">Address Details</h3>
+                  <div className="space-y-4">
+                    <Input label="Address Line 1" name="addressLine1" value={formData.addressLine1} onChange={handleInputChange} required />
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                      <Input label="City" name="city" value={formData.city} onChange={handleInputChange} required />
+                      <Input label="State" name="state" value={formData.state} onChange={handleInputChange} required />
+                      <Input label="Country" name="country" value={formData.country} onChange={handleInputChange} required />
+                      <Input label="Zip Code" name="zipCode" value={formData.zipCode} onChange={handleInputChange} required />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bank & Financial */}
+                <div>
+                  <h3 className="text-sm font-bold text-primary-600 uppercase tracking-wider mb-4 border-b pb-2">Financial & ID Details</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Input label="PAN Number" name="panNumber" value={formData.panNumber} onChange={handleInputChange} required />
+                    <Input label="Bank Name" name="bankName" value={formData.bankName} onChange={handleInputChange} required />
+                    <Input label="Account Number" name="bankAccount" value={formData.bankAccount} onChange={handleInputChange} required />
+                    <Input label="IFSC Code" name="ifscCode" value={formData.ifscCode} onChange={handleInputChange} required />
+                  </div>
+                </div>
+
+                {/* Security */}
+                <div>
+                  <h3 className="text-sm font-bold text-primary-600 uppercase tracking-wider mb-4 border-b pb-2">Login Credentials</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Input label="Login Password" type="password" name="password" value={formData.password} onChange={handleInputChange} required />
+                    <div className="flex items-center text-xs text-gray-500 italic pt-8">
+                      User ID will be set to: {formData.email || 'N/A'}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-6 border-t flex justify-end gap-3">
                   <Button variant="secondary" onClick={() => setShowForm(false)}>Cancel</Button>
-                  <Button type="submit">Add Employee</Button>
+                  <Button type="submit" className="px-8 shadow-lg shadow-primary-500/30">
+                    <UserPlus size={18} className="mr-2" />
+                    Complete Registration
+                  </Button>
                 </div>
               </form>
             </Card>
