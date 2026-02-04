@@ -103,9 +103,9 @@ const EmployeeDirectory = () => {
       return allUsers.filter(u => !u.isDeleted && u.reportingTo === currentUser.name);
     }
 
-    // Admins and Super Admins see everyone
+    // Admins and Super Admins see everyone (filtering out deleted)
     if (role === 'admin' || role === 'super_admin') {
-      return allUsers;
+      return allUsers.filter(u => !u.isDeleted);
     }
 
     // Default: Show common employee roles (filtering out deleted)
