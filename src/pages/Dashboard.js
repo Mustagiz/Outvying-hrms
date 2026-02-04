@@ -159,7 +159,10 @@ const Dashboard = () => {
       }).length;
 
       const pendingLeaves = leaves.filter(l => l.status === 'Pending').length;
-      const activeEmployees = allUsers.filter(u => u.role === 'employee').length;
+      const activeEmployees = allUsers.filter(u => {
+        const uRole = (u.role || '').toLowerCase();
+        return !u.isDeleted && (uRole === 'employee' || uRole === 'hr' || uRole === 'manager');
+      }).length;
 
       return [
         { label: 'Total Workforce', value: activeEmployees, icon: Users, color: 'text-blue-600', bg: 'bg-blue-100', gradient: 'from-blue-500/20 to-transparent' },

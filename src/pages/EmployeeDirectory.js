@@ -98,20 +98,11 @@ const EmployeeDirectory = () => {
   const employees = useMemo(() => {
     const role = (currentUser.role || '').toLowerCase();
 
-    // Managers only see their direct reports
-    if (role === 'manager') {
-      return allUsers.filter(u => !u.isDeleted && u.reportingTo === currentUser.name);
-    }
-
-    // Admins and Super Admins see everyone (filtering out deleted)
-    if (role === 'admin' || role === 'super_admin') {
-      return allUsers.filter(u => !u.isDeleted);
-    }
-
-    // Default: Show common employee roles (filtering out deleted)
+    // Unified Filter: Only show "Staff" roles (employee, hr, manager) and exclude deleted
     return allUsers.filter(u => {
       const uRole = (u.role || '').toLowerCase();
-      return !u.isDeleted && (uRole === 'employee' || uRole === 'hr' || uRole === 'manager');
+      const isStaff = uRole === 'employee' || uRole === 'hr' || uRole === 'manager';
+      return !u.isDeleted && isStaff && (role !== 'manager' || u.reportingTo === currentUser.name);
     });
   }, [allUsers, currentUser]);
 

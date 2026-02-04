@@ -46,7 +46,7 @@ const DateRosterGroup = React.memo(({ date, rosters, columns }) => {
     );
 });
 
-const ROSTERABLE_ROLES = ['employee', 'hr', 'manager', 'admin', 'super_admin'];
+const ROSTERABLE_ROLES = ['employee', 'hr', 'manager'];
 
 
 const Roster = () => {
