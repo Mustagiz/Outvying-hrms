@@ -8,31 +8,22 @@ const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState('');
+  const [alert, setAlert] = useState(null);
   const [loading, setLoading] = useState(false);
   const { login, resetPassword, seedDatabase } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
-    setLoading(true);
-
-    if (!email || !password) {
-      setError('Please enter both email and password');
-      setLoading(false);
-      return;
-    }
-
     const result = await login(email, password);
 
     if (result.success) {
       navigate('/dashboard');
     } else {
       if (result.ipBlocked) {
-        setError(`🔒 ${result.message}`);
+        setAlert({ type: 'error', message: `🔒 ${result.message}` });
       } else {
-        setError(result.message);
+        setAlert({ type: 'error', message: result.message });
       }
     }
 
@@ -50,7 +41,7 @@ const Login = () => {
             <p className="text-sm md:text-base text-gray-600 dark:text-gray-400">Human Resource Management System</p>
           </div>
 
-          {error && <Alert type="error" message={error} onClose={() => setError('')} />}
+          {alert && <Alert type={alert.type} message={alert.message} onClose={() => setAlert(null)} />}
 
           <form onSubmit={handleSubmit}>
             <div className="mb-4">
@@ -93,14 +84,14 @@ const Login = () => {
                 type="button"
                 onClick={async () => {
                   if (!email) {
-                    setError('Please enter your email address first');
+                    setAlert({ type: 'error', message: 'Please enter your email address first' });
                     return;
                   }
                   const res = await resetPassword(email);
                   if (res.success) {
-                    setError({ type: 'success', message: 'Password reset email sent!' });
+                    setAlert({ type: 'success', message: 'Password reset email sent! Please check your inbox (including spam).' });
                   } else {
-                    setError(res.message);
+                    setAlert({ type: 'error', message: res.message });
                   }
                 }}
                 className="text-sm font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300"

@@ -1,6 +1,20 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
+const nodemailer = require('nodemailer');
 admin.initializeApp();
+
+// Hostinger SMTP Configuration
+const smtpConfig = {
+    host: 'smtp.hostinger.com',
+    port: 465,
+    secure: true, // use TLS
+    auth: {
+        user: 'hrms@ovmkr.site',
+        pass: 'Outvying@123$'
+    }
+};
+
+const transporter = nodemailer.createTransport(smtpConfig);
 
 /**
  * Administrative password reset callable function.
@@ -112,5 +126,56 @@ exports.deleteUserAdmin = functions.https.onCall(async (data, context) => {
         }
 
         throw new functions.https.HttpsError('internal', error.message || 'An unexpected error occurred during user deletion.');
+    }
+});
+
+/**
+ * Generic system email sender.
+ * Allows sending emails via Hostinger SMTP (or any configured SMTP).
+ */
+exports.sendSystemEmail = functions.https.onCall(async (data, context) => {
+    // 1. Verify Authentication
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
+    }
+
+    const { to, subject, text, html } = data;
+
+    if (!to || !subject || (!text && !html)) {
+        throw new functions.https.HttpsError('invalid-argument', 'The function must be called with to, subject, and either text or html.');
+    }
+
+    try {
+        // 2. Fetch Email Settings from Firestore
+        const settingsDoc = await admin.firestore().collection('settings').doc('email').get();
+        let config = smtpConfig; // Fallback to hardcoded for first-time use
+
+        if (settingsDoc.exists()) {
+            config = settingsDoc.data();
+        }
+
+        const dynamicTransporter = nodemailer.createTransport({
+            host: config.host,
+            port: config.port,
+            secure: config.secure,
+            auth: {
+                user: config.user,
+                pass: config.pass
+            }
+        });
+
+        const mailOptions = {
+            from: `"Outvying HRMS" <${config.user}>`,
+            to,
+            subject,
+            text,
+            html
+        };
+
+        const info = await dynamicTransporter.sendMail(mailOptions);
+        return { success: true, message: 'Email sent successfully', messageId: info.messageId };
+    } catch (error) {
+        console.error('Error sending email:', error);
+        throw new functions.https.HttpsError('internal', 'Failed to send email: ' + error.message);
     }
 });

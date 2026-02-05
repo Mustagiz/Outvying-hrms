@@ -4,8 +4,14 @@ import { Card, Button, Input, Alert } from '../components/UI';
 import { Settings as SettingsIcon, Shield, Bell, Database } from 'lucide-react';
 
 const Settings = () => {
-  const { currentUser, toggleTheme, theme, repairAdminProfile } = useAuth();
+  const { currentUser, toggleTheme, theme, repairAdminProfile, emailSettings, updateEmailSettings } = useAuth();
   const [alert, setAlert] = useState(null);
+  const [emailFormData, setEmailFormData] = useState({ ...emailSettings });
+
+  // Update local form state if emailSettings change in context
+  React.useEffect(() => {
+    setEmailFormData({ ...emailSettings });
+  }, [emailSettings]);
 
   const handleSave = () => {
     setAlert({ type: 'success', message: 'Settings saved successfully' });
@@ -21,6 +27,13 @@ const Settings = () => {
       });
       setTimeout(() => setAlert(null), 5000);
     }
+  };
+
+  const handleEmailSave = async (e) => {
+    e.preventDefault();
+    const result = await updateEmailSettings(emailFormData);
+    setAlert({ type: result.success ? 'success' : 'error', message: result.message });
+    setTimeout(() => setAlert(null), 5000);
   };
 
   return (
@@ -111,6 +124,62 @@ const Settings = () => {
               </Button>
             </div>
           </div>
+        </Card>
+      </div>
+
+      <div className="mt-6">
+        <Card title="Email Service Configuration (SMTP)">
+          <form onSubmit={handleEmailSave} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Input
+                label="SMTP Host"
+                value={emailFormData.host}
+                onChange={(e) => setEmailFormData({ ...emailFormData, host: e.target.value })}
+                placeholder="e.g., smtp.hostinger.com"
+                required
+              />
+              <Input
+                label="SMTP Port"
+                type="number"
+                value={emailFormData.port}
+                onChange={(e) => setEmailFormData({ ...emailFormData, port: parseInt(e.target.value) })}
+                placeholder="e.g., 465 or 587"
+                required
+              />
+              <Input
+                label="Username / Email"
+                value={emailFormData.user}
+                onChange={(e) => setEmailFormData({ ...emailFormData, user: e.target.value })}
+                placeholder="e.g., hrms@ovmkr.site"
+                required
+              />
+              <Input
+                label="Password"
+                type="password"
+                value={emailFormData.pass}
+                onChange={(e) => setEmailFormData({ ...emailFormData, pass: e.target.value })}
+                placeholder="Enter SMTP password"
+                required
+              />
+            </div>
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="secure-smtp"
+                checked={emailFormData.secure}
+                onChange={(e) => setEmailFormData({ ...emailFormData, secure: e.target.checked })}
+                className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+              />
+              <label htmlFor="secure-smtp" className="text-sm text-gray-700 dark:text-gray-300">
+                Use Secure Connection (SSL/TLS) - Recommended for port 465
+              </label>
+            </div>
+            <div className="flex justify-end pt-2">
+              <Button type="submit" variant="primary">
+                Save Email Configuration
+              </Button>
+            </div>
+          </form>
         </Card>
       </div>
 

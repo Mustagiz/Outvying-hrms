@@ -72,8 +72,14 @@ export const AuthProvider = ({ children }) => {
   const [notifications, setNotifications] = useState([]);
   const [attendanceRules, setAttendanceRules] = useState([]);
   const [payrollSettings, setPayrollSettings] = useState({
-    template: { basic: 40, hra: 16, medical: 4, transport: 8.1, shiftAllowance: 8.6, attendanceAllowance: 8.6 },
     tax: { pfEmployee: 12, pfEmployer: 12, pfCeiling: 15000, esiEmployee: 0.75, esiEmployer: 3.25, esiCeiling: 21000, professionalTax: 200, tdsEnabled: true }
+  });
+  const [emailSettings, setEmailSettings] = useState({
+    host: 'smtp.hostinger.com',
+    port: 465,
+    secure: true,
+    user: 'hrms@ovmkr.site',
+    pass: 'Outvying@123$'
   });
 
   // Local State
@@ -176,10 +182,16 @@ export const AuthProvider = ({ children }) => {
       setAttendanceRules(rulesData);
     });
 
-    // Subscribe to Payroll Settings
     const unsubscribePayroll = onSnapshot(doc(db, 'settings', 'payroll'), (doc) => {
       if (doc.exists()) {
         setPayrollSettings(doc.data());
+      }
+    });
+
+    // Subscribe to Email Settings
+    const unsubscribeEmail = onSnapshot(doc(db, 'settings', 'email'), (doc) => {
+      if (doc.exists()) {
+        setEmailSettings(doc.data());
       }
     });
 
@@ -187,6 +199,7 @@ export const AuthProvider = ({ children }) => {
       unsubscribeAuth();
       unsubRules();
       unsubscribePayroll();
+      unsubscribeEmail();
     };
   }, []);
 
@@ -1188,6 +1201,21 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  /**
+   * Sends a system email using the custom hostinger SMTP server
+   */
+  const sendEmail = async (to, subject, html, text = '') => {
+    try {
+      const functions = getFunctions();
+      const emailFn = httpsCallable(functions, 'sendSystemEmail');
+      const result = await emailFn({ to, subject, text, html });
+      return { success: true, message: result.data.message };
+    } catch (e) {
+      console.error("Send Email Error:", e);
+      return { success: false, message: 'Email failed: ' + (e.message || 'Unknown error') };
+    }
+  };
+
   const changePassword = async (currentPassword, newPassword) => {
     try {
       const user = auth.currentUser;
@@ -1431,6 +1459,15 @@ export const AuthProvider = ({ children }) => {
         return { success: false, message: e.message };
       }
     },
+    updateEmailSettings: async (newSettings) => {
+      try {
+        await setDoc(doc(db, 'settings', 'email'), newSettings, { merge: true });
+        return { success: true, message: 'Email settings updated successfully. Please note: You may need to redeploy Cloud Functions if you changed the credentials, OR the functions will pick them up on next call.' };
+      } catch (e) {
+        return { success: false, message: e.message };
+      }
+    },
+    emailSettings,
     uploadDocument,
     updateBankAccount,
     updateDocumentStatus,
@@ -1439,6 +1476,9 @@ export const AuthProvider = ({ children }) => {
     addUser,
     updateUser,
     updateUserProfile: updateUser,
+    deleteHoliday,
+    leavePolicy,
+    sendEmail,
     resetPassword,
     resetPasswordAdmin,
     forceUpdatePassword: resetPasswordAdmin, // Map existing function to the new admin-only method
@@ -1456,8 +1496,6 @@ export const AuthProvider = ({ children }) => {
     allLeaveTypes,
     holidays,
     addHoliday,
-    deleteHoliday,
-    leavePolicy,
     regularizationRequests,
     updateRegularizationStatus,
     attendanceRules,
