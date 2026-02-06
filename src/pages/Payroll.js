@@ -72,7 +72,11 @@ const Payroll = () => {
     }
   }, [payrollSettings]);
 
-  const employees = allUsers.filter(u => (u.role === 'employee' || u.role === 'hr') && !u.isDeleted && u.status !== 'Exited');
+  const employees = allUsers.filter(u =>
+    (u.role === 'employee' || u.role === 'hr') &&
+    !u.isDeleted &&
+    u.status?.toLowerCase() !== 'exited'
+  );
   const filteredEmployees = employees.filter(e =>
     e.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     e.employeeId.toLowerCase().includes(searchTerm.toLowerCase())
@@ -144,8 +148,9 @@ const Payroll = () => {
     });
 
     // STATUTORY DEDUCTIONS - Re-calculate based on ACTUAL EARNED gross
-    // PF Calculation
-    const pfBasic = Math.min(parseFloat(components.actual_basic || 0), taxConfig.pfCeiling);
+    // PF Calculation - Use basicSalaryBS from new template or fallback to basic
+    const basicKey = components.actual_basicSalaryBS ? 'actual_basicSalaryBS' : 'actual_basic';
+    const pfBasic = Math.min(parseFloat(components[basicKey] || 0), taxConfig.pfCeiling);
     const pfEmployee = (toggles.pf !== false) ? pfBasic * (taxConfig.pfEmployee / 100) : 0;
     const pfEmployer = (toggles.pf !== false) ? pfBasic * (taxConfig.pfEmployer / 100) : 0;
 
@@ -594,22 +599,24 @@ const Payroll = () => {
 
   const deptData = useMemo(() => {
     const depts = {};
-    allUsers.forEach(u => { if (u.ctc && u.department) depts[u.department] = (depts[u.department] || 0) + (u.ctc / 12); });
+    const active = allUsers.filter(u => (u.role === 'employee' || u.role === 'hr') && !u.isDeleted && u.status?.toLowerCase() !== 'exited');
+    active.forEach(u => { if (u.ctc && u.department) depts[u.department] = (depts[u.department] || 0) + (u.ctc / 12); });
     return depts;
   }, [allUsers]);
 
   const topCtcData = useMemo(() => {
-    return allUsers.filter(u => u.ctc).sort((a, b) => b.ctc - a.ctc).slice(0, 7);
+    const active = allUsers.filter(u => (u.role === 'employee' || u.role === 'hr') && !u.isDeleted && u.status?.toLowerCase() !== 'exited');
+    return active.filter(u => u.ctc).sort((a, b) => b.ctc - a.ctc).slice(0, 7);
   }, [allUsers]);
 
   const stats = useMemo(() => {
-    const totalItems = allUsers.length;
-    const processed = allUsers.filter(u => u.salaryBreakdown).length;
+    const active = allUsers.filter(u => (u.role === 'employee' || u.role === 'hr') && !u.isDeleted && u.status?.toLowerCase() !== 'exited');
+    const processed = active.filter(u => u.salaryBreakdown).length;
     const activeLoanAmt = loans.reduce((s, l) => s + l.amount, 0);
-    return { totalItems, processed, activeLoanAmt };
+    return { totalItems: active.length, processed, activeLoanAmt };
   }, [allUsers, loans]);
 
-  if (currentUser.role !== 'admin' && currentUser.role !== 'Admin' && currentUser.role !== 'hr' && currentUser.role !== 'super_admin' && currentUser.role !== 'Super Admin') return <div className="text-center py-20 text-gray-400 italic">Restricted Access Dashboard.</div>;
+  if (currentUser.role !== 'admin' && currentUser.role !== 'Admin' && currentUser.role !== 'hr' && currentUser.role !== 'super_admin' && currentUser.role !== 'Super Admin' && currentUser.role !== 'Super admin') return <div className="text-center py-20 text-gray-400 italic">Restricted Access Dashboard.</div>;
 
   return (
     <div className="p-4 md:p-8 max-w-[1600px] mx-auto min-h-screen bg-gray-50/30">
