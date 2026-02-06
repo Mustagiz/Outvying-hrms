@@ -76,11 +76,15 @@ service cloud.firestore {
     match /cultureKudos/{id} {
       allow read: if isSignedIn();
       allow create: if isSignedIn();
-      allow update, delete: if isAdmin();
+      allow update: if isSignedIn();
+      allow delete: if isAdmin();
     }
     match /cultureSettings/{id} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
+    }
+    match /cultureMoods/{id} {
+      allow read, create: if isSignedIn();
     }
 
     // Bank Accounts

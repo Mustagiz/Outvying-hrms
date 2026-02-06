@@ -7,7 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { db } from '../config/firebase';
 import {
     collection, addDoc, updateDoc, deleteDoc, doc, setDoc,
-    onSnapshot, query, orderBy, serverTimestamp
+    onSnapshot, query, orderBy, serverTimestamp, increment
 } from 'firebase/firestore';
 import { Card, Button, Input, Select as UISelect } from '../components/UI';
 import { showToast } from '../utils/toast';
@@ -34,6 +34,7 @@ const CultureHub = () => {
     const [kudos, setKudos] = useState([]);
     const [badges, setBadges] = useState([]);
     const [cultureSettings, setCultureSettings] = useState(null);
+    const [moods, setMoods] = useState([]);
 
     // Admin Management State
     const [manageTab, setManageTab] = useState('badges');
@@ -64,6 +65,15 @@ const CultureHub = () => {
                 setCultureSettings(doc.data());
                 setSpotlight(doc.data().spotlight || { employeeId: '', shoutout: '' });
             }
+        });
+        return () => unsub();
+    }, []);
+
+    // Fetch Moods
+    React.useEffect(() => {
+        const q = query(collection(db, 'cultureMoods'), orderBy('createdAt', 'desc'));
+        const unsub = onSnapshot(q, (snapshot) => {
+            setMoods(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
         });
         return () => unsub();
     }, []);
@@ -140,6 +150,39 @@ const CultureHub = () => {
             showToast.error('Failed to moderate kudo');
         }
     };
+
+    const handleReaction = async (kudoId) => {
+        try {
+            await updateDoc(doc(db, 'cultureKudos', kudoId), {
+                reactions: increment(1)
+            });
+        } catch (error) {
+            showToast.error('Failed to react');
+        }
+    };
+
+    const handleMoodSelect = async (emoji) => {
+        try {
+            await addDoc(collection(db, 'cultureMoods'), {
+                emoji,
+                userId: currentUser.id,
+                createdAt: serverTimestamp()
+            });
+            showToast.success('Thanks for sharing your mood! ✨');
+        } catch (error) {
+            showToast.error('Failed to save mood');
+        }
+    };
+
+    const kudosReceivedCount = kudos.filter(k => k.toId === currentUser.id).length;
+    const badgesEarnedCount = currentUser?.earnedBadges?.length || 0;
+
+    // Simple happiness index: mapping emojis to values
+    const moodValues = { '🤩': 10, '😊': 8, '😐': 5, '😔': 3, '😫': 1 };
+    const recentMoods = moods.slice(0, 50);
+    const happinessIndex = recentMoods.length > 0
+        ? (recentMoods.reduce((acc, m) => acc + (moodValues[m.emoji] || 5), 0) / recentMoods.length).toFixed(1)
+        : '8.4'; // Default fallback
 
     const spotlightEmployee = allUsers.find(u => u.id === cultureSettings?.spotlight?.employeeId);
 
@@ -226,11 +269,19 @@ const CultureHub = () => {
                                                 "{kudo.msg}"
                                             </p>
                                             <div className="flex items-center gap-4">
-                                                <button className="flex items-center gap-1.5 text-xs text-blue-600 font-bold bg-blue-50 dark:bg-blue-900/30 px-3 py-1.5 rounded-full hover:scale-105 transition-transform">
+                                                <button
+                                                    onClick={() => handleReaction(kudo.id)}
+                                                    className="flex items-center gap-1.5 text-xs text-blue-600 font-bold bg-blue-50 dark:bg-blue-900/30 px-3 py-1.5 rounded-full hover:scale-105 transition-transform"
+                                                >
                                                     <Smile size={14} />
                                                     {kudo.reactions || 0} Cheers
                                                 </button>
-                                                <button className="text-xs text-gray-400 font-bold hover:text-blue-500">Add Reaction</button>
+                                                <button
+                                                    onClick={() => handleReaction(kudo.id)}
+                                                    className="text-xs text-gray-400 font-bold hover:text-blue-500"
+                                                >
+                                                    Add Reaction
+                                                </button>
                                             </div>
                                         </div>
                                     </div>
@@ -392,7 +443,11 @@ const CultureHub = () => {
                             <p className="text-gray-500 max-w-sm mx-auto">Your mental health matters. Share your mood anonymously to help us build a better workplace.</p>
                             <div className="flex justify-center gap-4 py-4">
                                 {['🤩', '😊', '😐', '😔', '😫'].map((emoji, i) => (
-                                    <button key={i} className="text-4xl p-4 rounded-2xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-all transform hover:scale-110 active:scale-95">
+                                    <button
+                                        key={i}
+                                        onClick={() => handleMoodSelect(emoji)}
+                                        className="text-4xl p-4 rounded-2xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-all transform hover:scale-110 active:scale-95"
+                                    >
                                         {emoji}
                                     </button>
                                 ))}
@@ -400,10 +455,13 @@ const CultureHub = () => {
                             <div className="pt-8 border-t border-gray-50 dark:border-gray-700">
                                 <div className="flex items-center justify-between text-sm font-bold mb-2">
                                     <span className="text-gray-500">Team Happiness Index</span>
-                                    <span className="text-blue-600">8.4 / 10</span>
+                                    <span className="text-blue-600">{happinessIndex} / 10</span>
                                 </div>
                                 <div className="h-2 w-full bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
-                                    <div className="h-full bg-gradient-to-r from-blue-400 to-blue-600 w-[84%]" />
+                                    <div
+                                        className="h-full bg-gradient-to-r from-blue-400 to-blue-600 transition-all duration-1000"
+                                        style={{ width: `${parseFloat(happinessIndex) * 10}%` }}
+                                    />
                                 </div>
                             </div>
                         </div>
@@ -441,21 +499,21 @@ const CultureHub = () => {
                                     <Gift className="text-purple-500" size={18} />
                                     <span className="text-sm font-medium">Kudos Received</span>
                                 </div>
-                                <span className="font-black">12</span>
+                                <span className="font-black">{kudosReceivedCount}</span>
                             </div>
                             <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900/50 rounded-xl">
                                 <div className="flex items-center gap-3">
                                     <Zap className="text-yellow-500" size={18} />
                                     <span className="text-sm font-medium">Badges Earned</span>
                                 </div>
-                                <span className="font-black">2</span>
+                                <span className="font-black">{badgesEarnedCount}</span>
                             </div>
                             <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900/50 rounded-xl">
                                 <div className="flex items-center gap-3">
                                     <Smile className="text-green-500" size={18} />
-                                    <span className="text-sm font-medium">Mood Streak</span>
+                                    <span className="text-sm font-medium">Active Days</span>
                                 </div>
-                                <span className="font-black">5 Days</span>
+                                <span className="font-black">Calculating...</span>
                             </div>
                         </div>
                     </div>
