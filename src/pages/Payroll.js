@@ -72,7 +72,7 @@ const Payroll = () => {
     }
   }, [payrollSettings]);
 
-  const employees = allUsers.filter(u => u.role === 'employee' || u.role === 'hr');
+  const employees = allUsers.filter(u => (u.role === 'employee' || u.role === 'hr') && !u.isDeleted && u.status !== 'Exited');
   const filteredEmployees = employees.filter(e =>
     e.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     e.employeeId.toLowerCase().includes(searchTerm.toLowerCase())
