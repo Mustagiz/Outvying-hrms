@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Card, Button, Table, Alert, Select, Modal } from '../components/UI';
 import { Clock, Calendar, ChevronLeft, ChevronRight, TrendingUp, Search, Download, RefreshCw, FilePlus, Wrench, RotateCcw, Upload } from 'lucide-react';
@@ -10,6 +11,7 @@ import { db } from '../config/firebase';
 
 const Attendance = () => {
   const { currentUser, attendance, rosters, clockIn, clockOut, syncBiometric, allUsers, attendanceRules, leaves } = useAuth();
+  const navigate = useNavigate();
   const [alert, setAlert] = useState(null);
   const [isSyncing, setIsSyncing] = useState(false);
 
@@ -618,7 +620,24 @@ const Attendance = () => {
         </span>
       )
     },
-    { header: 'Rule Applied', accessor: 'ruleApplied', render: (row) => row.ruleApplied || 'Standard Office' }
+    { header: 'Rule Applied', accessor: 'ruleApplied', render: (row) => row.ruleApplied || 'Standard Office' },
+    {
+      header: 'Actions',
+      render: (row) => (
+        <div className="flex gap-2">
+          {currentUser.role === 'employee' && (
+            <Button
+              onClick={() => navigate('/attendance-regularization', { state: { date: row.date } })}
+              variant="secondary"
+              className="text-xs py-1 px-3 bg-blue-50 text-blue-700 border-blue-100 hover:bg-blue-100"
+            >
+              Apply
+            </Button>
+          )}
+          {currentUser.role !== 'employee' && <span className="text-gray-400">-</span>}
+        </div>
+      )
+    }
   ];
 
   const monthOptions = [

@@ -213,7 +213,12 @@ const AttendanceRegularization = () => {
       setEditingRequest(null);
       setFormData({ date: '', inTime: '', outTime: '', type: 'Missed Punch', regularizationType: 'Both', reason: '', attachment: '' });
     } catch (error) {
-      setAlert({ type: 'error', message: error.message });
+      console.error("Regularization Submit Error:", error);
+      let errorMsg = error.message;
+      if (error.code === 'permission-denied' || error.message?.includes('permission')) {
+        errorMsg = "Missing Permission: Please ensure your account has 'admin' or 'hr' role. If you are an employee, you can only update/delete PENDING requests.";
+      }
+      setAlert({ type: 'error', message: errorMsg });
     }
     setTimeout(() => setAlert(null), 3000);
   };

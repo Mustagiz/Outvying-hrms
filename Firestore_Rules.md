@@ -23,12 +23,12 @@ service cloud.firestore {
     
     // Helper function to check if user is admin or HR
     function isAdmin() {
-      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
+      let user = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
       return isSignedIn() && 
-        (userDoc.data.role == 'admin' ||
-         userDoc.data.role == 'Admin' ||
-         userDoc.data.role == 'super_admin' ||
-         userDoc.data.role == 'hr');
+        (user.role == 'admin' ||
+         user.role == 'Admin' ||
+         user.role == 'super_admin' ||
+         user.role == 'hr');
     }
     
     // Default: allow reading users to all authenticated people
@@ -45,6 +45,14 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
     
+    // Regularization Requests
+    match /regularizationRequests/{requestId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isAdmin() || (isSignedIn() && resource.data.employeeId == request.auth.uid && resource.data.status == 'Pending');
+      allow delete: if isAdmin() || (isSignedIn() && resource.data.employeeId == request.auth.uid && resource.data.status == 'Pending');
+    }
+
     // --- Payroll System Rules ---
     
     // Payroll History, Loans, and Claims
