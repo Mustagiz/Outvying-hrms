@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Card, Table, Input, Select, Modal, Button } from '../components/UI';
 import { departments } from '../data/mockData';
-import { Mail, Phone, MapPin, Briefcase, Edit2, ChevronLeft, ChevronRight, Trash2, Download, FileText } from 'lucide-react';
+import { Mail, Phone, MapPin, Briefcase, Edit2, ChevronLeft, ChevronRight, Trash2, Download, FileText, RefreshCw } from 'lucide-react';
 import { formatDate, exportToCSV, filterData } from '../utils/helpers';
 import { db } from '../config/firebase';
 import { collection, query, getDocs, addDoc, serverTimestamp, doc } from 'firebase/firestore';
