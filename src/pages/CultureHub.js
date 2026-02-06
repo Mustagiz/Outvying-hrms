@@ -1,8 +1,12 @@
+import React, { useState } from 'react';
+import {
+    Trophy, Award, Heart, MessageSquare, Star, Users, TrendingUp, Zap, Gift, Smile, X
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../config/firebase';
 import {
-    collection, addDoc, updateDoc, deleteDoc, doc,
+    collection, addDoc, updateDoc, deleteDoc, doc, setDoc,
     onSnapshot, query, orderBy, serverTimestamp
 } from 'firebase/firestore';
 import { Card, Button, Input, Select as UISelect } from '../components/UI';
