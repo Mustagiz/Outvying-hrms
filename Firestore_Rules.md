@@ -68,6 +68,21 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // --- Culture Hub Rules ---
+    match /cultureBadges/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+    match /cultureKudos/{id} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if isAdmin();
+    }
+    match /cultureSettings/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
     // Bank Accounts
     match /bankAccounts/{accountId} {
       allow read: if isSignedIn();

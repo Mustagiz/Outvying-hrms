@@ -1,40 +1,143 @@
-/**
- * Culture Hub & Gamification
- * Central system for peer recognition, badges, and company culture
- */
-
-import React, { useState } from 'react';
-import {
-    Trophy,
-    Award,
-    Heart,
-    MessageSquare,
-    Star,
-    Users,
-    TrendingUp,
-    Zap,
-    Gift,
-    Smile,
-    X
-} from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useAuth } from '../context/AuthContext';
+import { db } from '../config/firebase';
+import {
+    collection, addDoc, updateDoc, deleteDoc, doc,
+    onSnapshot, query, orderBy, serverTimestamp
+} from 'firebase/firestore';
+import { Card, Button, Input, Select as UISelect } from '../components/UI';
+import { showToast } from '../utils/toast';
+
+const iconMap = {
+    Trophy, Award, Heart, MessageSquare, Star, Users, TrendingUp, Zap, Gift, Smile
+};
+
+const colorMap = [
+    { label: 'Blue', color: 'text-blue-500', bg: 'bg-blue-100' },
+    { label: 'Yellow', color: 'text-yellow-500', bg: 'bg-yellow-100' },
+    { label: 'Green', color: 'text-green-500', bg: 'bg-green-100' },
+    { label: 'Purple', color: 'text-purple-500', bg: 'bg-purple-100' },
+    { label: 'Red', color: 'text-red-500', bg: 'bg-red-100' },
+    { label: 'Orange', color: 'text-orange-500', bg: 'bg-orange-100' }
+];
 
 const CultureHub = () => {
+    const { currentUser, allUsers } = useAuth();
     const [activeTab, setActiveTab] = useState('recognition');
     const [showKudosModal, setShowKudosModal] = useState(false);
 
-    const badges = [
-        { id: 1, title: 'Speed Demon', desc: 'Closed 10 tickets in one day', icon: Zap, color: 'text-yellow-500', bg: 'bg-yellow-100', earned: true },
-        { id: 2, title: 'Team Player', desc: 'Received 5 kudos in a week', icon: Users, color: 'text-blue-500', bg: 'bg-blue-100', earned: true },
-        { id: 3, title: 'Early Bird', desc: '100% on-time attendance for a month', icon: TrendingUp, color: 'text-green-500', bg: 'bg-green-100', earned: false },
-        { id: 4, title: 'Culture Champ', desc: 'Nominated for employee of the month', icon: Trophy, color: 'text-purple-500', bg: 'bg-purple-100', earned: false },
-    ];
+    // Firestore Data
+    const [kudos, setKudos] = useState([]);
+    const [badges, setBadges] = useState([]);
+    const [cultureSettings, setCultureSettings] = useState(null);
 
-    const kudos = [
-        { id: 1, from: 'Sarah Connor', to: 'Me', msg: 'Amazing job on the Phase 9 deployment! The AI chatbot looks slick.', time: '2h ago', reactions: 5 },
-        { id: 2, from: 'Me', to: 'John Smith', msg: 'Thanks for helping with the database migration yesterday. Saved me hours!', time: '1d ago', reactions: 3 },
-        { id: 3, from: 'Elena Gilbert', to: 'Me', msg: 'Always bringing positive energy to the morning huddles!', time: '2d ago', reactions: 8 },
-    ];
+    // Admin Management State
+    const [manageTab, setManageTab] = useState('badges');
+    const [newBadge, setNewBadge] = useState({ title: '', desc: '', icon: 'Zap', color: 'Blue' });
+    const [spotlight, setSpotlight] = useState({ employeeId: '', shoutout: '' });
+
+    // Fetch Kudos
+    React.useEffect(() => {
+        const q = query(collection(db, 'cultureKudos'), orderBy('createdAt', 'desc'));
+        const unsub = onSnapshot(q, (snapshot) => {
+            setKudos(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        });
+        return () => unsub();
+    }, []);
+
+    // Fetch Badges
+    React.useEffect(() => {
+        const unsub = onSnapshot(collection(db, 'cultureBadges'), (snapshot) => {
+            setBadges(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        });
+        return () => unsub();
+    }, []);
+
+    // Fetch Settings (Spotlight)
+    React.useEffect(() => {
+        const unsub = onSnapshot(doc(db, 'cultureSettings', 'dashboard'), (doc) => {
+            if (doc.exists()) {
+                setCultureSettings(doc.data());
+                setSpotlight(doc.data().spotlight || { employeeId: '', shoutout: '' });
+            }
+        });
+        return () => unsub();
+    }, []);
+
+    const isAdmin = currentUser.role === 'admin' || currentUser.role === 'hr' || currentUser.role === 'super_admin';
+
+    const handleGiveKudos = async (e) => {
+        e.preventDefault();
+        const reader = new FormData(e.target);
+        const toId = reader.get('toId');
+        const targetUser = allUsers.find(u => u.id === toId);
+
+        const data = {
+            from: currentUser.name,
+            fromId: currentUser.id,
+            to: targetUser?.name || 'Unknown',
+            toId: toId,
+            msg: reader.get('msg'),
+            reactions: 0,
+            createdAt: serverTimestamp()
+        };
+
+        try {
+            await addDoc(collection(db, 'cultureKudos'), data);
+            setShowKudosModal(false);
+            showToast.success('Kudos sent successfully! ✨');
+        } catch (error) {
+            showToast.error('Failed to send kudos');
+        }
+    };
+
+    const handleAddBadge = async () => {
+        if (!newBadge.title || !newBadge.desc) return;
+        const colorData = colorMap.find(c => c.label === newBadge.color);
+        try {
+            await addDoc(collection(db, 'cultureBadges'), {
+                ...newBadge,
+                color: colorData.color,
+                bg: colorData.bg,
+                createdAt: serverTimestamp()
+            });
+            setNewBadge({ title: '', desc: '', icon: 'Zap', color: 'Blue' });
+            showToast.success('Badge added successfully');
+        } catch (error) {
+            showToast.error('Failed to add badge');
+        }
+    };
+
+    const handleDeleteBadge = async (id) => {
+        if (!window.confirm('Delete this badge?')) return;
+        try {
+            await deleteDoc(doc(db, 'cultureBadges', id));
+            showToast.success('Badge deleted');
+        } catch (error) {
+            showToast.error('Failed to delete badge');
+        }
+    };
+
+    const handleUpdateSpotlight = async () => {
+        try {
+            await setDoc(doc(db, 'cultureSettings', 'dashboard'), { spotlight }, { merge: true });
+            showToast.success('Spotlight updated');
+        } catch (error) {
+            showToast.error('Failed to update spotlight');
+        }
+    };
+
+    const handleDeleteKudo = async (id) => {
+        if (!window.confirm('Moderate this kudo by deleting it?')) return;
+        try {
+            await deleteDoc(doc(db, 'cultureKudos', id));
+            showToast.success('Kudo moderated');
+        } catch (error) {
+            showToast.error('Failed to moderate kudo');
+        }
+    };
+
+    const spotlightEmployee = allUsers.find(u => u.id === cultureSettings?.spotlight?.employeeId);
 
     return (
         <div className="space-y-6">
@@ -49,7 +152,7 @@ const CultureHub = () => {
 
             {/* Navigation Tabs */}
             <div className="flex gap-4 border-b border-gray-100 dark:border-gray-800 pb-px">
-                {['recognition', 'badges', 'wellness'].map((tab) => (
+                {['recognition', 'badges', 'wellness', ...(isAdmin ? ['manage'] : [])].map((tab) => (
                     <button
                         key={tab}
                         onClick={() => setActiveTab(tab)}
@@ -100,7 +203,20 @@ const CultureHub = () => {
                                                 <h4 className="font-bold text-gray-900 dark:text-white">
                                                     {kudo.from} <span className="text-gray-400 font-normal mx-1">recognized</span> {kudo.to}
                                                 </h4>
-                                                <span className="text-[10px] text-gray-400 uppercase font-bold">{kudo.time}</span>
+                                                <div className="flex items-center gap-3">
+                                                    <span className="text-[10px] text-gray-400 uppercase font-bold">
+                                                        {kudo.createdAt?.toDate ? kudo.createdAt.toDate().toLocaleDateString() : 'Just now'}
+                                                    </span>
+                                                    {isAdmin && (
+                                                        <button
+                                                            onClick={() => handleDeleteKudo(kudo.id)}
+                                                            className="text-red-400 hover:text-red-600 p-1"
+                                                            title="Delete/Moderate"
+                                                        >
+                                                            <X size={14} />
+                                                        </button>
+                                                    )}
+                                                </div>
                                             </div>
                                             <p className="text-gray-600 dark:text-gray-400 text-sm leading-relaxed mb-4">
                                                 "{kudo.msg}"
@@ -108,7 +224,7 @@ const CultureHub = () => {
                                             <div className="flex items-center gap-4">
                                                 <button className="flex items-center gap-1.5 text-xs text-blue-600 font-bold bg-blue-50 dark:bg-blue-900/30 px-3 py-1.5 rounded-full hover:scale-105 transition-transform">
                                                     <Smile size={14} />
-                                                    {kudo.reactions} Cheers
+                                                    {kudo.reactions || 0} Cheers
                                                 </button>
                                                 <button className="text-xs text-gray-400 font-bold hover:text-blue-500">Add Reaction</button>
                                             </div>
@@ -116,32 +232,150 @@ const CultureHub = () => {
                                     </div>
                                 </motion.div>
                             ))}
+                            {kudos.length === 0 && (
+                                <div className="text-center py-12 bg-gray-50 dark:bg-gray-800/50 rounded-3xl border-2 border-dashed border-gray-200 dark:border-gray-700">
+                                    <p className="text-gray-400 italic">No kudos yet. Be the first to recognize someone!</p>
+                                </div>
+                            )}
                         </div>
                     )}
 
                     {activeTab === 'badges' && (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {badges.map((badge) => (
-                                <div
-                                    key={badge.id}
-                                    className={`p-6 rounded-2xl border-2 transition-all ${badge.earned
-                                        ? 'border-blue-100 bg-white dark:bg-gray-800 dark:border-gray-700'
-                                        : 'border-dashed border-gray-200 dark:border-gray-800 opacity-60 grayscale'
-                                        }`}
-                                >
-                                    <div className={`w-14 h-14 rounded-2xl ${badge.bg} ${badge.color} flex items-center justify-center mb-4 shadow-sm`}>
-                                        <badge.icon size={28} />
+                            {badges.map((badge) => {
+                                const Icon = iconMap[badge.icon] || Zap;
+                                return (
+                                    <div
+                                        key={badge.id}
+                                        className={`p-6 rounded-2xl border-2 transition-all relative ${badge.earned !== false
+                                            ? 'border-blue-100 bg-white dark:bg-gray-800 dark:border-gray-700'
+                                            : 'border-dashed border-gray-200 dark:border-gray-800 opacity-60 grayscale'
+                                            }`}
+                                    >
+                                        {isAdmin && (
+                                            <button
+                                                onClick={() => handleDeleteBadge(badge.id)}
+                                                className="absolute top-4 right-4 text-red-400 hover:text-red-600"
+                                            >
+                                                <X size={16} />
+                                            </button>
+                                        )}
+                                        <div className={`w-14 h-14 rounded-2xl ${badge.bg} ${badge.color} flex items-center justify-center mb-4 shadow-sm`}>
+                                            <Icon size={28} />
+                                        </div>
+                                        <h3 className="font-bold text-gray-900 dark:text-white mb-1">{badge.title}</h3>
+                                        <p className="text-xs text-gray-500 line-clamp-2 mb-4">{badge.desc}</p>
+                                        <div className="flex items-center justify-between mt-auto pt-4 border-t border-gray-50 dark:border-gray-700">
+                                            <span className={`text-[10px] font-black uppercase tracking-widest ${badge.earned !== false ? 'text-green-500' : 'text-gray-400'}`}>
+                                                {badge.earned !== false ? 'Active' : 'Locked'}
+                                            </span>
+                                            {badge.earned !== false && <Award size={16} className="text-blue-500" />}
+                                        </div>
                                     </div>
-                                    <h3 className="font-bold text-gray-900 dark:text-white mb-1">{badge.title}</h3>
-                                    <p className="text-xs text-gray-500 line-clamp-2 mb-4">{badge.desc}</p>
-                                    <div className="flex items-center justify-between mt-auto pt-4 border-t border-gray-50 dark:border-gray-700">
-                                        <span className={`text-[10px] font-black uppercase tracking-widest ${badge.earned ? 'text-green-500' : 'text-gray-400'}`}>
-                                            {badge.earned ? 'Earned' : 'Locked'}
-                                        </span>
-                                        {badge.earned && <Award size={16} className="text-blue-500" />}
-                                    </div>
+                                );
+                            })}
+                            {badges.length === 0 && (
+                                <div className="col-span-full text-center py-12 bg-gray-50 dark:bg-gray-800/50 rounded-3xl border-2 border-dashed border-gray-200 dark:border-gray-700">
+                                    <p className="text-gray-400 italic">No cultural badges configured yet.</p>
                                 </div>
-                            ))}
+                            )}
+                        </div>
+                    )}
+
+                    {activeTab === 'manage' && isAdmin && (
+                        <div className="space-y-6">
+                            <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm">
+                                <div className="flex items-center gap-4 border-b border-gray-50 dark:border-gray-700 pb-4 mb-6">
+                                    {['badges', 'spotlight', 'moderation'].map(mTab => (
+                                        <button
+                                            key={mTab}
+                                            onClick={() => setManageTab(mTab)}
+                                            className={`text-xs font-black uppercase tracking-[0.15em] px-4 py-2 rounded-xl transition-all ${manageTab === mTab ? 'bg-blue-600 text-white shadow-lg' : 'text-gray-400 hover:text-gray-600'}`}
+                                        >
+                                            {mTab}
+                                        </button>
+                                    ))}
+                                </div>
+
+                                {manageTab === 'badges' && (
+                                    <div className="space-y-4">
+                                        <h3 className="font-bold text-lg mb-2">Create New Cultutral Badge</h3>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <Input
+                                                label="Badge Title"
+                                                value={newBadge.title}
+                                                onChange={e => setNewBadge({ ...newBadge, title: e.target.value })}
+                                                placeholder="e.g. Culture Champ"
+                                            />
+                                            <div className="space-y-1">
+                                                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Description</label>
+                                                <input
+                                                    className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-900 border-none rounded-xl outline-none focus:ring-2 ring-blue-500"
+                                                    value={newBadge.desc}
+                                                    onChange={e => setNewBadge({ ...newBadge, desc: e.target.value })}
+                                                    placeholder="e.g. For outstanding teamwork"
+                                                />
+                                            </div>
+                                            <UISelect
+                                                label="Icon"
+                                                value={newBadge.icon}
+                                                onChange={e => setNewBadge({ ...newBadge, icon: e.target.value })}
+                                                options={Object.keys(iconMap).map(k => ({ label: k, value: k }))}
+                                            />
+                                            <UISelect
+                                                label="Theme Color"
+                                                value={newBadge.color}
+                                                onChange={e => setNewBadge({ ...newBadge, color: e.target.value })}
+                                                options={colorMap.map(c => ({ label: c.label, value: c.label }))}
+                                            />
+                                        </div>
+                                        <Button onClick={handleAddBadge} className="w-full mt-4">Create Badge</Button>
+                                    </div>
+                                )}
+
+                                {manageTab === 'spotlight' && (
+                                    <div className="space-y-4">
+                                        <h3 className="font-bold text-lg mb-2">Update Employee Spotlight</h3>
+                                        <div className="space-y-4">
+                                            <UISelect
+                                                label="Select Employee"
+                                                value={spotlight.employeeId}
+                                                onChange={e => setSpotlight({ ...spotlight, employeeId: e.target.value })}
+                                                options={allUsers.map(u => ({ label: u.name, value: u.id }))}
+                                            />
+                                            <div className="space-y-1">
+                                                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Shoutout Text</label>
+                                                <textarea
+                                                    className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-900 border-none rounded-xl outline-none focus:ring-2 ring-blue-500 min-h-[100px]"
+                                                    value={spotlight.shoutout}
+                                                    onChange={e => setSpotlight({ ...spotlight, shoutout: e.target.value })}
+                                                    placeholder="Why is this person being spotlighted?"
+                                                />
+                                            </div>
+                                            <Button onClick={handleUpdateSpotlight} className="w-full">Update Wall of Fame</Button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {manageTab === 'moderation' && (
+                                    <div className="space-y-4">
+                                        <h3 className="font-bold text-lg mb-2">Kudos Moderation</h3>
+                                        <p className="text-sm text-gray-500">Admins can see all kudos and remove inappropriate content.</p>
+                                        <div className="divide-y divide-gray-50 dark:divide-gray-700">
+                                            {kudos.map(k => (
+                                                <div key={k.id} className="py-4 flex justify-between items-start gap-4">
+                                                    <div>
+                                                        <p className="text-sm font-bold">{k.from} → {k.to}</p>
+                                                        <p className="text-xs text-gray-500">{k.msg}</p>
+                                                    </div>
+                                                    <Button variant="secondary" onClick={() => handleDeleteKudo(k.id)} className="text-red-500 h-8 text-[10px]">Remove</Button>
+                                                </div>
+                                            ))}
+                                            {kudos.length === 0 && <p className="text-center py-6 text-gray-400 italic">No kudos to moderate.</p>}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     )}
 
@@ -183,13 +417,13 @@ const CultureHub = () => {
                         <div className="text-center">
                             <div className="w-24 h-24 rounded-full border-4 border-white dark:border-gray-800 mx-auto mb-4 shadow-xl overflow-hidden bg-white">
                                 <div className="w-full h-full bg-blue-100 flex items-center justify-center text-blue-600 text-3xl font-black">
-                                    AS
+                                    {spotlightEmployee?.name ? spotlightEmployee.name[0] : '?'}
                                 </div>
                             </div>
-                            <h3 className="text-xl font-black text-gray-900 dark:text-white">Anjali Sharma</h3>
-                            <p className="text-sm text-gray-500 mb-6">Senior Frontend Engineer</p>
+                            <h3 className="text-xl font-black text-gray-900 dark:text-white">{spotlightEmployee?.name || 'To Be Announced'}</h3>
+                            <p className="text-sm text-gray-500 mb-6">{spotlightEmployee?.designation || 'Outvying Member'}</p>
                             <div className="bg-white/60 dark:bg-black/20 p-4 rounded-2xl text-xs text-gray-600 dark:text-gray-400 italic">
-                                "Anjali smashed through the production issues this week while onboarding two new hires. Absolute rockstar!"
+                                "{cultureSettings?.spotlight?.shoutout || 'Coming soon...'}"
                             </div>
                         </div>
                     </div>
@@ -241,19 +475,37 @@ const CultureHub = () => {
                                 </button>
                             </div>
 
-                            <div className="space-y-4">
+                            <form onSubmit={handleGiveKudos} className="space-y-4">
                                 <div>
                                     <label className="text-xs font-black uppercase text-gray-400 mb-2 block tracking-widest">Select Toammate</label>
-                                    <input type="text" placeholder="Start typing name..." className="w-full p-4 bg-gray-50 dark:bg-gray-900 border-none rounded-2xl outline-none focus:ring-2 ring-blue-500 text-gray-900 dark:text-white" />
+                                    <select
+                                        name="toId"
+                                        required
+                                        className="w-full p-4 bg-gray-50 dark:bg-gray-900 border-none rounded-2xl outline-none focus:ring-2 ring-blue-500 text-gray-900 dark:text-white"
+                                        onChange={(e) => {
+                                            const u = allUsers.find(user => user.id === e.target.value);
+                                            // Selection logic if needed or just use hidden input
+                                        }}
+                                    >
+                                        <option value="">Select a teammate...</option>
+                                        {allUsers.filter(u => u.id !== currentUser.id).map(u => (
+                                            <option key={u.id} value={u.id}>{u.name}</option>
+                                        ))}
+                                    </select>
                                 </div>
                                 <div>
                                     <label className="text-xs font-black uppercase text-gray-400 mb-2 block tracking-widest">Your Message</label>
-                                    <textarea placeholder="Tell them why they're awesome..." className="w-full p-4 bg-gray-50 dark:bg-gray-900 border-none rounded-2xl outline-none focus:ring-2 ring-blue-500 min-h-[120px] text-gray-900 dark:text-white" />
+                                    <textarea
+                                        name="msg"
+                                        required
+                                        placeholder="Tell them why they're awesome..."
+                                        className="w-full p-4 bg-gray-50 dark:bg-gray-900 border-none rounded-2xl outline-none focus:ring-2 ring-blue-500 min-h-[120px] text-gray-900 dark:text-white"
+                                    />
                                 </div>
-                                <button className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black shadow-lg shadow-blue-600/30 hover:bg-blue-700 transition-all active:scale-95">
+                                <Button type="submit" className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black shadow-lg shadow-blue-600/30 hover:bg-blue-700 transition-all active:scale-95">
                                     Send Recognition ✨
-                                </button>
-                            </div>
+                                </Button>
+                            </form>
                         </motion.div>
                     </div>
                 )}
