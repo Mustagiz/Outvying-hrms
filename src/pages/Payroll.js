@@ -434,7 +434,7 @@ const Payroll = () => {
     if (!b) return alert('No salary breakdown assigned!');
 
     // Safety check for bank accounts
-    const bank = (allBankAccounts || bankAccounts || []).find(ba => String(ba.userId) === String(emp.id)) || {};
+    const bank = (allBankAccounts || []).find(ba => String(ba.userId) === String(emp.id)) || {};
     const statistics = getEmployeeWorkDays(emp.id, `${monthName} ${year}`);
     const actualBreakdown = calculateBreakdown(emp.ctc || 0, emp.deductionToggles, statistics);
 
