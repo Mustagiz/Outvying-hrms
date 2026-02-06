@@ -479,7 +479,9 @@ const Payslips = () => {
   const employeeOptions = useMemo(() => {
     return currentUser.role === 'employee'
       ? [{ value: currentUser.id, label: currentUser.name }]
-      : allUsers.filter(u => u.role === 'employee' || u.role === 'hr').map(u => ({ value: u.id, label: `${u.name} (${u.employeeId})` }));
+      : allUsers
+        .filter(u => (u.role === 'employee' || u.role === 'hr') && !u.isDeleted && u.status?.toLowerCase() !== 'exited')
+        .map(u => ({ value: u.id, label: `${u.name} (${u.employeeId})` }));
   }, [currentUser, allUsers]);
 
   // Effect to set default selected employee for Admin/HR if not already set or invalid
