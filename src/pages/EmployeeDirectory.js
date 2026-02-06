@@ -98,11 +98,12 @@ const EmployeeDirectory = () => {
   const employees = useMemo(() => {
     const role = (currentUser.role || '').toLowerCase();
 
-    // Unified Filter: Only show "Staff" roles (employee, hr, manager) and exclude deleted
+    // Unified Filter: Only show "Staff" roles (employee, hr, manager)
     return allUsers.filter(u => {
       const uRole = (u.role || '').toLowerCase();
       const isStaff = uRole === 'employee' || uRole === 'hr' || uRole === 'manager';
-      return !u.isDeleted && isStaff && (role !== 'manager' || u.reportingTo === currentUser.name);
+      // Note: We show both active and "deactive" (Exited) staff here so they can be managed
+      return isStaff && (role !== 'manager' || u.reportingTo === currentUser.name);
     });
   }, [allUsers, currentUser]);
 
@@ -182,9 +183,37 @@ const EmployeeDirectory = () => {
     {
       header: 'Account Status',
       render: (row) => (
-        <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-          Active Account
-        </span>
+        <div className="flex items-center gap-2">
+          <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${row.status === 'Active' && !row.isDeleted ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+            {row.status === 'Active' && !row.isDeleted ? 'Active' : 'Deactive'}
+          </span>
+          {(currentUser.role === 'Admin' || currentUser.role === 'admin') && (
+            <button
+              onClick={async () => {
+                const isCurrentlyActive = row.status === 'Active' && !row.isDeleted;
+                const newStatus = isCurrentlyActive ? 'Exited' : 'Active';
+                const newIsDeleted = isCurrentlyActive ? true : false;
+
+                if (window.confirm(`Mark ${row.name} as ${isCurrentlyActive ? 'Deactive' : 'Active'}?`)) {
+                  const result = await updateUser(row.id || row.uid, {
+                    status: newStatus,
+                    isDeleted: newIsDeleted,
+                    deactivatedAt: isCurrentlyActive ? serverTimestamp() : null
+                  });
+                  if (result.success) {
+                    showToast.success(`Employee marked as ${isCurrentlyActive ? 'Deactive' : 'Active'}`);
+                  } else {
+                    showToast.error('Update failed: ' + result.message);
+                  }
+                }
+              }}
+              className="p-1 hover:bg-gray-100 rounded-lg transition-colors text-gray-400 hover:text-primary-600"
+              title="Toggle Status"
+            >
+              <RefreshCw size={14} />
+            </button>
+          )}
+        </div>
       )
     },
     { header: 'Email', accessor: 'email' },

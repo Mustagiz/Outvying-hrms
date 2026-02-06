@@ -25,7 +25,7 @@ const UserManagement = () => {
   const itemsPerPage = 10;
 
   const filteredUsers = allUsers.filter(u =>
-    !u.isDeleted && (
+    !u.isDeleted && u.status !== 'Exited' && (
       (u.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (u.employeeId || '').toLowerCase().includes(searchTerm.toLowerCase())
     )
