@@ -881,30 +881,34 @@ const Attendance = () => {
                 />
               </div>
 
-              {currentUser.role !== 'employee' && (
-                <div className="lg:col-span-4 grid grid-cols-1 sm:grid-cols-3 gap-4 items-end bg-gray-100/50 dark:bg-black/20 p-4 rounded-xl">
+              <div className="lg:col-span-4 grid grid-cols-1 sm:grid-cols-3 gap-4 items-end bg-gray-100/50 dark:bg-black/20 p-4 rounded-xl">
+                {currentUser.role !== 'employee' ? (
                   <Select
                     label="Search Employee"
                     value={localFilters.employee}
                     onChange={(e) => setLocalFilters({ ...localFilters, employee: e.target.value })}
                     options={employeeOptions}
                   />
-                  <Select
-                    label="Filter Status"
-                    value={localFilters.status}
-                    onChange={(e) => setLocalFilters({ ...localFilters, status: e.target.value })}
-                    options={statusOptions}
-                  />
-                  <div className="flex gap-2 mb-4">
-                    <Button onClick={handleApplyFilters} variant="primary" className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl shadow-lg">
-                      <Search size={18} /> Apply
-                    </Button>
-                    <Button onClick={handleClearFilters} variant="secondary" className="flex items-center justify-center gap-2 py-2.5 rounded-xl border-gray-200">
-                      <RotateCcw size={18} />
-                    </Button>
-                  </div>
+                ) : (
+                  <div className="hidden sm:block"></div> /* Spacer for employees to keep buttons on right */
+                )}
+
+                <Select
+                  label="Filter Status"
+                  value={localFilters.status}
+                  onChange={(e) => setLocalFilters({ ...localFilters, status: e.target.value })}
+                  options={statusOptions}
+                />
+
+                <div className="flex gap-2 mb-4">
+                  <Button onClick={handleApplyFilters} variant="primary" className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl shadow-lg">
+                    <Search size={18} /> Apply
+                  </Button>
+                  <Button onClick={handleClearFilters} variant="secondary" className="flex items-center justify-center gap-2 py-2.5 rounded-xl border-gray-200">
+                    <RotateCcw size={18} />
+                  </Button>
                 </div>
-              )}
+              </div>
             </div>
           </div>
 
