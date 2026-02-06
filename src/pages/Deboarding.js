@@ -13,13 +13,10 @@ const Deboarding = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [editingRecordId, setEditingRecordId] = useState(null);
 
-  const [exitedEmployees, setExitedEmployees] = useState(() => {
-    const saved = localStorage.getItem('exitedEmployees');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const exitedEmployees = allUsers.filter(u => u.status === 'Exited' || u.isDeleted === true);
 
   const [formData, setFormData] = useState({
-    employeeId: '',
+    selectedUserId: '',
     lastWorkingDay: '',
     exitReason: '',
     exitInterview: '',
@@ -46,7 +43,7 @@ const Deboarding = () => {
     setEditingRecordId(record.id);
     setIsEditing(true);
     setFormData({
-      employeeId: String(record.employeeId),
+      selectedUserId: record.id,
       lastWorkingDay: record.lastWorkingDay || '',
       exitReason: record.exitReason || '',
       exitInterview: record.exitInterview || '',
@@ -62,74 +59,50 @@ const Deboarding = () => {
   const handleDelete = (recordId, employeeId) => {
     if (!window.confirm('Are you sure you want to delete this exit record? This will restore the employee to active status.')) return;
 
-    const updatedRecords = exitedEmployees.filter(r => r.id !== recordId);
-    setExitedEmployees(updatedRecords);
-    localStorage.setItem('exitedEmployees', JSON.stringify(updatedRecords));
-
-    const exitedIds = JSON.parse(localStorage.getItem('exitedEmployeeIds') || '[]');
-    const updatedIds = exitedIds.filter(id => String(id) !== String(employeeId));
-    localStorage.setItem('exitedEmployeeIds', JSON.stringify(updatedIds));
-
-    const exitedStatuses = JSON.parse(localStorage.getItem('exitedEmployeeStatuses') || '{}');
-    delete exitedStatuses[employeeId];
-    localStorage.setItem('exitedEmployeeStatuses', JSON.stringify(exitedStatuses));
-
-    alert('Exit record deleted successfully');
+    updateUser(recordId, {
+      isDeleted: false,
+      status: 'Active',
+      exitStatus: null,
+      lastWorkingDay: null,
+      exitReason: null,
+      exitInterview: null,
+      finalSettlement: null,
+      rehireEligible: null,
+      experienceRating: null,
+      clearance: null
+    }).then(() => {
+      alert('Employee restored to active status successfully');
+    });
   };
 
   const handleSubmit = () => {
-    const employee = allUsers.find(u => String(u.id) === String(formData.employeeId));
-    if (!employee) {
-      alert('Please select a valid employee');
+    if (!formData.selectedUserId) {
+      alert('Please select an employee');
       return;
     }
 
-    const exitRecord = {
-      id: isEditing ? editingRecordId : Date.now(),
-      ...employee,
-      ...formData,
-      exitDate: new Date().toISOString().split('T')[0],
-      checklistCompleted: completedTasks === tasks.length,
-      isExited: true,
-      exitStatus: formData.exitStatus
-    };
-
-    let updated;
-    if (isEditing) {
-      updated = exitedEmployees.map(r => r.id === editingRecordId ? exitRecord : r);
-    } else {
-      updated = [...exitedEmployees, exitRecord];
-      const exitedIds = JSON.parse(localStorage.getItem('exitedEmployeeIds') || '[]');
-      if (!exitedIds.includes(String(formData.employeeId))) {
-        exitedIds.push(String(formData.employeeId));
-        localStorage.setItem('exitedEmployeeIds', JSON.stringify(exitedIds));
-      }
-    }
-
-    setExitedEmployees(updated);
-    localStorage.setItem('exitedEmployees', JSON.stringify(updated));
-
-    const exitedStatuses = JSON.parse(localStorage.getItem('exitedEmployeeStatuses') || '{}');
-    exitedStatuses[formData.employeeId] = formData.exitStatus;
-    localStorage.setItem('exitedEmployeeStatuses', JSON.stringify(exitedStatuses));
-
-    // Update Firestore to mark user as deleted/deboarded
-    updateUser(formData.employeeId, {
+    // Update Firestore to mark user as deleted/deboarded with all details
+    updateUser(formData.selectedUserId, {
       isDeleted: true,
       status: 'Exited',
       exitStatus: formData.exitStatus,
-      lastWorkingDay: formData.lastWorkingDay
+      lastWorkingDay: formData.lastWorkingDay,
+      exitReason: formData.exitReason,
+      exitInterview: formData.exitInterview,
+      finalSettlement: formData.finalSettlement,
+      rehireEligible: formData.rehireEligible,
+      experienceRating: formData.experienceRating,
+      clearance: formData.clearance
     }).then(() => {
       setShowModal(false);
       resetForm();
       alert(isEditing ? 'Exit record updated successfully' : 'Employee exit record saved successfully');
-      // No need for window.location.reload() if using real-time Firestore updates
     });
   };
 
   const resetForm = () => {
     setFormData({
-      employeeId: '',
+      selectedUserId: '',
       lastWorkingDay: '',
       exitReason: '',
       exitInterview: '',
@@ -305,16 +278,15 @@ const Deboarding = () => {
               <label className="block text-[10px] font-bold text-gray-400 mb-1 uppercase tracking-widest pl-1">Target Employee</label>
               <select
                 disabled={isEditing}
-                value={formData.employeeId}
-                onChange={(e) => setFormData({ ...formData, employeeId: e.target.value })}
+                value={formData.selectedUserId}
+                onChange={(e) => setFormData({ ...formData, selectedUserId: e.target.value })}
                 className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 text-sm font-medium focus:ring-2 focus:ring-primary-500 outline-none disabled:opacity-50"
               >
                 <option value="">Select an employee</option>
                 {allUsers.filter(u => {
-                  const exitedIds = JSON.parse(localStorage.getItem('exitedEmployeeIds') || '[]');
-                  return (u.role === 'employee' || u.role === 'hr') && (!exitedIds.includes(String(u.id)) || (isEditing && String(u.id) === String(formData.employeeId)));
+                  return (u.role === 'employee' || u.role === 'hr') && (!u.isDeleted || (isEditing && String(u.id) === String(formData.selectedUserId)));
                 }).map(emp => (
-                  <option key={emp.id} value={emp.id}>{emp.name} ({emp.employeeId})</option>
+                  <option key={emp.id} value={emp.id}>{emp.name} ({emp.employeeId || emp.id})</option>
                 ))}
               </select>
             </div>
