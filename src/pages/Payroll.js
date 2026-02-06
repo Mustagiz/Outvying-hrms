@@ -23,6 +23,7 @@ import {
   addDoc, serverTimestamp, doc, updateDoc
 } from 'firebase/firestore';
 import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 ChartJS.register(
   CategoryScale, LinearScale, BarElement,
@@ -431,82 +432,107 @@ const Payroll = () => {
     const doc = new jsPDF();
     const b = emp.salaryBreakdown;
     if (!b) return alert('No salary breakdown assigned!');
-    const bank = allBankAccounts.find(ba => String(ba.userId) === String(emp.id)) || {};
+
+    // Safety check for bank accounts
+    const bank = (allBankAccounts || bankAccounts || []).find(ba => String(ba.userId) === String(emp.id)) || {};
     const statistics = getEmployeeWorkDays(emp.id, `${monthName} ${year}`);
     const actualBreakdown = calculateBreakdown(emp.ctc || 0, emp.deductionToggles, statistics);
 
-    const workDays = statistics.effectiveDays || statistics.totalDays;
+    const labelMap = {
+      basicSalaryBS: 'Basic Salary (BS)',
+      houseRentAllowanceHRA: 'House Rent Allowance (HRA)',
+      medicalAllowance: 'Medical Allowance',
+      transportationAllowanceTA: 'Transportation Allowance (TA)',
+      shiftAllowance: 'Shift Allowance',
+      attendanceAllowance: 'Attendance Allowance'
+    };
 
+    // Header logic
     doc.setFont('helvetica', 'bold'); doc.setFontSize(22); doc.setTextColor(0);
     doc.text('Outvying Media', 105, 20, { align: 'center' });
     doc.setFontSize(9); doc.setFont('helvetica', 'normal');
     doc.text('A-106, 1st floor, Town Square, New Airport Road, Viman Nagar, Pune, Maharashtra 411014', 105, 26, { align: 'center' });
     doc.text(`Email: hr@outvying.com | Website: www.Outvying.com`, 105, 31, { align: 'center' });
-    doc.setFillColor(220, 220, 220); doc.rect(20, 36, 170, 8, 'F');
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.text(`Payslip For The Month Of ${monthName}-${year}`, 105, 42, { align: 'center' });
 
-    doc.setFontSize(10); doc.setTextColor(0);
-    const leftX = 20, midX = 110; let currentY = 55; const lineGap = 7;
-    const infoFields = [
+    doc.setFillColor(245, 245, 245); doc.rect(20, 36, 170, 8, 'F');
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.text(`PAYSLIP FOR THE MONTH OF ${monthName.toUpperCase()} ${year}`, 105, 41.5, { align: 'center' });
+
+    // Employee Selection Info
+    const leftX = 20, midX = 110; let currentY = 55;
+    doc.setFontSize(9);
+    const info = [
       ['Employee ID', emp.employeeId || '-', 'Employee Name', emp.name || '-'],
       ['Designation', emp.designation || '-', 'Business Unit', emp.department || '-'],
-      ['Date Of Joining', emp.dateOfJoining || '-', 'Location', 'Pune'],
-      ['Bank Name', bank.bankName || '-', 'Bank Account No.', bank.accountNumber || '-'],
-      ['IFSC Code', bank.ifscCode || '-', 'ESI No.', emp.esiNumber || '-'],
+      ['Joining Date', emp.dateOfJoining || '-', 'Location', 'Pune'],
+      ['Bank Name', bank.bankName || '-', 'Bank A/c No.', bank.accountNumber || '-'],
       ['PF Number', emp.pfNumber || '-', 'UAN Number', emp.uanNumber || '-'],
-      ['PAN Number', emp.panNumber || '-', '', ''],
-      ['Days In Month', statistics.totalDays.toString(), 'Effective Work Days', workDays.toString()]
+      ['PAN Number', emp.panNumber || '-', 'Work Days', `${statistics.effectiveDays} / ${statistics.totalDays}`]
     ];
-    infoFields.forEach((row) => {
+
+    info.forEach(row => {
       doc.setFont('helvetica', 'bold'); doc.text(row[0], leftX, currentY);
-      doc.setFont('helvetica', 'normal'); doc.text(row[1], leftX + 45, currentY);
-      if (row[2]) { doc.setFont('helvetica', 'bold'); doc.text(row[2], midX, currentY); doc.setFont('helvetica', 'normal'); doc.text(row[3], midX + 45, currentY); }
-      currentY += lineGap;
-    });
-    doc.setLineWidth(0.5); doc.line(20, currentY + 5, 190, currentY + 5); currentY += 12;
-    doc.setFont('helvetica', 'bold'); doc.text('EARNINGS', 55, currentY, { align: 'center' }); doc.text('DEDUCTIONS', 150, currentY, { align: 'center' });
-    doc.line(20, currentY + 2, 190, currentY + 2); currentY += 8;
-    doc.setFontSize(9); doc.text('Description', 22, currentY); doc.text('Full', 70, currentY, { align: 'right' }); doc.text('Actual', 105, currentY, { align: 'right' });
-    doc.text('Description', 112, currentY); doc.text('Amount', 188, currentY, { align: 'right' }); currentY += 6;
-
-    // Earnings mapping
-    const earnings = Object.keys(template).map(k => {
-      const full = actualBreakdown[k];
-      const actual = actualBreakdown[`actual_${k}`];
-      return [
-        k.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()),
-        full,
-        actual
-      ];
+      doc.setFont('helvetica', 'normal'); doc.text(row[1], leftX + 35, currentY);
+      doc.setFont('helvetica', 'bold'); doc.text(row[2], midX, currentY);
+      doc.setFont('helvetica', 'normal'); doc.text(row[3], midX + 35, currentY);
+      currentY += 6;
     });
 
-    const deductions = [
-      ['Tax (TDS)', actualBreakdown.tds],
-      ['Professional TAX', actualBreakdown.professionalTax],
-      ['ESI Contribution', actualBreakdown.esiEmployee],
-      ['PF Contribution', actualBreakdown.pfEmployee]
+    // Earnings Table Construction
+    const earningsData = Object.keys(template).map(k => [
+      labelMap[k] || k.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()),
+      parseFloat(actualBreakdown[k] || 0).toFixed(2),
+      '0.00', // Arrear column as per image
+      parseFloat(actualBreakdown[`actual_${k}`] || 0).toFixed(2)
+    ]);
+
+    autoTable(doc, {
+      startY: currentY + 5,
+      head: [['Description', 'Full', 'Arrear', 'Actual']],
+      body: earningsData,
+      theme: 'grid',
+      headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: 'bold', halign: 'center' },
+      styles: { fontSize: 8, cellPadding: 2 },
+      columnStyles: {
+        0: { cellWidth: 80 },
+        1: { halign: 'right' },
+        2: { halign: 'right' },
+        3: { halign: 'right' }
+      },
+      foot: [['Total Earnings', parseFloat(actualBreakdown.monthly || 0).toFixed(2), '', parseFloat(actualBreakdown.actualGrossSalary || 0).toFixed(2)]],
+      footStyles: { fillColor: [245, 245, 245], textColor: [0, 0, 0], fontStyle: 'bold', halign: 'right' }
+    });
+
+    currentY = doc.lastAutoTable.finalY + 10;
+
+    // Deductions Table Construction
+    const deductionsData = [
+      ['Statutory PF Contribution', parseFloat(actualBreakdown.pfEmployee || 0).toFixed(2)],
+      ['ESI Contribution', parseFloat(actualBreakdown.esiEmployee || 0).toFixed(2)],
+      ['Professional Tax (PT)', parseFloat(actualBreakdown.professionalTax || 0).toFixed(2)],
+      ['Income Tax (TDS)', parseFloat(actualBreakdown.tds || 0).toFixed(2)]
     ];
 
-    const rowCount = Math.max(earnings.length, deductions.length);
-    for (let i = 0; i < rowCount; i++) {
-      if (earnings[i]) {
-        doc.text(earnings[i][0], 22, currentY);
-        doc.text(parseFloat(earnings[i][1]).toFixed(2), 70, currentY, { align: 'right' });
-        doc.text(parseFloat(earnings[i][2]).toFixed(2), 105, currentY, { align: 'right' });
-      }
-      if (deductions[i]) {
-        doc.text(deductions[i][0], 112, currentY);
-        doc.text(parseFloat(deductions[i][1]).toFixed(2), 188, currentY, { align: 'right' });
-      }
-      currentY += lineGap;
-    }
+    autoTable(doc, {
+      startY: currentY,
+      head: [['Deductions', 'Amount']],
+      body: deductionsData,
+      theme: 'grid',
+      headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: 'bold', halign: 'center' },
+      styles: { fontSize: 8, cellPadding: 2 },
+      margin: { left: 110 },
+      columnStyles: { 1: { halign: 'right' } },
+      foot: [['Total Deductions', parseFloat(actualBreakdown.totalDeductions || 0).toFixed(2)]],
+      footStyles: { fillColor: [245, 245, 245], textColor: [0, 0, 0], fontStyle: 'bold', halign: 'right' }
+    });
 
-    const finalEarnings = actualBreakdown.actualGrossSalary;
-    const totalDeds = actualBreakdown.totalDeductions;
-    doc.line(20, currentY - 2, 190, currentY - 2); doc.setFont('helvetica', 'bold'); doc.text('Total Earnings', 22, currentY); doc.text(parseFloat(finalEarnings).toFixed(2), 105, currentY, { align: 'right' }); doc.text('Total Deduction', 112, currentY); doc.text(parseFloat(totalDeds).toFixed(2), 188, currentY, { align: 'right' });
-    currentY += 10; doc.setFontSize(11); doc.text(`Net Pay for the month (Total Earnings - Total Dedutions):`, 22, currentY); doc.setFontSize(14);
-    const net = actualBreakdown.netSalary; doc.text(`₹ ${parseFloat(net).toLocaleString()}`, 188, currentY, { align: 'right' });
-    doc.save(`Payslip_${emp.employeeId}_${monthName}.pdf`);
+    // Payout Summary Section
+    const netPay = parseFloat(actualBreakdown.netSalary || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
+    doc.text(`NET PAYABLE: INR ${netPay}`, 20, doc.lastAutoTable.finalY + 15);
+    doc.setFontSize(8); doc.setFont('helvetica', 'italic');
+    doc.text('*This is a computer generated document and does not require a physical signature.', 105, 280, { align: 'center' });
+
+    doc.save(`Payslip_${emp.employeeId || 'EMP'}_${monthName}_${year}.pdf`);
   };
 
   const columns = [

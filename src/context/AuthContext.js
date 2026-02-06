@@ -73,7 +73,14 @@ export const AuthProvider = ({ children }) => {
   const [attendanceRules, setAttendanceRules] = useState([]);
   const [payrollSettings, setPayrollSettings] = useState({
     tax: { pfEmployee: 12, pfEmployer: 12, pfCeiling: 15000, esiEmployee: 0.75, esiEmployer: 3.25, esiCeiling: 21000, professionalTax: 200, tdsEnabled: true },
-    template: { basic: 50, hra: 20, conveyance: 10, other: 20 }
+    template: {
+      basicSalaryBS: 40,
+      houseRentAllowanceHRA: 16,
+      medicalAllowance: 4,
+      transportationAllowanceTA: 8.6,
+      shiftAllowance: 16,
+      attendanceAllowance: 15.4
+    }
   });
   const [emailSettings, setEmailSettings] = useState({
     host: 'smtp.hostinger.com',
