@@ -89,7 +89,7 @@ const Reports = () => {
     const endRaw = new Date(selectedYear, selectedMonth + 1, 0).toISOString().split('T')[0];
     const end = endRaw > today ? today : endRaw;
 
-    const employees = allUsers.filter(u => u.role === 'employee');
+    const employees = allUsers.filter(u => u.role === 'employee' && !u.isDeleted);
     const byDepartment = {};
 
     employees.forEach(emp => {
@@ -135,7 +135,7 @@ const Reports = () => {
     // 1. Department Wise Cost (Current)
     const deptCost = {};
     allUsers.forEach(u => {
-      if (u.ctc && u.department && u.role !== 'admin') {
+      if (u.ctc && u.department && u.role !== 'admin' && !u.isDeleted) {
         deptCost[u.department] = (deptCost[u.department] || 0) + (u.ctc / 12);
       }
     });

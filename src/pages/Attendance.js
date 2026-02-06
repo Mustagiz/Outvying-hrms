@@ -1011,8 +1011,8 @@ const Attendance = () => {
               }}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white h-32"
             >
-              {allUsers.filter(u => u.role !== 'admin' && u.role !== 'super_admin')
-                .sort((a, b) => a.name.localeCompare(b.name))
+              {allUsers.filter(u => u.role !== 'admin' && u.role !== 'super_admin' && !u.isDeleted)
+                .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
                 .map(u => (
                   <option key={u.id} value={String(u.id)}>
                     {u.name} ({u.employeeId})

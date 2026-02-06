@@ -1270,20 +1270,51 @@ export const AuthProvider = ({ children }) => {
     try {
       const functions = getFunctions();
       const deleteFn = httpsCallable(functions, 'deleteUserAdmin');
-      const result = await deleteFn({ targetUid: userId });
 
-      // Fallback/Safety: Even if Cloud function fails to find Auth user, 
-      // ensure Firestore doc is gone if possible, or just report success from function
-      return { success: true, message: result.data.message || 'User deleted successfully.' };
+      // 1. First, attempt to delete Auth account via Cloud Function
+      const authResult = await deleteFn({ targetUid: userId });
+      console.log("Auth deletion result:", authResult.data);
+
+      // 2. SCRUB ALL RELATED COLLECTIONS
+      const collectionsToScrub = [
+        { name: 'attendance', key: 'employeeId' },
+        { name: 'leaves', key: 'employeeId' },
+        { name: 'rosters', key: 'employeeId' },
+        { name: 'bankAccounts', key: 'userId' },
+        { name: 'bankAccounts', key: 'employeeId' }, // Some might use employeeId
+        { name: 'releasedPayslips', key: 'employeeId' },
+        { name: 'regularizationRequests', key: 'userId' },
+        { name: 'notifications', key: 'userId' },
+        { name: 'documents', key: 'userId' },
+        { name: 'manualLeaveAllocations', key: 'employeeId' },
+        { name: 'payrollLoans', key: 'employeeId' },
+        { name: 'payrollClaims', key: 'employeeId' },
+        { name: 'payrollHistory', key: 'employeeId' }
+      ];
+
+      for (const colInfo of collectionsToScrub) {
+        try {
+          const q = query(collection(db, colInfo.name), where(colInfo.key, '==', userId));
+          const snapshot = await getDocs(q);
+          const deletePromises = snapshot.docs.map(doc => deleteDoc(doc.ref));
+          await Promise.all(deletePromises);
+        } catch (err) {
+          console.error(`Failed to scrub collection ${colInfo.name}:`, err);
+        }
+      }
+
+      // 3. Delete the main user document last
+      await deleteDoc(doc(db, 'users', userId));
+
+      return { success: true, message: 'Employee and all associated records deleted permanently.' };
     } catch (e) {
-      console.error("Delete User Error:", e);
-      // Fallback to Firestore-only deletion if Cloud Function fails specifically due to not being found/deployed
-      // This ensures basic functionality remains while user figures out deployment
+      console.error("Deep Delete Error:", e);
+      // Fallback: If Cloud Function fails, still try to delete Firestore data
       try {
         await deleteDoc(doc(db, 'users', userId));
-        return { success: true, message: 'User profile removed (Auth account might remain). Please deploy Cloud Functions for full deletion.' };
+        return { success: true, message: 'User profile removed (Auth account/records may persist). Please deploy Cloud Functions for full scrubbing.' };
       } catch (firestoreError) {
-        return { success: false, message: 'Delete failed: ' + (e.message || 'Unknown error') };
+        return { success: false, message: 'Scrubbing failed: ' + (e.message || 'Unknown error') };
       }
     }
   };
@@ -1423,8 +1454,9 @@ export const AuthProvider = ({ children }) => {
   const value = {
     currentUser,
     allUsers,
-    attendance,
-    leaves,
+    employees: allUsers.filter(u => (u.role === 'employee' || u.role === 'hr') && !u.isDeleted && u.status?.toLowerCase() !== 'exited'),
+    attendance: attendance.filter(a => allUsers.some(u => String(u.id) === String(a.employeeId) && !u.isDeleted)),
+    leaves: leaves.filter(l => allUsers.some(u => String(u.id) === String(l.employeeId) && !u.isDeleted)),
     leaveBalances: allLeaveBalances,
     documents: allDocuments,
     allBankAccounts: allBankAccounts, // Added for component compatibility
