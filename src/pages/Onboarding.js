@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Card, Button, Input, Select, Alert, Badge } from '../components/UI';
 import { onboardingTasks as defaultTasks, departments, designations } from '../data/mockData';
-import { CheckCircle, Circle, UserPlus, Upload, LayoutGrid, List, Plus, Trash2, Calendar, FileText, ExternalLink, XCircle, MessageSquare } from 'lucide-react';
+import { CheckCircle, Circle, UserPlus, Upload, LayoutGrid, List, Plus, Trash2, Calendar, FileText, ExternalLink, XCircle, MessageSquare, Download } from 'lucide-react';
 import OnboardingQueue from '../components/Hiring/OnboardingQueue';
 import { db } from '../config/firebase';
 import { doc, updateDoc, onSnapshot, arrayUnion, arrayRemove, collection, query } from 'firebase/firestore';
