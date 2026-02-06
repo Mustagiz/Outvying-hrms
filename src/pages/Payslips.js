@@ -412,13 +412,9 @@ const Payslips = () => {
       const date = new Date(selectedYear, selectedMonth - i, 1);
       const payslip = calculatePayslip(empId, date.getMonth(), date.getFullYear());
 
-      // For employees: show last 3 months regardless of release status, then only released ones
+      // For employees: only show released ones
       if (currentUser.role === 'employee') {
-        if (i < 3) {
-          // Always show last 3 months for employees
-          history.push(payslip);
-        } else if (payslip.released) {
-          // Show older months only if released
+        if (payslip.released) {
           history.push(payslip);
         }
       } else {
@@ -523,7 +519,9 @@ const Payslips = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Gross Pay</p>
-                <p className="text-3xl font-bold text-green-600">₹{currentPayslip.grossPay}</p>
+                <p className="text-3xl font-bold text-green-600">
+                  {canViewPayslip(selectedMonth, selectedYear) ? `₹${currentPayslip.grossPay}` : '₹—'}
+                </p>
               </div>
             </div>
           </Card>
@@ -532,23 +530,27 @@ const Payslips = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Deductions</p>
-                <p className="text-3xl font-bold text-red-600">₹{currentPayslip.totalDeductions}</p>
-                <div className="text-xs text-gray-500 dark:text-gray-400 mt-2 space-y-0.5">
-                  {currentPayslip.computedDeductions
-                    .map(cd => (
-                      <div key={cd.id} className="flex justify-between w-full gap-4 text-gray-600 dark:text-gray-300">
-                        <span>{cd.name}:</span>
-                        <span>₹{cd.amount}</span>
-                      </div>
-                    ))}
+                <p className="text-3xl font-bold text-red-600">
+                  {canViewPayslip(selectedMonth, selectedYear) ? `₹${currentPayslip.totalDeductions}` : '₹—'}
+                </p>
+                {canViewPayslip(selectedMonth, selectedYear) && (
+                  <div className="text-xs text-gray-500 dark:text-gray-400 mt-2 space-y-0.5">
+                    {currentPayslip.computedDeductions
+                      .map(cd => (
+                        <div key={cd.id} className="flex justify-between w-full gap-4 text-gray-600 dark:text-gray-300">
+                          <span>{cd.name}:</span>
+                          <span>₹{cd.amount}</span>
+                        </div>
+                      ))}
 
-                  {parseFloat(currentPayslip.customDeduction) > 0 && (
-                    <div className="flex justify-between w-full gap-4 text-red-500 font-medium">
-                      <span>{currentPayslip.deductionReason || 'Manual Deduction'}:</span>
-                      <span>₹{currentPayslip.customDeduction}</span>
-                    </div>
-                  )}
-                </div>
+                    {parseFloat(currentPayslip.customDeduction) > 0 && (
+                      <div className="flex justify-between w-full gap-4 text-red-500 font-medium">
+                        <span>{currentPayslip.deductionReason || 'Manual Deduction'}:</span>
+                        <span>₹{currentPayslip.customDeduction}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </Card>
@@ -557,7 +559,9 @@ const Payslips = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Net Pay</p>
-                <p className="text-3xl font-bold text-blue-600">₹{currentPayslip.netPay}</p>
+                <p className="text-3xl font-bold text-blue-600">
+                  {canViewPayslip(selectedMonth, selectedYear) ? `₹${currentPayslip.netPay}` : '₹—'}
+                </p>
               </div>
             </div>
           </Card>
