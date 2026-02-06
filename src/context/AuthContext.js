@@ -72,7 +72,8 @@ export const AuthProvider = ({ children }) => {
   const [notifications, setNotifications] = useState([]);
   const [attendanceRules, setAttendanceRules] = useState([]);
   const [payrollSettings, setPayrollSettings] = useState({
-    tax: { pfEmployee: 12, pfEmployer: 12, pfCeiling: 15000, esiEmployee: 0.75, esiEmployer: 3.25, esiCeiling: 21000, professionalTax: 200, tdsEnabled: true }
+    tax: { pfEmployee: 12, pfEmployer: 12, pfCeiling: 15000, esiEmployee: 0.75, esiEmployer: 3.25, esiCeiling: 21000, professionalTax: 200, tdsEnabled: true },
+    template: { basic: 50, hra: 20, conveyance: 10, other: 20 }
   });
   const [emailSettings, setEmailSettings] = useState({
     host: 'smtp.hostinger.com',
@@ -1419,6 +1420,7 @@ export const AuthProvider = ({ children }) => {
     leaves,
     leaveBalances: allLeaveBalances,
     documents: allDocuments,
+    allBankAccounts: allBankAccounts, // Added for component compatibility
     bankAccounts: allBankAccounts,
     announcements,
     rosters,

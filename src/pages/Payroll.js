@@ -60,15 +60,14 @@ const Payroll = () => {
     type: 'Bonus', amount: '', reason: '', date: new Date().toISOString().split('T')[0]
   });
   const [history, setHistory] = useState([]);
-
-  const [template, setTemplate] = useState(payrollSettings.template);
-  const [taxConfig, setTaxConfig] = useState(payrollSettings.tax);
+  const [template, setTemplate] = useState(payrollSettings?.template || { basic: 50, hra: 20, conveyance: 10, other: 20 });
+  const [taxConfig, setTaxConfig] = useState(payrollSettings?.tax || { pfEmployee: 12, pfEmployer: 12, pfCeiling: 15000, esiEmployee: 0.75, esiEmployer: 3.25, esiCeiling: 21000, professionalTax: 200, tdsEnabled: true });
 
   // Sync with Database when settings change globally
   useEffect(() => {
     if (payrollSettings) {
-      setTemplate(payrollSettings.template);
-      setTaxConfig(payrollSettings.tax);
+      if (payrollSettings.template) setTemplate(payrollSettings.template);
+      if (payrollSettings.tax) setTaxConfig(payrollSettings.tax);
     }
   }, [payrollSettings]);
 
@@ -584,7 +583,7 @@ const Payroll = () => {
     return { totalItems, processed, activeLoanAmt };
   }, [allUsers, loans]);
 
-  if (currentUser.role !== 'admin' && currentUser.role !== 'Admin' && currentUser.role !== 'hr') return <div className="text-center py-20 text-gray-400 italic">Restricted Access Dashboard.</div>;
+  if (currentUser.role !== 'admin' && currentUser.role !== 'Admin' && currentUser.role !== 'hr' && currentUser.role !== 'super_admin' && currentUser.role !== 'Super Admin') return <div className="text-center py-20 text-gray-400 italic">Restricted Access Dashboard.</div>;
 
   return (
     <div className="p-4 md:p-8 max-w-[1600px] mx-auto min-h-screen bg-gray-50/30">
