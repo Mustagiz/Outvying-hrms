@@ -70,7 +70,8 @@ const Attendance = () => {
     endDate: '',
     clockIn: '',
     clockOut: '',
-    status: ''
+    status: '',
+    customStatus: ''
   });
 
   const activeAttendance = useMemo(() => {
@@ -226,7 +227,6 @@ const Attendance = () => {
               clockIn,
               clockOut: clockOut || null,
               clockOutDate: clockOut ? clockOutDate : null,
-              status: manualData.status || result.status,
               workHours: result.workHours,
               workingDays: result.workingDays,
               overtime: result.overtime,
@@ -235,13 +235,20 @@ const Attendance = () => {
               updatedBy: currentUser.id,
               updatedAt: serverTimestamp()
             };
+
+            if (manualData.status === 'Custom' && manualData.customStatus) {
+              attendanceUpdate.status = manualData.customStatus;
+            } else if (manualData.status) {
+              attendanceUpdate.status = manualData.status;
+            }
           } else if (manualData.status) {
+            const finalStatus = manualData.status === 'Custom' ? manualData.customStatus : manualData.status;
             attendanceUpdate = {
               clockIn: null,
               clockOut: null,
-              status: manualData.status,
+              status: finalStatus,
               workHours: 0,
-              workingDays: manualData.status === 'Present' ? 1 : (manualData.status === 'Half Day' ? 0.5 : 0),
+              workingDays: finalStatus === 'Present' ? 1 : (finalStatus === 'Half Day' ? 0.5 : 0),
               overtime: 0,
               ruleApplied: 'Manual Override',
               manualEntry: true,
@@ -281,7 +288,7 @@ const Attendance = () => {
 
       setAlert({ type: 'success', message: `Successfully updated ${successCount} records` });
       setShowManualModal(false);
-      setManualData({ employeeIds: [], startDate: '', endDate: '', clockIn: '', clockOut: '', status: '' });
+      setManualData({ employeeIds: [], startDate: '', endDate: '', clockIn: '', clockOut: '', status: '', customStatus: '' });
     } catch (error) {
       console.error(error);
       setAlert({ type: 'error', message: 'Update failed: ' + error.message });
@@ -1036,8 +1043,23 @@ const Attendance = () => {
               <option value="LWP">LWP (Leave Without Pay)</option>
               <option value="PL">PL (Paid Leave)</option>
               <option value="UPL">UPL (Unplanned Leave)</option>
+              <option value="Custom">Custom Status</option>
             </select>
           </div>
+
+          {manualData.status === 'Custom' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Enter Custom Status</label>
+              <input
+                type="text"
+                value={manualData.customStatus}
+                onChange={(e) => setManualData({ ...manualData, customStatus: e.target.value })}
+                placeholder="e.g., On Duty, Business Trip, etc."
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+                required
+              />
+            </div>
+          )}
 
           {!['PL', 'UPL', 'LWP', 'Absent'].includes(manualData.status) && (
             <div className="grid grid-cols-2 gap-4">
@@ -1052,7 +1074,18 @@ const Attendance = () => {
             </div>
           )}
 
-          <Button onClick={handleManualSubmit} className="w-full" disabled={!manualData.employeeIds.length || !manualData.startDate || !manualData.endDate || (!manualData.clockIn && !['PL', 'UPL', 'LWP', 'Absent'].includes(manualData.status)) || isSyncing}>
+          <Button
+            onClick={handleManualSubmit}
+            className="w-full"
+            disabled={
+              !manualData.employeeIds.length ||
+              !manualData.startDate ||
+              !manualData.endDate ||
+              (manualData.status === 'Custom' && !manualData.customStatus) ||
+              (!manualData.clockIn && !['PL', 'UPL', 'LWP', 'Absent', 'Custom'].includes(manualData.status)) ||
+              isSyncing
+            }
+          >
             {isSyncing ? 'Processing...' : 'Save Attendance'}
           </Button>
         </div>
