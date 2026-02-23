@@ -8,7 +8,7 @@ import {
   ChevronLeft, ChevronRight, Gift, History,
   Download, Eye, CheckCircle, BarChart, Wallet,
   Receipt, Plus, FileSpreadsheet, TrendingDown,
-  Briefcase, Landmark, ShieldCheck, Upload
+  Briefcase, Landmark, ShieldCheck, Upload, Calendar
 } from 'lucide-react';
 import Papa from 'papaparse';
 import { logAuditAction } from '../utils/auditLogger';
@@ -27,7 +27,7 @@ import { Bar, Pie } from 'react-chartjs-2';
 import { db } from '../config/firebase';
 import {
   collection, query, where, getDocs,
-  addDoc, serverTimestamp, doc, updateDoc
+  addDoc, serverTimestamp, doc, updateDoc, getDoc
 } from 'firebase/firestore';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
