@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Card, Button, Modal, Table, Alert } from '../components/UI';
 import {
@@ -11,6 +12,12 @@ import {
 } from 'lucide-react';
 import Papa from 'papaparse';
 import { logAuditAction } from '../utils/auditLogger';
+import { 
+  getSalaryCyclePeriod, 
+  getWorkingDaysInCycle, 
+  calculateProRataSalary,
+  calculateOvertimePay 
+} from '../utils/salaryCycle';
 
 import {
   BarElement, CategoryScale, Chart as ChartJS,
@@ -32,6 +39,7 @@ ChartJS.register(
 
 const Payroll = () => {
   const { allUsers, updateUser, currentUser, allBankAccounts, attendance, commitPayroll, rosters, payrollSettings, updatePayrollSettings } = useAuth();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('employees');
   const [showModal, setShowModal] = useState(false);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
@@ -63,6 +71,7 @@ const Payroll = () => {
   const [history, setHistory] = useState([]);
   const [template, setTemplate] = useState(payrollSettings?.template || { basic: 50, hra: 20, conveyance: 10, other: 20 });
   const [taxConfig, setTaxConfig] = useState(payrollSettings?.tax || { pfEmployee: 12, pfEmployer: 12, pfCeiling: 15000, esiEmployee: 0.75, esiEmployer: 3.25, esiCeiling: 21000, professionalTax: 200, tdsEnabled: true });
+  const [salaryCycleConfig, setSalaryCycleConfig] = useState(null);
 
   // Sync with Database when settings change globally
   useEffect(() => {
@@ -71,6 +80,22 @@ const Payroll = () => {
       if (payrollSettings.tax) setTaxConfig(payrollSettings.tax);
     }
   }, [payrollSettings]);
+
+  // Load salary cycle configuration
+  useEffect(() => {
+    const loadCycleConfig = async () => {
+      try {
+        const docRef = doc(db, 'settings', 'salaryCycle');
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          setSalaryCycleConfig(docSnap.data());
+        }
+      } catch (error) {
+        console.error('Error loading salary cycle config:', error);
+      }
+    };
+    loadCycleConfig();
+  }, []);
 
   const employees = allUsers.filter(u =>
     (u.role === 'employee' || u.role === 'hr') &&
@@ -91,21 +116,41 @@ const Payroll = () => {
     const monthNum = months.indexOf(monthName);
     const year = parseInt(yearStr);
 
-    // 1. Calculate Total Working Days for the month (Denominator)
-    // As per user requirement: Always base on calendar weekdays (Mon-Fri)
+    // Use salary cycle configuration if available
+    if (salaryCycleConfig) {
+      const cycleDate = new Date(year, monthNum, 15);
+      const cyclePeriod = getSalaryCyclePeriod(cycleDate, salaryCycleConfig);
+      
+      const totalWorkingDays = getWorkingDaysInCycle(cyclePeriod.startDate, cyclePeriod.endDate);
+      
+      const records = attendance.filter(a => {
+        if (!a.date) return false;
+        return String(a.employeeId) === String(empId) && 
+               a.date >= cyclePeriod.startDate && 
+               a.date <= cyclePeriod.endDate;
+      });
+
+      const effectiveDays = records.reduce((sum, rec) => {
+        if (rec.status === 'Present') return sum + 1;
+        if (rec.status === 'Late') return sum + 1;
+        if (rec.status === 'Half Day') return sum + 0.5;
+        return sum;
+      }, 0);
+
+      return { effectiveDays, totalDays: totalWorkingDays, recordCount: records.length, cyclePeriod };
+    }
+
+    // Fallback to old logic
     let totalWorkingDays = 0;
     const daysInMonth = new Date(year, monthNum + 1, 0).getDate();
     for (let day = 1; day <= daysInMonth; day++) {
       const date = new Date(year, monthNum, day);
       const dayOfWeek = date.getDay();
-      if (dayOfWeek !== 0 && dayOfWeek !== 6) { // Not Sat/Sun
+      if (dayOfWeek !== 0 && dayOfWeek !== 6) {
         totalWorkingDays++;
       }
     }
 
-    // 2. Calculate Effective Worked Days (Numerator)
-    // Count days where employee was Present or Late (1.0) or Half Day (0.5)
-    // Note: Absent, LWP, UPL, etc. are correctly excluded (valued at 0)
     const records = attendance.filter(a => {
       if (!a.date) return false;
       const d = new Date(a.date);
@@ -650,6 +695,9 @@ const Payroll = () => {
             disabled={isBulkProcessing}
           >
             <Upload size={16} className="mr-2" /> Bulk Adjustments
+          </Button>
+          <Button onClick={() => navigate('/salary-cycle-settings')} variant="secondary" className="bg-white hover:shadow-md transition-all text-purple-600">
+            <Calendar size={16} className="mr-2" /> Salary Cycle
           </Button>
           <Button onClick={() => setShowTemplateModal(true)} variant="secondary" className="bg-white hover:shadow-md transition-all">
             <Settings size={16} className="mr-2" /> Configuration

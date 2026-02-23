@@ -55,6 +55,7 @@ const OfferLetters = lazy(() => import('./pages/OfferLetters'));
 const Applicants = lazy(() => import('./pages/Applicants'));
 const CandidateOffer = lazy(() => import('./pages/CandidateOffer'));
 const DocumentTemplates = lazy(() => import('./pages/DocumentTemplates'));
+const SalaryCycleSettings = lazy(() => import('./pages/SalaryCycleSettings'));
 
 const PrivateRoute = ({ children }) => {
   const { currentUser, loading } = useAuth();
@@ -539,6 +540,16 @@ const AppRoutes = () => {
           <PrivateRoute>
             <Layout>
               <Applicants />
+            </Layout>
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/salary-cycle-settings"
+        element={
+          <PrivateRoute>
+            <Layout>
+              <SalaryCycleSettings />
             </Layout>
           </PrivateRoute>
         }
