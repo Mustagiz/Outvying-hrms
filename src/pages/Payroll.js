@@ -117,17 +117,22 @@ const Payroll = () => {
     const year = parseInt(yearStr);
 
     // Use salary cycle configuration if available
-    if (salaryCycleConfig) {
-      const cycleDate = new Date(year, monthNum, 15);
-      const cyclePeriod = getSalaryCyclePeriod(cycleDate, salaryCycleConfig);
+    if (salaryCycleConfig && salaryCycleConfig.type === 'monthly') {
+      const startDay = salaryCycleConfig.startDay || 1;
+      const endDay = salaryCycleConfig.endDay === 'last' ? new Date(year, monthNum + 1, 0).getDate() : parseInt(salaryCycleConfig.endDay);
       
-      const totalWorkingDays = getWorkingDaysInCycle(cyclePeriod.startDate, cyclePeriod.endDate);
+      const cycleStartDate = new Date(year, monthNum, startDay).toISOString().split('T')[0];
+      const cycleEndDate = new Date(year, monthNum, endDay).toISOString().split('T')[0];
       
+      // Use configured working days per month
+      const totalWorkingDays = salaryCycleConfig.workingDaysPerMonth || 26;
+      
+      // Calculate effective days from attendance within cycle period
       const records = attendance.filter(a => {
         if (!a.date) return false;
         return String(a.employeeId) === String(empId) && 
-               a.date >= cyclePeriod.startDate && 
-               a.date <= cyclePeriod.endDate;
+               a.date >= cycleStartDate && 
+               a.date <= cycleEndDate;
       });
 
       const effectiveDays = records.reduce((sum, rec) => {
@@ -137,10 +142,16 @@ const Payroll = () => {
         return sum;
       }, 0);
 
-      return { effectiveDays, totalDays: totalWorkingDays, recordCount: records.length, cyclePeriod };
+      return { 
+        effectiveDays, 
+        totalDays: totalWorkingDays, 
+        recordCount: records.length,
+        cycleStart: cycleStartDate,
+        cycleEnd: cycleEndDate
+      };
     }
 
-    // Fallback to old logic
+    // Fallback to calendar weekdays
     let totalWorkingDays = 0;
     const daysInMonth = new Date(year, monthNum + 1, 0).getDate();
     for (let day = 1; day <= daysInMonth; day++) {
