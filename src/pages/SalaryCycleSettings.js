@@ -53,6 +53,11 @@ const SalaryCycleSettings = () => {
     }
   }, [autoCalculate, config.startDay, config.endDay, config.type, holidays]);
 
+  // Auto-enable calculation on mount
+  useEffect(() => {
+    setAutoCalculate(true);
+  }, []);
+
   const loadConfig = async () => {
     try {
       const docRef = doc(db, 'settings', 'salaryCycle');
