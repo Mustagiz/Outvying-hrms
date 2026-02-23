@@ -16,7 +16,7 @@ export const DEFAULT_CYCLE_CONFIG = {
   type: SALARY_CYCLES.MONTHLY,
   startDay: 1, // Day of month (1-31)
   endDay: 'last', // 'last' or specific day
-  workingDaysPerMonth: 26,
+  workingDaysPerMonth: 22,
   workingHoursPerDay: 9,
   overtimeMultiplier: 1.5
 };
