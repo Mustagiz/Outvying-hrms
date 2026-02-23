@@ -25,6 +25,7 @@ const SalaryCycleSettings = () => {
   const [yearCycles, setYearCycles] = useState([]);
   const [warnings, setWarnings] = useState([]);
   const [autoCalculate, setAutoCalculate] = useState(false);
+  const [effectiveMonth, setEffectiveMonth] = useState(new Date().toISOString().substring(0, 7));
 
   useEffect(() => {
     loadConfig();
@@ -32,27 +33,25 @@ const SalaryCycleSettings = () => {
   }, []);
 
   useEffect(() => {
-    const currentPeriod = getSalaryCyclePeriod(new Date(), config);
+    const effectiveDate = new Date(effectiveMonth + '-15');
+    const currentPeriod = getSalaryCyclePeriod(effectiveDate, config);
     setPreview(currentPeriod);
-    setYearCycles(getYearlySalaryCycles(new Date().getFullYear(), config));
+    setYearCycles(getYearlySalaryCycles(effectiveDate.getFullYear(), config));
     validateConfiguration();
-  }, [config]);
+  }, [config, effectiveMonth]);
 
   useEffect(() => {
     if (autoCalculate && config.type === SALARY_CYCLES.MONTHLY) {
-      const today = new Date();
-      const year = today.getFullYear();
-      const month = today.getMonth();
+      const effectiveDate = new Date(effectiveMonth + '-15');
+      const year = effectiveDate.getFullYear();
+      const month = effectiveDate.getMonth();
       const startDay = config.startDay || 1;
       
-      // Handle cross-month cycles (e.g., 26th to 25th)
       let cycleStart, cycleEnd;
       if (config.endDay !== 'last' && parseInt(config.endDay) < startDay) {
-        // Cross-month cycle: start in current month, end in next month
         cycleStart = new Date(year, month, startDay).toISOString().split('T')[0];
         cycleEnd = new Date(year, month + 1, parseInt(config.endDay)).toISOString().split('T')[0];
       } else {
-        // Same-month cycle
         const endDay = config.endDay === 'last' ? new Date(year, month + 1, 0).getDate() : parseInt(config.endDay);
         cycleStart = new Date(year, month, startDay).toISOString().split('T')[0];
         cycleEnd = new Date(year, month, endDay).toISOString().split('T')[0];
@@ -62,7 +61,7 @@ const SalaryCycleSettings = () => {
       const calculatedDays = getWorkingDaysInCycle(cycleStart, cycleEnd, holidayDates, [0, 6]);
       setConfig(prev => ({ ...prev, workingDaysPerMonth: calculatedDays }));
     }
-  }, [autoCalculate, config.startDay, config.endDay, config.type, holidays]);
+  }, [autoCalculate, config.startDay, config.endDay, config.type, holidays, effectiveMonth]);
 
   // Auto-enable calculation on mount
   useEffect(() => {
@@ -200,6 +199,21 @@ const SalaryCycleSettings = () => {
         <div className="lg:col-span-2 space-y-6">
           <Card title="Pay Period Configuration">
             <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Calculate For Month
+                </label>
+                <input
+                  type="month"
+                  value={effectiveMonth}
+                  onChange={(e) => setEffectiveMonth(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Select past/future month (e.g., Dec 2025, Jan 2026)
+                </p>
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Salary Cycle Type
