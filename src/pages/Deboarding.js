@@ -2,14 +2,18 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Card, Button, Modal, Table } from '../components/UI';
 import { deboardingTasks } from '../data/mockData';
-import { CheckCircle, Circle, UserMinus, Eye, Edit2, Trash2, Star, CheckSquare } from 'lucide-react';
+import { CheckCircle, Circle, UserMinus, Eye, Edit2, Trash2, Star, CheckSquare, Calculator, FileText, Download } from 'lucide-react';
+import { calculateFinalSettlement } from '../utils/finalSettlement';
+import { generateExperienceCertificate, generateRelievingLetter } from '../utils/certificateGenerator';
 
 const Deboarding = () => {
-  const { allUsers, updateUser } = useAuth();
+  const { allUsers, updateUser, attendance, leaves, leaveBalances } = useAuth();
   const [tasks, setTasks] = useState(deboardingTasks);
   const [showModal, setShowModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [showSettlementModal, setShowSettlementModal] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
+  const [settlement, setSettlement] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editingRecordId, setEditingRecordId] = useState(null);
 
@@ -121,6 +125,23 @@ const Deboarding = () => {
     setShowDetailsModal(true);
   };
 
+  const handleCalculateSettlement = (emp) => {
+    const exitDate = emp.lastWorkingDay || new Date().toISOString().split('T')[0];
+    const calculated = calculateFinalSettlement(emp, exitDate, attendance, leaves, leaveBalances);
+    setSettlement({ ...calculated, employee: emp, exitDate });
+    setShowSettlementModal(true);
+  };
+
+  const handleApplySettlement = async () => {
+    if (!settlement) return;
+    await updateUser(settlement.employee.id, {
+      finalSettlement: settlement.summary.netSettlement,
+      settlementBreakdown: settlement.breakdown
+    });
+    alert('Settlement amount applied successfully');
+    setShowSettlementModal(false);
+  };
+
   const getClearanceCount = (clearance) => {
     if (!clearance) return '0/4';
     const count = Object.values(clearance).filter(v => v).length;
@@ -166,6 +187,9 @@ const Deboarding = () => {
         <div className="flex space-x-2">
           <Button onClick={() => viewDetails(row)} variant="secondary" className="text-[10px] py-1 px-2 uppercase font-bold tracking-tighter">
             <Eye size={12} className="mr-1 inline" /> View
+          </Button>
+          <Button onClick={() => handleCalculateSettlement(row)} variant="secondary" className="text-[10px] py-1 px-2 bg-green-50 text-green-700 border-green-100 uppercase font-bold tracking-tighter">
+            <Calculator size={12} className="mr-1 inline" /> Settle
           </Button>
           <Button onClick={() => handleEdit(row)} variant="secondary" className="text-[10px] py-1 px-2 bg-indigo-50 text-indigo-700 border-indigo-100 uppercase font-bold tracking-tighter">
             <Edit2 size={12} className="mr-1 inline" /> Edit
@@ -515,6 +539,79 @@ const Deboarding = () => {
 
             <div className="pt-2">
               <Button onClick={() => setShowDetailsModal(false)} className="w-full">Close Documentation</Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Settlement Calculator Modal */}
+      <Modal isOpen={showSettlementModal} onClose={() => setShowSettlementModal(false)} title="Final Settlement Calculator" size="lg">
+        {settlement && (
+          <div className="space-y-6">
+            <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+              <h3 className="font-bold text-lg mb-2">{settlement.employee.name}</h3>
+              <p className="text-sm text-gray-600">Tenure: {settlement.details.tenureYears} years | Worked Days: {settlement.details.workedDays}/{settlement.details.daysInMonth}</p>
+            </div>
+
+            <div className="space-y-3">
+              <h4 className="font-bold text-sm uppercase tracking-wider text-gray-500">Earnings</h4>
+              <div className="space-y-2">
+                <div className="flex justify-between p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                  <span className="text-sm">Pro-rata Salary</span>
+                  <span className="font-bold">₹{settlement.breakdown.proRataSalary.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                  <span className="text-sm">Leave Encashment ({settlement.details.unusedLeaves} days)</span>
+                  <span className="font-bold">₹{settlement.breakdown.leaveEncashment.toLocaleString()}</span>
+                </div>
+                {settlement.breakdown.gratuity > 0 && (
+                  <div className="flex justify-between p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                    <span className="text-sm">Gratuity</span>
+                    <span className="font-bold">₹{settlement.breakdown.gratuity.toLocaleString()}</span>
+                  </div>
+                )}
+                {settlement.breakdown.proRatedBonus > 0 && (
+                  <div className="flex justify-between p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                    <span className="text-sm">Pro-rated Bonus</span>
+                    <span className="font-bold">₹{settlement.breakdown.proRatedBonus.toLocaleString()}</span>
+                  </div>
+                )}
+              </div>
+
+              {settlement.breakdown.noticePeriodRecovery > 0 && (
+                <>
+                  <h4 className="font-bold text-sm uppercase tracking-wider text-gray-500 mt-4">Deductions</h4>
+                  <div className="flex justify-between p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
+                    <span className="text-sm">Notice Period Recovery ({settlement.details.noticePeriodShortfall} days)</span>
+                    <span className="font-bold text-red-600">₹{settlement.breakdown.noticePeriodRecovery.toLocaleString()}</span>
+                  </div>
+                </>
+              )}
+
+              <div className="border-t-2 pt-4 mt-4">
+                <div className="flex justify-between items-center p-4 bg-primary-50 dark:bg-primary-900/20 rounded-lg">
+                  <span className="font-bold text-lg">Net Settlement</span>
+                  <span className="font-black text-2xl text-primary-600">₹{settlement.summary.netSettlement.toLocaleString()}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <Button onClick={handleApplySettlement} className="flex-1">
+                Apply to Record
+              </Button>
+              <Button onClick={() => {
+                generateExperienceCertificate(settlement.employee, { lastWorkingDay: settlement.exitDate });
+              }} variant="secondary" className="flex-1">
+                <FileText size={16} className="mr-2" />
+                Experience Letter
+              </Button>
+              <Button onClick={() => {
+                generateRelievingLetter(settlement.employee, { lastWorkingDay: settlement.exitDate });
+              }} variant="secondary" className="flex-1">
+                <Download size={16} className="mr-2" />
+                Relieving Letter
+              </Button>
             </div>
           </div>
         )}
