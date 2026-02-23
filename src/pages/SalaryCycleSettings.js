@@ -44,9 +44,20 @@ const SalaryCycleSettings = () => {
       const year = today.getFullYear();
       const month = today.getMonth();
       const startDay = config.startDay || 1;
-      const endDay = config.endDay === 'last' ? new Date(year, month + 1, 0).getDate() : parseInt(config.endDay);
-      const cycleStart = new Date(year, month, startDay).toISOString().split('T')[0];
-      const cycleEnd = new Date(year, month, endDay).toISOString().split('T')[0];
+      
+      // Handle cross-month cycles (e.g., 26th to 25th)
+      let cycleStart, cycleEnd;
+      if (config.endDay !== 'last' && parseInt(config.endDay) < startDay) {
+        // Cross-month cycle: start in current month, end in next month
+        cycleStart = new Date(year, month, startDay).toISOString().split('T')[0];
+        cycleEnd = new Date(year, month + 1, parseInt(config.endDay)).toISOString().split('T')[0];
+      } else {
+        // Same-month cycle
+        const endDay = config.endDay === 'last' ? new Date(year, month + 1, 0).getDate() : parseInt(config.endDay);
+        cycleStart = new Date(year, month, startDay).toISOString().split('T')[0];
+        cycleEnd = new Date(year, month, endDay).toISOString().split('T')[0];
+      }
+      
       const holidayDates = (holidays || []).map(h => h.date);
       const calculatedDays = getWorkingDaysInCycle(cycleStart, cycleEnd, holidayDates, [0, 6]);
       setConfig(prev => ({ ...prev, workingDaysPerMonth: calculatedDays }));

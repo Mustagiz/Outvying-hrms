@@ -31,9 +31,21 @@ export const getSalaryCyclePeriod = (date, cycleConfig = DEFAULT_CYCLE_CONFIG) =
   
   switch (cycleConfig.type) {
     case SALARY_CYCLES.MONTHLY:
+      const startDay = cycleConfig.startDay;
+      const endDay = cycleConfig.endDay === 'last' ? new Date(year, month + 1, 0).getDate() : parseInt(cycleConfig.endDay);
+      
+      // Handle cross-month cycles (e.g., 26th to 25th)
+      if (endDay < startDay) {
+        return {
+          startDate: new Date(year, month, startDay).toISOString().split('T')[0],
+          endDate: new Date(year, month + 1, endDay).toISOString().split('T')[0],
+          period: `${getMonthName(month)} ${startDay} - ${getMonthName(month + 1)} ${endDay}, ${year}`
+        };
+      }
+      
       return {
-        startDate: new Date(year, month, cycleConfig.startDay).toISOString().split('T')[0],
-        endDate: getLastDayOfMonth(year, month, cycleConfig.endDay),
+        startDate: new Date(year, month, startDay).toISOString().split('T')[0],
+        endDate: new Date(year, month, endDay).toISOString().split('T')[0],
         period: `${getMonthName(month)} ${year}`
       };
       
