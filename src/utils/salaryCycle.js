@@ -21,6 +21,11 @@ export const DEFAULT_CYCLE_CONFIG = {
   overtimeMultiplier: 1.5
 };
 
+export const toLocalISODate = (d) => {
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
+
 /**
  * Get salary cycle period for a given date
  */
@@ -37,15 +42,15 @@ export const getSalaryCyclePeriod = (date, cycleConfig = DEFAULT_CYCLE_CONFIG) =
       // Handle cross-month cycles (e.g., 26th to 25th)
       if (endDay < startDay) {
         return {
-          startDate: new Date(year, month - 1, startDay).toISOString().split('T')[0],
-          endDate: new Date(year, month, endDay).toISOString().split('T')[0],
+          startDate: toLocalISODate(new Date(year, month - 1, startDay)),
+          endDate: toLocalISODate(new Date(year, month, endDay)),
           period: `${getMonthName((month + 11) % 12)} ${startDay}${month === 0 ? `, ${year - 1}` : ''} - ${getMonthName(month)} ${endDay}, ${year}`
         };
       }
 
       return {
-        startDate: new Date(year, month, startDay).toISOString().split('T')[0],
-        endDate: new Date(year, month, endDay).toISOString().split('T')[0],
+        startDate: toLocalISODate(new Date(year, month, startDay)),
+        endDate: toLocalISODate(new Date(year, month, endDay)),
         period: `${getMonthName(month)} ${year}`
       };
 
@@ -53,13 +58,13 @@ export const getSalaryCyclePeriod = (date, cycleConfig = DEFAULT_CYCLE_CONFIG) =
       const day = d.getDate();
       if (day <= 15) {
         return {
-          startDate: new Date(year, month, 1).toISOString().split('T')[0],
-          endDate: new Date(year, month, 15).toISOString().split('T')[0],
+          startDate: toLocalISODate(new Date(year, month, 1)),
+          endDate: toLocalISODate(new Date(year, month, 15)),
           period: `${getMonthName(month)} 1-15, ${year}`
         };
       } else {
         return {
-          startDate: new Date(year, month, 16).toISOString().split('T')[0],
+          startDate: toLocalISODate(new Date(year, month, 16)),
           endDate: getLastDayOfMonth(year, month),
           period: `${getMonthName(month)} 16-End, ${year}`
         };
@@ -76,8 +81,8 @@ export const getSalaryCyclePeriod = (date, cycleConfig = DEFAULT_CYCLE_CONFIG) =
       periodEnd.setDate(periodEnd.getDate() + 13);
 
       return {
-        startDate: periodStart.toISOString().split('T')[0],
-        endDate: periodEnd.toISOString().split('T')[0],
+        startDate: toLocalISODate(periodStart),
+        endDate: toLocalISODate(periodEnd),
         period: `Week ${weekNumber * 2 + 1}-${weekNumber * 2 + 2}, ${year}`
       };
 
@@ -88,8 +93,8 @@ export const getSalaryCyclePeriod = (date, cycleConfig = DEFAULT_CYCLE_CONFIG) =
       endOfWeek.setDate(startOfWeek.getDate() + 6); // Sunday
 
       return {
-        startDate: startOfWeek.toISOString().split('T')[0],
-        endDate: endOfWeek.toISOString().split('T')[0],
+        startDate: toLocalISODate(startOfWeek),
+        endDate: toLocalISODate(endOfWeek),
         period: `Week of ${startOfWeek.toLocaleDateString()}`
       };
 
@@ -252,11 +257,11 @@ export const validateCycleConfig = (config) => {
 // Helper functions
 const getLastDayOfMonth = (year, month, endDay = 'last') => {
   if (endDay === 'last') {
-    return new Date(year, month + 1, 0).toISOString().split('T')[0];
+    return toLocalISODate(new Date(year, month + 1, 0));
   }
   const lastDay = new Date(year, month + 1, 0).getDate();
   const day = Math.min(parseInt(endDay), lastDay);
-  return new Date(year, month, day).toISOString().split('T')[0];
+  return toLocalISODate(new Date(year, month, day));
 };
 
 const getMonthName = (month) => {

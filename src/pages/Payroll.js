@@ -121,13 +121,15 @@ const Payroll = () => {
       const startDay = salaryCycleConfig.startDay || 1;
       const endDay = salaryCycleConfig.endDay === 'last' ? new Date(year, monthNum + 1, 0).getDate() : parseInt(salaryCycleConfig.endDay);
 
+      const toLocalISODate = (d) => { const pad = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
+
       let cycleStartDate, cycleEndDate;
       if (endDay < startDay) {
-        cycleStartDate = new Date(year, monthNum - 1, startDay).toISOString().split('T')[0];
-        cycleEndDate = new Date(year, monthNum, endDay).toISOString().split('T')[0];
+        cycleStartDate = toLocalISODate(new Date(year, monthNum - 1, startDay));
+        cycleEndDate = toLocalISODate(new Date(year, monthNum, endDay));
       } else {
-        cycleStartDate = new Date(year, monthNum, startDay).toISOString().split('T')[0];
-        cycleEndDate = new Date(year, monthNum, endDay).toISOString().split('T')[0];
+        cycleStartDate = toLocalISODate(new Date(year, monthNum, startDay));
+        cycleEndDate = toLocalISODate(new Date(year, monthNum, endDay));
       }
 
       // Use configured working days per month

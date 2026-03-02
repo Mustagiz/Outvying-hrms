@@ -147,13 +147,15 @@ const Payslips = () => {
     const startDay = salaryCycleConfig?.startDay || 26;
     const endDay = salaryCycleConfig?.endDay === 'last' ? new Date(year, month + 1, 0).getDate() : parseInt(salaryCycleConfig?.endDay || 25);
 
+    const toLocalISODate = (d) => { const pad = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
+
     let cycleStartDate, cycleEndDate;
     if (endDay < startDay) {
-      cycleStartDate = new Date(year, month - 1, startDay).toISOString().split('T')[0];
-      cycleEndDate = new Date(year, month, endDay).toISOString().split('T')[0];
+      cycleStartDate = toLocalISODate(new Date(year, month - 1, startDay));
+      cycleEndDate = toLocalISODate(new Date(year, month, endDay));
     } else {
-      cycleStartDate = new Date(year, month, startDay).toISOString().split('T')[0];
-      cycleEndDate = new Date(year, month, endDay).toISOString().split('T')[0];
+      cycleStartDate = toLocalISODate(new Date(year, month, startDay));
+      cycleEndDate = toLocalISODate(new Date(year, month, endDay));
     }
 
     const daysInMonth = Math.round((new Date(cycleEndDate) - new Date(cycleStartDate)) / (1000 * 60 * 60 * 24)) + 1;
