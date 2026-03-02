@@ -4,9 +4,9 @@ import { Card, Button, Alert } from '../components/UI';
 import { Calendar, DollarSign, Clock, Save, RefreshCw, AlertTriangle, History, Users } from 'lucide-react';
 import { db } from '../config/firebase';
 import { doc, getDoc, setDoc, collection, addDoc, query, orderBy, limit, getDocs, serverTimestamp } from 'firebase/firestore';
-import { 
-  SALARY_CYCLES, 
-  DEFAULT_CYCLE_CONFIG, 
+import {
+  SALARY_CYCLES,
+  DEFAULT_CYCLE_CONFIG,
   getSalaryCyclePeriod,
   getYearlySalaryCycles,
   validateCycleConfig,
@@ -43,22 +43,9 @@ const SalaryCycleSettings = () => {
   useEffect(() => {
     if (autoCalculate && config.type === SALARY_CYCLES.MONTHLY) {
       const effectiveDate = new Date(effectiveMonth + '-15');
-      const year = effectiveDate.getFullYear();
-      const month = effectiveDate.getMonth();
-      const startDay = config.startDay || 1;
-      
-      let cycleStart, cycleEnd;
-      if (config.endDay !== 'last' && parseInt(config.endDay) < startDay) {
-        cycleStart = new Date(year, month, startDay).toISOString().split('T')[0];
-        cycleEnd = new Date(year, month + 1, parseInt(config.endDay)).toISOString().split('T')[0];
-      } else {
-        const endDay = config.endDay === 'last' ? new Date(year, month + 1, 0).getDate() : parseInt(config.endDay);
-        cycleStart = new Date(year, month, startDay).toISOString().split('T')[0];
-        cycleEnd = new Date(year, month, endDay).toISOString().split('T')[0];
-      }
-      
+      const period = getSalaryCyclePeriod(effectiveDate, config);
       const holidayDates = (holidays || []).map(h => h.date);
-      const calculatedDays = getWorkingDaysInCycle(cycleStart, cycleEnd, holidayDates, [0, 6]);
+      const calculatedDays = getWorkingDaysInCycle(period.startDate, period.endDate, holidayDates, [0, 6]);
       setConfig(prev => ({ ...prev, workingDaysPerMonth: calculatedDays }));
     }
   }, [autoCalculate, config.startDay, config.endDay, config.type, holidays, effectiveMonth]);
@@ -94,17 +81,16 @@ const SalaryCycleSettings = () => {
 
   const validateConfiguration = () => {
     const warns = [];
-    const today = new Date();
-    const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
-    const weekdaysInMonth = Array.from({ length: daysInMonth }, (_, i) => {
-      const d = new Date(today.getFullYear(), today.getMonth(), i + 1);
-      return d.getDay() !== 0 && d.getDay() !== 6;
-    }).filter(Boolean).length;
+    const effectiveDate = new Date(effectiveMonth + '-15');
+    const period = getSalaryCyclePeriod(effectiveDate, config);
+    const holidayDates = (holidays || []).map(h => h.date);
+    const weekdaysInCycle = getWorkingDaysInCycle(period.startDate, period.endDate, holidayDates, [0, 6]);
 
-    if (config.workingDaysPerMonth > weekdaysInMonth) {
-      warns.push(`Working days (${config.workingDaysPerMonth}) exceeds weekdays in month (${weekdaysInMonth})`);
+    if (config.workingDaysPerMonth > weekdaysInCycle) {
+      warns.push(`Working days (${config.workingDaysPerMonth}) exceeds weekdays in cycle (${weekdaysInCycle})`);
     }
 
+    const today = new Date();
     const currentDay = today.getDate();
     if (config.startDay !== 1 && currentDay >= config.startDay && currentDay <= 15) {
       warns.push('Changing cycle mid-period may affect current month payroll');
@@ -115,7 +101,7 @@ const SalaryCycleSettings = () => {
 
   const handleSave = async () => {
     const validation = validateCycleConfig(config);
-    
+
     if (!validation.valid) {
       setAlert({ type: 'error', message: validation.errors.join(', ') });
       return;
