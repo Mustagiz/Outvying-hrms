@@ -41,10 +41,13 @@ export const getSalaryCyclePeriod = (date, cycleConfig = DEFAULT_CYCLE_CONFIG) =
 
       // Handle cross-month cycles (e.g., 26th to 25th)
       if (endDay < startDay) {
+        const isCrossYear = month === 11;
         return {
-          startDate: toLocalISODate(new Date(year, month - 1, startDay)),
-          endDate: toLocalISODate(new Date(year, month, endDay)),
-          period: `${getMonthName((month + 11) % 12)} ${startDay}${month === 0 ? `, ${year - 1}` : ''} - ${getMonthName(month)} ${endDay}, ${year}`
+          startDate: toLocalISODate(new Date(year, month, startDay)),
+          endDate: toLocalISODate(new Date(year, month + 1, endDay)),
+          period: isCrossYear
+            ? `${getMonthName(11)} ${startDay}, ${year} - ${getMonthName(0)} ${endDay}, ${year + 1}`
+            : `${getMonthName(month)} ${startDay} - ${getMonthName(month + 1)} ${endDay}, ${year}`
         };
       }
 
