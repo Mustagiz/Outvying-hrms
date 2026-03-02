@@ -209,9 +209,9 @@ const SalaryCycleSettings = () => {
                   onChange={(e) => setConfig({ ...config, type: e.target.value })}
                   className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 >
-                  <option value={SALARY_CYCLES.MONTHLY}>Monthly (1st to Last Day)</option>
-                  <option value={SALARY_CYCLES.SEMI_MONTHLY}>Semi-Monthly (1-15, 16-End)</option>
-                  <option value={SALARY_CYCLES.BI_WEEKLY}>Bi-Weekly (Every 2 Weeks)</option>
+                  <option value={SALARY_CYCLES.MONTHLY}>Monthly</option>
+                  <option value={SALARY_CYCLES.SEMI_MONTHLY}>Semi-Monthly</option>
+                  <option value={SALARY_CYCLES.BI_WEEKLY}>Bi-Weekly</option>
                   <option value={SALARY_CYCLES.WEEKLY}>Weekly</option>
                 </select>
               </div>
