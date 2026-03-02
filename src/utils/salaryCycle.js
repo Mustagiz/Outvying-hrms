@@ -14,8 +14,8 @@ export const SALARY_CYCLES = {
 // Default cycle configuration
 export const DEFAULT_CYCLE_CONFIG = {
   type: SALARY_CYCLES.MONTHLY,
-  startDay: 1, // Day of month (1-31)
-  endDay: 'last', // 'last' or specific day
+  startDay: 26, // Day of month (1-31)
+  endDay: 25, // 'last' or specific day
   workingDaysPerMonth: 22,
   workingHoursPerDay: 9,
   overtimeMultiplier: 1.5
@@ -28,27 +28,27 @@ export const getSalaryCyclePeriod = (date, cycleConfig = DEFAULT_CYCLE_CONFIG) =
   const d = new Date(date);
   const year = d.getFullYear();
   const month = d.getMonth();
-  
+
   switch (cycleConfig.type) {
     case SALARY_CYCLES.MONTHLY:
       const startDay = cycleConfig.startDay;
       const endDay = cycleConfig.endDay === 'last' ? new Date(year, month + 1, 0).getDate() : parseInt(cycleConfig.endDay);
-      
+
       // Handle cross-month cycles (e.g., 26th to 25th)
       if (endDay < startDay) {
         return {
-          startDate: new Date(year, month, startDay).toISOString().split('T')[0],
-          endDate: new Date(year, month + 1, endDay).toISOString().split('T')[0],
-          period: `${getMonthName(month)} ${startDay} - ${getMonthName(month + 1)} ${endDay}, ${year}`
+          startDate: new Date(year, month - 1, startDay).toISOString().split('T')[0],
+          endDate: new Date(year, month, endDay).toISOString().split('T')[0],
+          period: `${getMonthName((month + 11) % 12)} ${startDay}${month === 0 ? `, ${year - 1}` : ''} - ${getMonthName(month)} ${endDay}, ${year}`
         };
       }
-      
+
       return {
         startDate: new Date(year, month, startDay).toISOString().split('T')[0],
         endDate: new Date(year, month, endDay).toISOString().split('T')[0],
         period: `${getMonthName(month)} ${year}`
       };
-      
+
     case SALARY_CYCLES.SEMI_MONTHLY:
       const day = d.getDate();
       if (day <= 15) {
@@ -64,7 +64,7 @@ export const getSalaryCyclePeriod = (date, cycleConfig = DEFAULT_CYCLE_CONFIG) =
           period: `${getMonthName(month)} 16-End, ${year}`
         };
       }
-      
+
     case SALARY_CYCLES.BI_WEEKLY:
       // Calculate bi-weekly period based on start day
       const startOfYear = new Date(year, 0, 1);
@@ -74,25 +74,25 @@ export const getSalaryCyclePeriod = (date, cycleConfig = DEFAULT_CYCLE_CONFIG) =
       periodStart.setDate(periodStart.getDate() + (weekNumber * 14));
       const periodEnd = new Date(periodStart);
       periodEnd.setDate(periodEnd.getDate() + 13);
-      
+
       return {
         startDate: periodStart.toISOString().split('T')[0],
         endDate: periodEnd.toISOString().split('T')[0],
         period: `Week ${weekNumber * 2 + 1}-${weekNumber * 2 + 2}, ${year}`
       };
-      
+
     case SALARY_CYCLES.WEEKLY:
       const startOfWeek = new Date(d);
       startOfWeek.setDate(d.getDate() - d.getDay() + 1); // Monday
       const endOfWeek = new Date(startOfWeek);
       endOfWeek.setDate(startOfWeek.getDate() + 6); // Sunday
-      
+
       return {
         startDate: startOfWeek.toISOString().split('T')[0],
         endDate: endOfWeek.toISOString().split('T')[0],
         period: `Week of ${startOfWeek.toLocaleDateString()}`
       };
-      
+
     default:
       return getSalaryCyclePeriod(date, { ...cycleConfig, type: SALARY_CYCLES.MONTHLY });
   }
@@ -105,17 +105,17 @@ export const getWorkingDaysInCycle = (startDate, endDate, holidays = [], weeklyO
   let workingDays = 0;
   const start = new Date(startDate);
   const end = new Date(endDate);
-  
+
   for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
     const dateStr = d.toISOString().split('T')[0];
     const dayOfWeek = d.getDay();
-    
+
     // Skip weekly offs and holidays
     if (!weeklyOffs.includes(dayOfWeek) && !holidays.includes(dateStr)) {
       workingDays++;
     }
   }
-  
+
   return workingDays;
 };
 
@@ -129,7 +129,7 @@ export const calculateProRataSalary = (
   cycleConfig = DEFAULT_CYCLE_CONFIG
 ) => {
   if (totalWorkingDays === 0) return 0;
-  
+
   const dailyRate = baseSalary / totalWorkingDays;
   return parseFloat((dailyRate * actualWorkingDays).toFixed(2));
 };
@@ -147,15 +147,15 @@ export const calculateMidCycleSalary = (
 ) => {
   const start = new Date(Math.max(new Date(cycleStartDate), new Date(actualStartDate)));
   const end = new Date(Math.min(new Date(cycleEndDate), new Date(actualEndDate)));
-  
+
   if (start > end) return 0;
-  
+
   const totalWorkingDays = getWorkingDaysInCycle(cycleStartDate, cycleEndDate);
   const actualWorkingDays = getWorkingDaysInCycle(
     start.toISOString().split('T')[0],
     end.toISOString().split('T')[0]
   );
-  
+
   return calculateProRataSalary(
     employee.salary || 0,
     actualWorkingDays,
@@ -182,7 +182,7 @@ export const calculateOvertimePay = (
  */
 export const getYearlySalaryCycles = (year, cycleConfig = DEFAULT_CYCLE_CONFIG) => {
   const cycles = [];
-  
+
   switch (cycleConfig.type) {
     case SALARY_CYCLES.MONTHLY:
       for (let month = 0; month < 12; month++) {
@@ -190,14 +190,14 @@ export const getYearlySalaryCycles = (year, cycleConfig = DEFAULT_CYCLE_CONFIG) 
         cycles.push(period);
       }
       break;
-      
+
     case SALARY_CYCLES.SEMI_MONTHLY:
       for (let month = 0; month < 12; month++) {
         cycles.push(getSalaryCyclePeriod(new Date(year, month, 10), cycleConfig));
         cycles.push(getSalaryCyclePeriod(new Date(year, month, 20), cycleConfig));
       }
       break;
-      
+
     case SALARY_CYCLES.BI_WEEKLY:
       const startDate = new Date(year, 0, 1);
       for (let i = 0; i < 26; i++) { // ~26 bi-weekly periods in a year
@@ -208,7 +208,7 @@ export const getYearlySalaryCycles = (year, cycleConfig = DEFAULT_CYCLE_CONFIG) 
         }
       }
       break;
-      
+
     case SALARY_CYCLES.WEEKLY:
       const weekStart = new Date(year, 0, 1);
       for (let i = 0; i < 52; i++) {
@@ -220,7 +220,7 @@ export const getYearlySalaryCycles = (year, cycleConfig = DEFAULT_CYCLE_CONFIG) 
       }
       break;
   }
-  
+
   return cycles;
 };
 
@@ -229,23 +229,23 @@ export const getYearlySalaryCycles = (year, cycleConfig = DEFAULT_CYCLE_CONFIG) 
  */
 export const validateCycleConfig = (config) => {
   const errors = [];
-  
+
   if (!Object.values(SALARY_CYCLES).includes(config.type)) {
     errors.push('Invalid cycle type');
   }
-  
+
   if (config.startDay < 1 || config.startDay > 31) {
     errors.push('Start day must be between 1 and 31');
   }
-  
+
   if (config.workingDaysPerMonth < 1 || config.workingDaysPerMonth > 31) {
     errors.push('Working days per month must be between 1 and 31');
   }
-  
+
   if (config.workingHoursPerDay < 1 || config.workingHoursPerDay > 24) {
     errors.push('Working hours per day must be between 1 and 24');
   }
-  
+
   return { valid: errors.length === 0, errors };
 };
 

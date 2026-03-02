@@ -18,12 +18,28 @@ const Payslips = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
   const [releasedPayslips, setReleasedPayslips] = useState([]);
+  const [salaryCycleConfig, setSalaryCycleConfig] = useState({ type: 'monthly', startDay: 26, endDay: 25, workingDaysPerMonth: 22 });
+  const { doc, getDoc } = require('firebase/firestore');
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'releasedPayslips'), (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setReleasedPayslips(data);
     });
+
+    const loadCycleConfig = async () => {
+      try {
+        const docRef = doc(db, 'settings', 'salaryCycle');
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          setSalaryCycleConfig(docSnap.data());
+        }
+      } catch (error) {
+        console.error('Error loading config:', error);
+      }
+    };
+    loadCycleConfig();
+
     return () => unsub();
   }, []);
   const [showPreview, setShowPreview] = useState(false);
@@ -128,20 +144,27 @@ const Payslips = () => {
     // Fetch Bank Details
     const bankDetails = allBankAccounts?.find(b => String(b.employeeId) === String(employeeId) || String(b.id) === String(employeeId)) || {};
 
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    // ... rest of working days logic ...
-    let workingDaysInMonth = 0;
-    for (let day = 1; day <= daysInMonth; day++) {
-      const date = new Date(year, month, day);
-      if (date.getDay() !== 0 && date.getDay() !== 6) workingDaysInMonth++;
+    const startDay = salaryCycleConfig?.startDay || 26;
+    const endDay = salaryCycleConfig?.endDay === 'last' ? new Date(year, month + 1, 0).getDate() : parseInt(salaryCycleConfig?.endDay || 25);
+
+    let cycleStartDate, cycleEndDate;
+    if (endDay < startDay) {
+      cycleStartDate = new Date(year, month - 1, startDay).toISOString().split('T')[0];
+      cycleEndDate = new Date(year, month, endDay).toISOString().split('T')[0];
+    } else {
+      cycleStartDate = new Date(year, month, startDay).toISOString().split('T')[0];
+      cycleEndDate = new Date(year, month, endDay).toISOString().split('T')[0];
     }
+
+    const daysInMonth = Math.round((new Date(cycleEndDate) - new Date(cycleStartDate)) / (1000 * 60 * 60 * 24)) + 1;
+    const workingDaysInMonth = salaryCycleConfig?.workingDaysPerMonth || 22;
 
     const empBaseSalary = employee?.ctc ? (employee.ctc / 12) : 50000;
     const dailyRate = empBaseSalary / workingDaysInMonth;
 
     const monthAttendance = attendance.filter(a => {
-      const date = new Date(a.date);
-      return a.employeeId === employeeId && date.getMonth() === month && date.getFullYear() === year;
+      if (!a.date) return false;
+      return a.employeeId === employeeId && a.date >= cycleStartDate && a.date <= cycleEndDate;
     });
 
     const statistics = {

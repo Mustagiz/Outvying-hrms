@@ -12,11 +12,11 @@ import {
 } from 'lucide-react';
 import Papa from 'papaparse';
 import { logAuditAction } from '../utils/auditLogger';
-import { 
-  getSalaryCyclePeriod, 
-  getWorkingDaysInCycle, 
+import {
+  getSalaryCyclePeriod,
+  getWorkingDaysInCycle,
   calculateProRataSalary,
-  calculateOvertimePay 
+  calculateOvertimePay
 } from '../utils/salaryCycle';
 
 import {
@@ -120,19 +120,25 @@ const Payroll = () => {
     if (salaryCycleConfig && salaryCycleConfig.type === 'monthly') {
       const startDay = salaryCycleConfig.startDay || 1;
       const endDay = salaryCycleConfig.endDay === 'last' ? new Date(year, monthNum + 1, 0).getDate() : parseInt(salaryCycleConfig.endDay);
-      
-      const cycleStartDate = new Date(year, monthNum, startDay).toISOString().split('T')[0];
-      const cycleEndDate = new Date(year, monthNum, endDay).toISOString().split('T')[0];
-      
+
+      let cycleStartDate, cycleEndDate;
+      if (endDay < startDay) {
+        cycleStartDate = new Date(year, monthNum - 1, startDay).toISOString().split('T')[0];
+        cycleEndDate = new Date(year, monthNum, endDay).toISOString().split('T')[0];
+      } else {
+        cycleStartDate = new Date(year, monthNum, startDay).toISOString().split('T')[0];
+        cycleEndDate = new Date(year, monthNum, endDay).toISOString().split('T')[0];
+      }
+
       // Use configured working days per month
       const totalWorkingDays = salaryCycleConfig.workingDaysPerMonth || 26;
-      
+
       // Calculate effective days from attendance within cycle period
       const records = attendance.filter(a => {
         if (!a.date) return false;
-        return String(a.employeeId) === String(empId) && 
-               a.date >= cycleStartDate && 
-               a.date <= cycleEndDate;
+        return String(a.employeeId) === String(empId) &&
+          a.date >= cycleStartDate &&
+          a.date <= cycleEndDate;
       });
 
       const effectiveDays = records.reduce((sum, rec) => {
@@ -142,9 +148,9 @@ const Payroll = () => {
         return sum;
       }, 0);
 
-      return { 
-        effectiveDays, 
-        totalDays: totalWorkingDays, 
+      return {
+        effectiveDays,
+        totalDays: totalWorkingDays,
         recordCount: records.length,
         cycleStart: cycleStartDate,
         cycleEnd: cycleEndDate
