@@ -132,8 +132,8 @@ const Payroll = () => {
         cycleEndDate = toLocalISODate(new Date(year, monthNum, endDay));
       }
 
-      // Use configured working days per month
-      const totalWorkingDays = salaryCycleConfig.workingDaysPerMonth || 26;
+      // Use configured working days per month dynamically
+      const totalWorkingDays = getWorkingDaysInCycle(cycleStartDate, cycleEndDate);
 
       // Calculate effective days from attendance within cycle period
       const records = attendance.filter(a => {

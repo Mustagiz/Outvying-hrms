@@ -7,6 +7,7 @@ import { getYearOptions } from '../utils/helpers';
 import { logAuditAction } from '../utils/auditLogger';
 import { db } from '../config/firebase';
 import { collection, addDoc, onSnapshot, query, where, serverTimestamp } from 'firebase/firestore';
+import { getWorkingDaysInCycle } from '../utils/salaryCycle';
 
 
 const Payslips = () => {
@@ -159,7 +160,7 @@ const Payslips = () => {
     }
 
     const daysInMonth = Math.round((new Date(cycleEndDate) - new Date(cycleStartDate)) / (1000 * 60 * 60 * 24)) + 1;
-    const workingDaysInMonth = salaryCycleConfig?.workingDaysPerMonth || 22;
+    const workingDaysInMonth = getWorkingDaysInCycle(cycleStartDate, cycleEndDate);
 
     const empBaseSalary = employee?.ctc ? (employee.ctc / 12) : 50000;
     const dailyRate = empBaseSalary / workingDaysInMonth;
