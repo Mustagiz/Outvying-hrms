@@ -111,15 +111,22 @@ export const getSalaryCyclePeriod = (date, cycleConfig = DEFAULT_CYCLE_CONFIG) =
  */
 export const getWorkingDaysInCycle = (startDate, endDate, holidays = [], weeklyOffs = [0, 6]) => {
   let workingDays = 0;
-  const start = new Date(startDate);
-  const end = new Date(endDate);
+
+  // Safely parse "YYYY-MM-DD" natively in local time
+  const [sYear, sMonth, sDay] = startDate.split('-').map(Number);
+  const [eYear, eMonth, eDay] = endDate.split('-').map(Number);
+
+  const start = new Date(sYear, sMonth - 1, sDay);
+  const end = new Date(eYear, eMonth - 1, eDay);
 
   for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-    const dateStr = d.toISOString().split('T')[0];
+    // Reconstruct YYYY-MM-DD from local date
+    const pad = n => String(n).padStart(2, '0');
+    const localDateStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
     const dayOfWeek = d.getDay();
 
     // Skip weekly offs and holidays
-    if (!weeklyOffs.includes(dayOfWeek) && !holidays.includes(dateStr)) {
+    if (!weeklyOffs.includes(dayOfWeek) && !holidays.includes(localDateStr)) {
       workingDays++;
     }
   }
