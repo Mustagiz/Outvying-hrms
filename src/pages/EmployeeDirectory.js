@@ -13,6 +13,8 @@ import html2canvas from 'html2canvas';
 
 const EmployeeDirectory = () => {
   const { allUsers, currentUser, updateUser, deleteUser } = useAuth();
+
+  const canEdit = ['admin', 'hr', 'super_admin'].includes((currentUser.role || '').toLowerCase());
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState('all');
   const [selectedEmployee, setSelectedEmployee] = useState(null);
@@ -187,7 +189,7 @@ const EmployeeDirectory = () => {
           <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${row.status === 'Active' && !row.isDeleted ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
             {row.status === 'Active' && !row.isDeleted ? 'Active' : 'Deactive'}
           </span>
-          {(currentUser.role === 'Admin' || currentUser.role === 'admin') && (
+          {canEdit && (
             <button
               onClick={async () => {
                 const isCurrentlyActive = row.status === 'Active' && !row.isDeleted;
@@ -234,7 +236,7 @@ const EmployeeDirectory = () => {
           >
             View Details
           </Button>
-          {(currentUser.role === 'Admin' || currentUser.role === 'admin') && (
+          {canEdit && (
             <Button
               onClick={() => {
                 setSelectedEmployee(row);
@@ -248,7 +250,7 @@ const EmployeeDirectory = () => {
               <Edit2 size={14} className="inline mr-1" />Edit
             </Button>
           )}
-          {(currentUser.role === 'Admin' || currentUser.role === 'admin') && (
+          {canEdit && (
             <Button
               onClick={async () => {
                 if (window.confirm(`Are you sure you want to delete ${row.name}? This action cannot be undone.`)) {
@@ -481,7 +483,7 @@ const EmployeeDirectory = () => {
                   <p className="text-sm text-gray-800 dark:text-white">{selectedEmployee.emergencyContact}</p>
                 </div>
 
-                {(currentUser.role === 'Admin' || currentUser.role === 'admin') && (
+                {canEdit && (
                   <div className="flex justify-end pt-4 border-t">
                     <Button onClick={() => setIsEditing(true)} variant="primary">
                       <Edit2 size={16} className="inline mr-2" />Edit Employee
