@@ -143,12 +143,11 @@ const Payroll = () => {
           a.date <= cycleEndDate;
       });
 
-      const effectiveDays = records.reduce((sum, rec) => {
-        if (rec.status === 'Present') return sum + 1;
-        if (rec.status === 'Late') return sum + 1;
-        if (rec.status === 'Half Day') return sum + 0.5;
-        return sum;
-      }, 0);
+      const lwpDays = records.filter(a => a.status === 'LWP' || a.status === 'Absent').length;
+      const halfDays = records.filter(a => a.status === 'Half Day').length;
+      const penaltyDays = lwpDays + (halfDays * 0.5);
+
+      const effectiveDays = Math.max(0, totalWorkingDays - penaltyDays);
 
       return {
         effectiveDays,
@@ -176,12 +175,11 @@ const Payroll = () => {
       return String(a.employeeId) === String(empId) && d.getMonth() === monthNum && d.getFullYear() === year;
     });
 
-    const effectiveDays = records.reduce((sum, rec) => {
-      if (rec.status === 'Present') return sum + 1;
-      if (rec.status === 'Late') return sum + 1;
-      if (rec.status === 'Half Day') return sum + 0.5;
-      return sum;
-    }, 0);
+    const lwpDays = records.filter(a => a.status === 'LWP' || a.status === 'Absent').length;
+    const halfDays = records.filter(a => a.status === 'Half Day').length;
+    const penaltyDays = lwpDays + (halfDays * 0.5);
+
+    const effectiveDays = Math.max(0, totalWorkingDays - penaltyDays);
 
     return { effectiveDays, totalDays: totalWorkingDays, recordCount: records.length };
   };

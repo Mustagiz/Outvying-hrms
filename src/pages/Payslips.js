@@ -170,17 +170,20 @@ const Payslips = () => {
       return a.employeeId === employeeId && a.date >= cycleStartDate && a.date <= cycleEndDate;
     });
 
+    const lwpDays = monthAttendance.filter(a => a.status === 'LWP' || a.status === 'Absent').length;
+    const halfDays = monthAttendance.filter(a => a.status === 'Half Day').length;
+    const penaltyDays = lwpDays + (halfDays * 0.5);
+
+    // Exception-based effective days (assume working all working days, subtract absences)
+    const effectiveDays = Math.max(0, workingDaysInMonth - penaltyDays);
+
     const statistics = {
-      effectiveDays: monthAttendance.reduce((sum, rec) => {
-        if (rec.status === 'Present' || rec.status === 'Late') return sum + 1;
-        if (rec.status === 'Half Day') return sum + 0.5;
-        return sum;
-      }, 0),
+      effectiveDays: effectiveDays,
       totalDays: workingDaysInMonth
     };
 
-    // Use common pro-ratio (default to 1 if no attendance data)
-    const ratio = monthAttendance.length > 0 ? (statistics.effectiveDays / statistics.totalDays) : 1;
+    // Use common pro-ratio
+    const ratio = statistics.effectiveDays / statistics.totalDays;
 
     // Map components from central template
     const template = payrollSettings?.template || { basic: 40, hra: 16 };
