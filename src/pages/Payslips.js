@@ -179,8 +179,8 @@ const Payslips = () => {
       totalDays: workingDaysInMonth
     };
 
-    // Use common pro-ratio
-    const ratio = statistics.effectiveDays / statistics.totalDays;
+    // Use common pro-ratio (default to 1 if no attendance data)
+    const ratio = monthAttendance.length > 0 ? (statistics.effectiveDays / statistics.totalDays) : 1;
 
     // Map components from central template
     const template = payrollSettings?.template || { basic: 40, hra: 16 };
