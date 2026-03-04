@@ -137,9 +137,9 @@ const Payslips = () => {
   };
 
   const calculatePayslip = (employeeId, month, year) => {
-    const employee = allUsers.find(u => u.id === employeeId);
+    const employee = allUsers.find(u => String(u.id) === String(employeeId));
     const releaseInfo = releasedPayslips.find(p =>
-      p.month === month && p.year === year && (p.employeeId === employeeId || p.allReleased)
+      p.month === month && p.year === year && (String(p.employeeId) === String(employeeId) || p.allReleased)
     );
 
     // Fetch Bank Details
@@ -284,7 +284,7 @@ const Payslips = () => {
   const currentPayslip = useMemo(() => {
     const empId = currentUser.role === 'employee' ? currentUser.id : selectedEmployee;
     return calculatePayslip(empId, selectedMonth, selectedYear);
-  }, [selectedEmployee, selectedMonth, selectedYear, attendance, currentUser, releasedPayslips, payrollSettings, allBankAccounts]);
+  }, [selectedEmployee, selectedMonth, selectedYear, attendance, currentUser, releasedPayslips, payrollSettings, allBankAccounts, allUsers]);
 
   const downloadPDF = (payslipData) => {
     if (!canViewPayslip(payslipData.month, payslipData.year)) {
