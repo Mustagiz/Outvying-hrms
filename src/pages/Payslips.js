@@ -165,6 +165,29 @@ const Payslips = () => {
     const empBaseSalary = employee?.ctc ? (employee.ctc / 12) : 50000;
     const dailyRate = empBaseSalary / workingDaysInMonth;
 
+    let activeCycleStartDate = cycleStartDate;
+    if (employee?.dateOfJoining && employee.dateOfJoining > activeCycleStartDate) {
+      if (employee.dateOfJoining <= cycleEndDate) {
+        activeCycleStartDate = employee.dateOfJoining;
+      } else {
+        activeCycleStartDate = null;
+      }
+    }
+
+    let activeCycleEndDate = cycleEndDate;
+    if (employee?.status?.toLowerCase() === 'exited' && employee?.lastWorkingDay && employee.lastWorkingDay < activeCycleEndDate) {
+      if (employee.lastWorkingDay >= cycleStartDate) {
+        activeCycleEndDate = employee.lastWorkingDay;
+      } else {
+        activeCycleEndDate = null;
+      }
+    }
+
+    let applicableWorkingDays = 0;
+    if (activeCycleStartDate && activeCycleEndDate && activeCycleStartDate <= activeCycleEndDate) {
+      applicableWorkingDays = getWorkingDaysInCycle(activeCycleStartDate, activeCycleEndDate);
+    }
+
     const monthAttendance = attendance.filter(a => {
       if (!a.date) return false;
       return String(a.employeeId) === String(employeeId) && a.date >= cycleStartDate && a.date <= cycleEndDate;
@@ -174,8 +197,8 @@ const Payslips = () => {
     const halfDays = monthAttendance.filter(a => a.status === 'Half Day').length;
     const penaltyDays = lwpDays + (halfDays * 0.5);
 
-    // Exception-based effective days (assume working all working days, subtract absences)
-    const effectiveDays = Math.max(0, workingDaysInMonth - penaltyDays);
+    // Exception-based effective days (start with the days they were ACTUALLY employed in this cycle, then subtract absences)
+    const effectiveDays = Math.max(0, applicableWorkingDays - penaltyDays);
 
     const statistics = {
       effectiveDays: effectiveDays,

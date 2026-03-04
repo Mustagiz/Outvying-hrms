@@ -132,6 +132,30 @@ const Payroll = () => {
         cycleEndDate = toLocalISODate(new Date(year, monthNum, endDay));
       }
 
+      const employee = allUsers.find(u => String(u.id) === String(empId));
+      let activeCycleStartDate = cycleStartDate;
+      if (employee?.dateOfJoining && employee.dateOfJoining > activeCycleStartDate) {
+        if (employee.dateOfJoining <= cycleEndDate) {
+          activeCycleStartDate = employee.dateOfJoining;
+        } else {
+          activeCycleStartDate = null;
+        }
+      }
+
+      let activeCycleEndDate = cycleEndDate;
+      if (employee?.status?.toLowerCase() === 'exited' && employee?.lastWorkingDay && employee.lastWorkingDay < activeCycleEndDate) {
+        if (employee.lastWorkingDay >= cycleStartDate) {
+          activeCycleEndDate = employee.lastWorkingDay;
+        } else {
+          activeCycleEndDate = null;
+        }
+      }
+
+      let applicableWorkingDays = 0;
+      if (activeCycleStartDate && activeCycleEndDate && activeCycleStartDate <= activeCycleEndDate) {
+        applicableWorkingDays = getWorkingDaysInCycle(activeCycleStartDate, activeCycleEndDate);
+      }
+
       // Use configured working days per month dynamically
       const totalWorkingDays = getWorkingDaysInCycle(cycleStartDate, cycleEndDate);
 
@@ -147,7 +171,7 @@ const Payroll = () => {
       const halfDays = records.filter(a => a.status === 'Half Day').length;
       const penaltyDays = lwpDays + (halfDays * 0.5);
 
-      const effectiveDays = Math.max(0, totalWorkingDays - penaltyDays);
+      const effectiveDays = Math.max(0, applicableWorkingDays - penaltyDays);
 
       return {
         effectiveDays,
@@ -175,11 +199,37 @@ const Payroll = () => {
       return String(a.employeeId) === String(empId) && d.getMonth() === monthNum && d.getFullYear() === year;
     });
 
+    const employee = allUsers.find(u => String(u.id) === String(empId));
+    let applicableWorkingDaysFallback = totalWorkingDays;
+    // Fallback prorating logic using simple calendar days could be added here,
+    // but typically DOJ is more critical for the primary cycles. We'll add it for completeness.
+    if (employee?.dateOfJoining || employee?.lastWorkingDay) {
+      // Just rough approximation if not using cycle logic
+      const cycleStartStr = `${year}-${String(monthNum + 1).padStart(2, '0')}-01`;
+      const cycleEndStr = `${year}-${String(monthNum + 1).padStart(2, '0')}-${String(daysInMonth).padStart(2, '0')}`;
+
+      let activeStart = cycleStartStr;
+      if (employee?.dateOfJoining && employee.dateOfJoining > activeStart) {
+        activeStart = employee.dateOfJoining <= cycleEndStr ? employee.dateOfJoining : null;
+      }
+
+      let activeEnd = cycleEndStr;
+      if (employee?.status?.toLowerCase() === 'exited' && employee?.lastWorkingDay && employee.lastWorkingDay < activeEnd) {
+        activeEnd = employee.lastWorkingDay >= cycleStartStr ? employee.lastWorkingDay : null;
+      }
+
+      if (activeStart && activeEnd && activeStart <= activeEnd) {
+        applicableWorkingDaysFallback = getWorkingDaysInCycle(activeStart, activeEnd);
+      } else {
+        applicableWorkingDaysFallback = 0;
+      }
+    }
+
     const lwpDays = records.filter(a => a.status === 'LWP' || a.status === 'Absent').length;
     const halfDays = records.filter(a => a.status === 'Half Day').length;
     const penaltyDays = lwpDays + (halfDays * 0.5);
 
-    const effectiveDays = Math.max(0, totalWorkingDays - penaltyDays);
+    const effectiveDays = Math.max(0, applicableWorkingDaysFallback - penaltyDays);
 
     return { effectiveDays, totalDays: totalWorkingDays, recordCount: records.length };
   };
