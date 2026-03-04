@@ -152,8 +152,12 @@ const Payslips = () => {
 
     let cycleStartDate, cycleEndDate;
     if (endDay < startDay) {
-      cycleStartDate = toLocalISODate(new Date(year, month, startDay));
-      cycleEndDate = toLocalISODate(new Date(year, month + 1, endDay));
+      if (month === 0) {
+        cycleStartDate = toLocalISODate(new Date(year - 1, 11, startDay)); // Dec of prev year
+      } else {
+        cycleStartDate = toLocalISODate(new Date(year, month - 1, startDay));
+      }
+      cycleEndDate = toLocalISODate(new Date(year, month, endDay));
     } else {
       cycleStartDate = toLocalISODate(new Date(year, month, startDay));
       cycleEndDate = toLocalISODate(new Date(year, month, endDay));

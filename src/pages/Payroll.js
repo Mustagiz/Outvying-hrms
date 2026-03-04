@@ -125,8 +125,12 @@ const Payroll = () => {
 
       let cycleStartDate, cycleEndDate;
       if (endDay < startDay) {
-        cycleStartDate = toLocalISODate(new Date(year, monthNum, startDay));
-        cycleEndDate = toLocalISODate(new Date(year, monthNum + 1, endDay));
+        if (monthNum === 0) {
+          cycleStartDate = toLocalISODate(new Date(year - 1, 11, startDay));
+        } else {
+          cycleStartDate = toLocalISODate(new Date(year, monthNum - 1, startDay));
+        }
+        cycleEndDate = toLocalISODate(new Date(year, monthNum, endDay));
       } else {
         cycleStartDate = toLocalISODate(new Date(year, monthNum, startDay));
         cycleEndDate = toLocalISODate(new Date(year, monthNum, endDay));
