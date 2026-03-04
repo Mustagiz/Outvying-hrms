@@ -171,6 +171,15 @@ const Payslips = () => {
 
     let activeCycleStartDate = cycleStartDate;
     const doj = normalizeToISODate(employee?.dateOfJoining);
+    console.log('[PAYSLIP DEBUG]', {
+      employeeId,
+      name: employee?.name,
+      rawDOJ: employee?.dateOfJoining,
+      normalizedDOJ: doj,
+      cycleStartDate,
+      cycleEndDate,
+      dojIsAfterCycleEnd: doj > cycleEndDate
+    });
     if (doj && doj > activeCycleStartDate) {
       if (doj <= cycleEndDate) {
         activeCycleStartDate = doj;
