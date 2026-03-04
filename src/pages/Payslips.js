@@ -167,7 +167,7 @@ const Payslips = () => {
 
     const monthAttendance = attendance.filter(a => {
       if (!a.date) return false;
-      return a.employeeId === employeeId && a.date >= cycleStartDate && a.date <= cycleEndDate;
+      return String(a.employeeId) === String(employeeId) && a.date >= cycleStartDate && a.date <= cycleEndDate;
     });
 
     const lwpDays = monthAttendance.filter(a => a.status === 'LWP' || a.status === 'Absent').length;
@@ -186,7 +186,7 @@ const Payslips = () => {
     const ratio = statistics.effectiveDays / statistics.totalDays;
 
     // Map components from central template
-    const template = payrollSettings?.template || { basic: 40, hra: 16 };
+    const template = payrollSettings?.template || { basic: 50, hra: 20, conveyance: 10, other: 20 };
     let grossEarningsFull = 0;
     let grossEarningsActual = 0;
 
