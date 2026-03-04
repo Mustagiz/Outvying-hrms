@@ -415,6 +415,10 @@ const Attendance = () => {
     const role = (currentUser.role || '').toLowerCase();
     const teamUserIds = new Set();
     allUsers.forEach(u => {
+      // Skip deleted or deactivated employees
+      if (u.isDeleted) return;
+      if (u.status && ['exited', 'inactive', 'deactivated'].includes(u.status.toLowerCase())) return;
+
       const isSelf = String(u.id) === String(currentUser.id);
       const isReport = role === 'manager' && (u.reportingTo || '').toLowerCase().trim() === (currentUser.name || '').toLowerCase().trim();
 
@@ -658,14 +662,18 @@ const Attendance = () => {
   const employeeOptions = [
     { value: 'all', label: 'All Employees' },
     ...allUsers.filter(u => {
+      // Exclude deleted or deactivated/exited employees
+      if (u.isDeleted) return false;
+      if (u.status && ['exited', 'inactive', 'deactivated'].includes(u.status.toLowerCase())) return false;
+
       const role = (currentUser.role || '').toLowerCase();
       if (role === 'manager') {
         // Show direct reports + self
         return (u.reportingTo || '').toLowerCase() === (currentUser.name || '').toLowerCase() || String(u.id) === String(currentUser.id);
       }
-      // Admins/HR see everyone with an employee role (or all registered if needed, but keeping existing filter)
-      return true;
-    }).map(u => ({ value: String(u.id), label: u.name }))
+      // Admins/HR see active employee-role users only
+      return u.role === 'employee' || u.role === 'hr' || u.role === 'manager';
+    }).map(u => ({ value: String(u.id), label: `${u.name} (${u.employeeId || u.id})` }))
   ];
   const statusOptions = [
     { value: 'all', label: 'All Status' },
