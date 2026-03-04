@@ -16,7 +16,8 @@ import {
   getSalaryCyclePeriod,
   getWorkingDaysInCycle,
   calculateProRataSalary,
-  calculateOvertimePay
+  calculateOvertimePay,
+  normalizeToISODate
 } from '../utils/salaryCycle';
 
 import {
@@ -138,18 +139,20 @@ const Payroll = () => {
 
       const employee = allUsers.find(u => String(u.id) === String(empId));
       let activeCycleStartDate = cycleStartDate;
-      if (employee?.dateOfJoining && employee.dateOfJoining > activeCycleStartDate) {
-        if (employee.dateOfJoining <= cycleEndDate) {
-          activeCycleStartDate = employee.dateOfJoining;
+      const doj = normalizeToISODate(employee?.dateOfJoining);
+      if (doj && doj > activeCycleStartDate) {
+        if (doj <= cycleEndDate) {
+          activeCycleStartDate = doj;
         } else {
           activeCycleStartDate = null;
         }
       }
 
       let activeCycleEndDate = cycleEndDate;
-      if (employee?.status?.toLowerCase() === 'exited' && employee?.lastWorkingDay && employee.lastWorkingDay < activeCycleEndDate) {
-        if (employee.lastWorkingDay >= cycleStartDate) {
-          activeCycleEndDate = employee.lastWorkingDay;
+      const lwd = normalizeToISODate(employee?.lastWorkingDay);
+      if (employee?.status?.toLowerCase() === 'exited' && lwd && lwd < activeCycleEndDate) {
+        if (lwd >= cycleStartDate) {
+          activeCycleEndDate = lwd;
         } else {
           activeCycleEndDate = null;
         }
@@ -213,13 +216,15 @@ const Payroll = () => {
       const cycleEndStr = `${year}-${String(monthNum + 1).padStart(2, '0')}-${String(daysInMonth).padStart(2, '0')}`;
 
       let activeStart = cycleStartStr;
-      if (employee?.dateOfJoining && employee.dateOfJoining > activeStart) {
-        activeStart = employee.dateOfJoining <= cycleEndStr ? employee.dateOfJoining : null;
+      const doj = normalizeToISODate(employee?.dateOfJoining);
+      if (doj && doj > activeStart) {
+        activeStart = doj <= cycleEndStr ? doj : null;
       }
 
       let activeEnd = cycleEndStr;
-      if (employee?.status?.toLowerCase() === 'exited' && employee?.lastWorkingDay && employee.lastWorkingDay < activeEnd) {
-        activeEnd = employee.lastWorkingDay >= cycleStartStr ? employee.lastWorkingDay : null;
+      const lwd = normalizeToISODate(employee?.lastWorkingDay);
+      if (employee?.status?.toLowerCase() === 'exited' && lwd && lwd < activeEnd) {
+        activeEnd = lwd >= cycleStartStr ? lwd : null;
       }
 
       if (activeStart && activeEnd && activeStart <= activeEnd) {

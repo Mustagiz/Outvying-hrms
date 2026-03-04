@@ -22,8 +22,38 @@ export const DEFAULT_CYCLE_CONFIG = {
 };
 
 export const toLocalISODate = (d) => {
+  if (!d) return null;
   const pad = n => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
+
+/**
+ * Normalizes various date formats (DD-MM-YYYY, YYYY-MM-DD, objects) to YYYY-MM-DD
+ */
+export const normalizeToISODate = (dateInput) => {
+  if (!dateInput) return null;
+  if (dateInput instanceof Date) return toLocalISODate(dateInput);
+
+  const dateStr = String(dateInput).trim();
+  if (!dateStr) return null;
+
+  // Pattern YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) return dateStr.substring(0, 10);
+
+  // Pattern DD-MM-YYYY or DD/MM/YYYY
+  const dmYMatch = dateStr.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+  if (dmYMatch) {
+    const [_, d, m, y] = dmYMatch;
+    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+  }
+
+  // Fallback to standard JS parsing if possible
+  try {
+    const d = new Date(dateStr);
+    if (!isNaN(d.getTime())) return toLocalISODate(d);
+  } catch (e) { }
+
+  return dateStr; // Return as is if all fails
 };
 
 /**

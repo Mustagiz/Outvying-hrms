@@ -7,7 +7,7 @@ import { getYearOptions } from '../utils/helpers';
 import { logAuditAction } from '../utils/auditLogger';
 import { db } from '../config/firebase';
 import { collection, addDoc, onSnapshot, query, where, serverTimestamp } from 'firebase/firestore';
-import { getWorkingDaysInCycle } from '../utils/salaryCycle';
+import { getWorkingDaysInCycle, normalizeToISODate } from '../utils/salaryCycle';
 
 
 const Payslips = () => {
@@ -170,18 +170,20 @@ const Payslips = () => {
     const dailyRate = empBaseSalary / workingDaysInMonth;
 
     let activeCycleStartDate = cycleStartDate;
-    if (employee?.dateOfJoining && employee.dateOfJoining > activeCycleStartDate) {
-      if (employee.dateOfJoining <= cycleEndDate) {
-        activeCycleStartDate = employee.dateOfJoining;
+    const doj = normalizeToISODate(employee?.dateOfJoining);
+    if (doj && doj > activeCycleStartDate) {
+      if (doj <= cycleEndDate) {
+        activeCycleStartDate = doj;
       } else {
         activeCycleStartDate = null;
       }
     }
 
     let activeCycleEndDate = cycleEndDate;
-    if (employee?.status?.toLowerCase() === 'exited' && employee?.lastWorkingDay && employee.lastWorkingDay < activeCycleEndDate) {
-      if (employee.lastWorkingDay >= cycleStartDate) {
-        activeCycleEndDate = employee.lastWorkingDay;
+    const lwd = normalizeToISODate(employee?.lastWorkingDay);
+    if (employee?.status?.toLowerCase() === 'exited' && lwd && lwd < activeCycleEndDate) {
+      if (lwd >= cycleStartDate) {
+        activeCycleEndDate = lwd;
       } else {
         activeCycleEndDate = null;
       }
