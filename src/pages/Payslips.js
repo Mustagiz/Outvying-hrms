@@ -208,12 +208,16 @@ const Payslips = () => {
       return String(a.employeeId) === String(employeeId) && a.date >= cycleStartDate && a.date <= cycleEndDate;
     });
 
-    const lwpDays = monthAttendance.filter(a => a.status === 'LWP' || a.status === 'Absent').length;
-    const halfDays = monthAttendance.filter(a => a.status === 'Half Day').length;
-    const penaltyDays = lwpDays + (halfDays * 0.5);
-
-    // Exception-based effective days (start with the days they were ACTUALLY employed in this cycle, then subtract absences)
-    const effectiveDays = Math.max(0, applicableWorkingDays - penaltyDays);
+    let effectiveDays;
+    if (monthAttendance.length === 0) {
+      // No attendance records → assume full applicable days (exception-based fallback)
+      effectiveDays = applicableWorkingDays;
+    } else {
+      // Attendance records exist → calculate from actual records
+      const presentDays = monthAttendance.filter(a => a.status === 'Present' || a.status === 'Late' || a.status === 'On Duty').length;
+      const halfDayCount = monthAttendance.filter(a => a.status === 'Half Day').length;
+      effectiveDays = Math.min(presentDays + (halfDayCount * 0.5), applicableWorkingDays);
+    }
 
     const statistics = {
       effectiveDays: effectiveDays,

@@ -28,10 +28,21 @@ export const toLocalISODate = (d) => {
 };
 
 /**
- * Normalizes various date formats (DD-MM-YYYY, YYYY-MM-DD, objects) to YYYY-MM-DD
+ * Normalizes various date formats (DD-MM-YYYY, YYYY-MM-DD, Firestore Timestamp, objects) to YYYY-MM-DD
  */
 export const normalizeToISODate = (dateInput) => {
   if (!dateInput) return null;
+
+  // Handle Firestore Timestamps (has .toDate() method)
+  if (typeof dateInput === 'object' && typeof dateInput.toDate === 'function') {
+    return toLocalISODate(dateInput.toDate());
+  }
+
+  // Handle Firestore Timestamps (has .seconds field)
+  if (typeof dateInput === 'object' && dateInput.seconds !== undefined) {
+    return toLocalISODate(new Date(dateInput.seconds * 1000));
+  }
+
   if (dateInput instanceof Date) return toLocalISODate(dateInput);
 
   const dateStr = String(dateInput).trim();
@@ -53,7 +64,7 @@ export const normalizeToISODate = (dateInput) => {
     if (!isNaN(d.getTime())) return toLocalISODate(d);
   } catch (e) { }
 
-  return dateStr; // Return as is if all fails
+  return null; // Return null if all fails to prevent bad comparisons
 };
 
 /**
